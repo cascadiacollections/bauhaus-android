@@ -33,7 +33,11 @@ import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 
 /**
- * Main (and only) screen — shows today's bauhaus artwork and wallpaper controls.
+ * Stateless settings screen — accepts [UiState] and event callbacks directly.
+ *
+ * Keeping state out of this composable makes it straightforward to test: callers
+ * (and tests) supply a fixed [UiState] snapshot and capture callbacks to verify
+ * interactions without standing up a real [BauhausViewModel].
  *
  * ## Layout
  *
@@ -48,11 +52,12 @@ import com.cascadiacollections.bauhaus.data.WallpaperTarget
  */
 @Composable
 fun SettingsScreen(
-    viewModel: BauhausViewModel,
+    uiState: UiState,
+    onWallpaperTargetChange: (WallpaperTarget) -> Unit,
+    onSchedulingToggle: (Boolean) -> Unit,
+    onSetWallpaperNow: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -99,7 +104,7 @@ fun SettingsScreen(
             WallpaperTarget.entries.forEachIndexed { index, target ->
                 SegmentedButton(
                     selected = uiState.wallpaperTarget == target,
-                    onClick = { viewModel.setWallpaperTarget(target) },
+                    onClick = { onWallpaperTargetChange(target) },
                     shape = SegmentedButtonDefaults.itemShape(
                         index = index,
                         count = WallpaperTarget.entries.size,
@@ -122,7 +127,7 @@ fun SettingsScreen(
             )
             Switch(
                 checked = uiState.schedulingEnabled,
-                onCheckedChange = { viewModel.setSchedulingEnabled(it) },
+                onCheckedChange = onSchedulingToggle,
             )
         }
 
@@ -138,7 +143,7 @@ fun SettingsScreen(
 
         // -- Set wallpaper now --
         Button(
-            onClick = { viewModel.setWallpaperNow() },
+            onClick = onSetWallpaperNow,
             modifier = Modifier.fillMaxWidth(),
             enabled = !uiState.isSettingWallpaper,
         ) {
@@ -160,4 +165,23 @@ fun SettingsScreen(
             )
         }
     }
+}
+
+/**
+ * Convenience overload that wires a [BauhausViewModel] into the stateless
+ * [SettingsScreen]. Used by [com.cascadiacollections.bauhaus.MainActivity].
+ */
+@Composable
+fun SettingsScreen(
+    viewModel: BauhausViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    SettingsScreen(
+        uiState = uiState,
+        onWallpaperTargetChange = viewModel::setWallpaperTarget,
+        onSchedulingToggle = viewModel::setSchedulingEnabled,
+        onSetWallpaperNow = viewModel::setWallpaperNow,
+        modifier = modifier,
+    )
 }
