@@ -25,6 +25,7 @@ android {
 
 dependencies {
     implementation(libs.androidx.junit)
+    implementation(libs.androidx.test.runner)
     implementation(libs.benchmark.macro.junit4)
     implementation(libs.androidx.test.uiautomator)
 }
