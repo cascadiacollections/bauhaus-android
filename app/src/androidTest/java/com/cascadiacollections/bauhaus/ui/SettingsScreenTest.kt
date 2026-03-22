@@ -2,21 +2,23 @@ package com.cascadiacollections.bauhaus.ui
 
 import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.isToggleable
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNode
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -36,6 +38,11 @@ class SettingsScreenTest {
 
     private val defaultState = UiState()
 
+    /** Resolves a string resource from the app under test at runtime, ensuring
+     *  tests are not coupled to any particular English copy. */
+    private fun getString(resId: Int): String =
+        InstrumentationRegistry.getInstrumentation().targetContext.getString(resId)
+
     companion object {
         private const val TEST_ERROR_MESSAGE = "Failed to set wallpaper"
         private val TEST_METADATA = ArtworkMetadata(
@@ -48,8 +55,8 @@ class SettingsScreenTest {
 
     /**
      * The artwork preview card must always be present in the composition.
-     * The [AsyncImage] uses a fixed content description that is findable even
-     * before the image finishes loading.
+     * The node is located by its semantic testTag so the test is not coupled
+     * to the locale-specific content description text.
      */
     @Test
     fun settingsScreen_artworkPreview_isDisplayed() {
@@ -63,7 +70,7 @@ class SettingsScreenTest {
         }
 
         composeTestRule
-            .onNodeWithContentDescription("Today's artwork")
+            .onNodeWithTag(SettingsScreenTestTags.ARTWORK_PREVIEW)
             .assertIsDisplayed()
     }
 
@@ -115,6 +122,8 @@ class SettingsScreenTest {
 
     /**
      * The daily-updates switch must reflect the [UiState.schedulingEnabled] flag.
+     * The node is located by its semantic testTag to avoid ambiguity with the
+     * segmented buttons, which are also toggleable.
      */
     @Test
     fun settingsScreen_dailyUpdatesSwitch_reflectsSchedulingState() {
@@ -127,7 +136,7 @@ class SettingsScreenTest {
             )
         }
 
-        composeTestRule.onNode(isToggleable()).assertIsOff()
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.DAILY_UPDATES_SWITCH).assertIsOff()
     }
 
     /**
@@ -147,17 +156,18 @@ class SettingsScreenTest {
             )
         }
 
-        composeTestRule.onNode(isToggleable()).assertIsOn()
-        composeTestRule.onNode(isToggleable()).performClick()
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.DAILY_UPDATES_SWITCH).assertIsOn()
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.DAILY_UPDATES_SWITCH).performClick()
 
+        assertNotNull("onSchedulingToggle callback should have been invoked", capturedEnabled)
         assertFalse("Callback should be called with false when toggling off", capturedEnabled!!)
     }
 
     // ── Test 4: Set Now button – loading state ────────────────────────────────
 
     /**
-     * While [UiState.isSettingWallpaper] is `true` the button text must be
-     * replaced by the loading indicator and the button must be disabled.
+     * While [UiState.isSettingWallpaper] is `true` the button must be disabled
+     * and its text label must be replaced by the loading indicator.
      */
     @Test
     fun settingsScreen_setNowButton_showsLoadingStateWhenSettingWallpaper() {
@@ -170,12 +180,15 @@ class SettingsScreenTest {
             )
         }
 
-        // Button label is hidden while the loading indicator is shown
-        composeTestRule.onNodeWithText("Set Wallpaper Now").assertDoesNotExist()
+        // Button is present but disabled while loading
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.SET_NOW_BUTTON).assertIsNotEnabled()
+        // The text label is replaced by a CircularProgressIndicator
+        composeTestRule.onNodeWithText(getString(R.string.set_now)).assertDoesNotExist()
     }
 
     /**
-     * When not loading the "Set Wallpaper Now" button must be visible and enabled.
+     * When not loading the "Set Wallpaper Now" button must be visible, enabled,
+     * and invoke the callback on click.
      */
     @Test
     fun settingsScreen_setNowButton_isEnabledWhenNotLoading() {
@@ -190,9 +203,8 @@ class SettingsScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Set Wallpaper Now")
-            .assertIsDisplayed()
-            .performClick()
+        composeTestRule.onNodeWithText(getString(R.string.set_now)).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.SET_NOW_BUTTON).performClick()
 
         assertTrue("onSetWallpaperNow callback should be invoked on button click", callbackInvoked)
     }

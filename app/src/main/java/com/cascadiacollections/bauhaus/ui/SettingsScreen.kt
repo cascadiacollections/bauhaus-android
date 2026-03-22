@@ -27,10 +27,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
+
+/**
+ * Semantic test tags for nodes in [SettingsScreen].
+ *
+ * Keeping tags here (in main source) lets both the production composable and
+ * the instrumented tests reference the same constants without duplicating
+ * strings, and without a test-only dependency on the test sources.
+ */
+object SettingsScreenTestTags {
+    const val ARTWORK_PREVIEW = "artwork_preview"
+    const val DAILY_UPDATES_SWITCH = "daily_updates_switch"
+    const val SET_NOW_BUTTON = "set_now_button"
+}
 
 /**
  * Stateless settings screen — accepts [UiState] and event callbacks directly.
@@ -73,7 +88,8 @@ fun SettingsScreen(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(4f / 3f),
+                    .aspectRatio(4f / 3f)
+                    .semantics { testTag = SettingsScreenTestTags.ARTWORK_PREVIEW },
             )
         }
 
@@ -128,6 +144,7 @@ fun SettingsScreen(
             Switch(
                 checked = uiState.schedulingEnabled,
                 onCheckedChange = onSchedulingToggle,
+                modifier = Modifier.semantics { testTag = SettingsScreenTestTags.DAILY_UPDATES_SWITCH },
             )
         }
 
@@ -144,7 +161,9 @@ fun SettingsScreen(
         // -- Set wallpaper now --
         Button(
             onClick = onSetWallpaperNow,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { testTag = SettingsScreenTestTags.SET_NOW_BUTTON },
             enabled = !uiState.isSettingWallpaper,
         ) {
             if (uiState.isSettingWallpaper) {
