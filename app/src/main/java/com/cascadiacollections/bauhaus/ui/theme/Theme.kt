@@ -11,6 +11,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
+/**
+ * App-wide Material 3 theme using **dynamic color** (Material You).
+ *
+ * Since the app targets min SDK 35, dynamic color is always available — no
+ * fallback palette is needed. The color scheme is derived from the user's
+ * current wallpaper, which creates a nice feedback loop: the bauhaus artwork
+ * this app sets as the wallpaper influences the app's own color scheme on the
+ * next launch.
+ *
+ * Status bar appearance is synchronized with the theme so icons remain
+ * legible in both light and dark modes.
+ */
 @Composable
 fun BauhausTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),

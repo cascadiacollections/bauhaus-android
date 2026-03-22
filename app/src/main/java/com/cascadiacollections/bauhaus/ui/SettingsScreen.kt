@@ -32,6 +32,20 @@ import coil3.compose.AsyncImage
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 
+/**
+ * Main (and only) screen — shows today's bauhaus artwork and wallpaper controls.
+ *
+ * ## Layout
+ *
+ * 1. **Preview card** — today's artwork loaded via Coil from the CDN. Uses the
+ *    app-wide [ImageLoader][coil3.ImageLoader] (configured in [BauhausApplication][com.cascadiacollections.bauhaus.BauhausApplication])
+ *    which negotiates AVIF > WebP > JPEG and caches via the shared OkHttp client.
+ * 2. **Metadata** — title and artist from `/api/today.json` (optional; gracefully
+ *    hidden if the CDN is unreachable).
+ * 3. **Wallpaper target** — Material 3 segmented button row (Home / Lock / Both).
+ * 4. **Daily updates toggle** — enables or disables the [WorkManager][androidx.work.WorkManager] periodic job.
+ * 5. **"Set Now" button** — immediate wallpaper apply with loading state.
+ */
 @Composable
 fun SettingsScreen(
     viewModel: BauhausViewModel,
@@ -46,9 +60,8 @@ fun SettingsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        // -- Artwork preview --
+        Card(modifier = Modifier.fillMaxWidth()) {
             AsyncImage(
                 model = "https://bauhaus.cascadiacollections.workers.dev/api/today",
                 contentDescription = stringResource(R.string.todays_artwork),
@@ -59,15 +72,16 @@ fun SettingsScreen(
             )
         }
 
-        if (uiState.metadata != null) {
+        // -- Metadata (title + artist) --
+        uiState.metadata?.let { metadata ->
             Column {
                 Text(
-                    text = uiState.metadata!!.title.ifEmpty { stringResource(R.string.daily_bauhaus) },
+                    text = metadata.title.ifEmpty { stringResource(R.string.daily_bauhaus) },
                     style = MaterialTheme.typography.titleLarge,
                 )
-                if (uiState.metadata!!.artist.isNotEmpty()) {
+                if (metadata.artist.isNotEmpty()) {
                     Text(
-                        text = uiState.metadata!!.artist,
+                        text = metadata.artist,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -75,6 +89,7 @@ fun SettingsScreen(
             }
         }
 
+        // -- Wallpaper target selector --
         Text(
             text = stringResource(R.string.wallpaper_target),
             style = MaterialTheme.typography.labelLarge,
@@ -95,6 +110,7 @@ fun SettingsScreen(
             }
         }
 
+        // -- Daily updates toggle --
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -110,9 +126,9 @@ fun SettingsScreen(
             )
         }
 
-        if (uiState.lastUpdated != null) {
+        uiState.lastUpdated?.let { date ->
             Text(
-                text = stringResource(R.string.last_updated, uiState.lastUpdated!!),
+                text = stringResource(R.string.last_updated, date),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -120,6 +136,7 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
+        // -- Set wallpaper now --
         Button(
             onClick = { viewModel.setWallpaperNow() },
             modifier = Modifier.fillMaxWidth(),
@@ -135,9 +152,9 @@ fun SettingsScreen(
             }
         }
 
-        if (uiState.error != null) {
+        uiState.error?.let { error ->
             Text(
-                text = uiState.error!!,
+                text = error,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
             )

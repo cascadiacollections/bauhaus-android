@@ -1,20 +1,10 @@
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-/.idea/gradle.xml
-/.idea/vcs.xml
 .DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
 local.properties
+
+# IDE
+.idea/
+!.idea/codeStyles/
 
 # Kotlin
 .kotlin/
@@ -24,14 +14,11 @@ local.properties
 .gradle/
 build/
 !gradle/wrapper/gradle-wrapper.jar
-caches/
-daemon/
-jdks/
-kotlin-profile/
-native/
-wrapper/
 
-# Android Studio
+# Android
+.externalNativeBuild
+.cxx
+/captures
 *.hprof
 *.log
 

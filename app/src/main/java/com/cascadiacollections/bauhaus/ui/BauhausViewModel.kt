@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.cascadiacollections.bauhaus.BauhausApplication
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
+import com.cascadiacollections.bauhaus.data.HttpModule
 import com.cascadiacollections.bauhaus.data.SettingsRepository
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +17,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
+/**
+ * Immutable snapshot of the settings screen.
+ *
+ * Every field drives a corresponding UI element in [SettingsScreen]; Compose
+ * recomposes only the affected subtree when a single field changes.
+ */
 data class UiState(
     val wallpaperTarget: WallpaperTarget = WallpaperTarget.BOTH,
     val schedulingEnabled: Boolean = true,
@@ -25,10 +32,24 @@ data class UiState(
     val error: String? = null,
 )
 
+/**
+ * Drives the [SettingsScreen] UI by combining [SettingsRepository] flows with
+ * transient action state (loading, error).
+ *
+ * ## COGs Note
+ *
+ * Metadata is fetched once per ViewModel lifecycle (i.e. once per activity
+ * creation). The CDN caches `/api/today.json` for 5 min and the OkHttp disk
+ * cache respects that header, so rapid config-change rotations cost nothing.
+ *
+ * The "Set Now" action fetches the image bytes through the same cached
+ * [OkHttpClient][okhttp3.OkHttpClient], so if the Coil preview already loaded
+ * the image it may already be in the HTTP cache.
+ */
 class BauhausViewModel(application: Application) : AndroidViewModel(application) {
 
     private val settings = SettingsRepository(application)
-    private val api = BauhausApi()
+    private val api = BauhausApi(HttpModule.client(application))
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -54,39 +75,56 @@ class BauhausViewModel(application: Application) : AndroidViewModel(application)
                 val metadata = api.fetchTodayMetadata()
                 _uiState.update { it.copy(metadata = metadata) }
             } catch (_: Exception) {
-                // Metadata is optional — don't block UI
+                // Metadata is optional — don't block UI if the CDN is unreachable
             }
         }
     }
 
+    /** Persists the selected wallpaper target (home, lock, or both). */
     fun setWallpaperTarget(target: WallpaperTarget) {
         viewModelScope.launch {
             settings.setWallpaperTarget(target)
         }
     }
 
+    /**
+     * Toggles the daily scheduling worker on or off.
+     *
+     * When disabled, the existing periodic [WorkManager][androidx.work.WorkManager]
+     * job is cancelled. Re-enabling re-enqueues it with [ExistingPeriodicWorkPolicy.KEEP][androidx.work.ExistingPeriodicWorkPolicy.KEEP].
+     */
     fun setSchedulingEnabled(enabled: Boolean) {
         val app = getApplication<BauhausApplication>()
         viewModelScope.launch {
             settings.setSchedulingEnabled(enabled)
-            if (enabled) {
-                app.scheduleWallpaperWorker()
-            } else {
-                app.cancelWallpaperWorker()
-            }
+            if (enabled) app.scheduleWallpaperWorker() else app.cancelWallpaperWorker()
         }
     }
 
+    /**
+     * Immediately fetches today's artwork and applies it as the wallpaper.
+     *
+     * The bitmap is downsampled to the device screen resolution and recycled
+     * after [WallpaperManager.setBitmap] to minimize native memory usage.
+     */
     fun setWallpaperNow() {
         viewModelScope.launch {
             _uiState.update { it.copy(isSettingWallpaper = true, error = null) }
             try {
-                val bitmap = api.fetchTodayImage()
-                val target = _uiState.value.wallpaperTarget
-                val wallpaperManager = WallpaperManager.getInstance(getApplication())
-                wallpaperManager.setBitmap(bitmap, null, true, target.flag)
-                settings.setLastUpdated(LocalDate.now().toString())
-                _uiState.update { it.copy(isSettingWallpaper = false) }
+                val metrics = getApplication<Application>().resources.displayMetrics
+                val bitmap = api.fetchTodayImage(
+                    maxWidth = metrics.widthPixels,
+                    maxHeight = metrics.heightPixels,
+                )
+                try {
+                    val target = _uiState.value.wallpaperTarget
+                    val wallpaperManager = WallpaperManager.getInstance(getApplication())
+                    wallpaperManager.setBitmap(bitmap, null, true, target.flag)
+                    settings.setLastUpdated(LocalDate.now().toString())
+                    _uiState.update { it.copy(isSettingWallpaper = false) }
+                } finally {
+                    bitmap.recycle()
+                }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(isSettingWallpaper = false, error = e.message ?: "Failed to set wallpaper")

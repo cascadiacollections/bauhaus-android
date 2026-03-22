@@ -16,6 +16,15 @@ import com.cascadiacollections.bauhaus.ui.BauhausViewModel
 import com.cascadiacollections.bauhaus.ui.SettingsScreen
 import com.cascadiacollections.bauhaus.ui.theme.BauhausTheme
 
+/**
+ * Single-activity host for the bauhaus wallpaper app.
+ *
+ * Uses edge-to-edge rendering and Material 3 dynamic color. The entire UI is
+ * a single [SettingsScreen] composable driven by [BauhausViewModel].
+ *
+ * Architecture is intentionally simple — no navigation graph, no fragments —
+ * because this is a single-purpose utility app with one screen.
+ */
 class MainActivity : ComponentActivity() {
 
     private val viewModel: BauhausViewModel by viewModels()

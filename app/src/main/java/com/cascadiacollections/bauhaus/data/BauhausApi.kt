@@ -11,6 +11,12 @@ import okhttp3.Request
 
 private val json = Json { ignoreUnknownKeys = true }
 
+/**
+ * Metadata returned by the bauhaus CDN for a given day's artwork.
+ *
+ * All fields default to empty strings so deserialization never fails on
+ * missing keys — the CDN may omit fields for older archive entries.
+ */
 @Serializable
 data class ArtworkMetadata(
     val title: String = "",
@@ -20,28 +26,123 @@ data class ArtworkMetadata(
     val date: String = "",
 )
 
-class BauhausApi(private val client: OkHttpClient = OkHttpClient()) {
+/**
+ * Client for the bauhaus Cloudflare Workers CDN.
+ *
+ * ## Endpoints
+ *
+ * | Route | Returns |
+ * |-------|---------|
+ * | `GET /api/today` | Today's stylized image (content-negotiated) |
+ * | `GET /api/today.json` | Today's [ArtworkMetadata] |
+ * | `GET /api/YYYY-MM-DD` | Archive image (immutable cache) |
+ *
+ * ## Format Negotiation
+ *
+ * The `Accept` header requests AVIF > WebP > JPEG. The CDN picks the best
+ * pre-generated variant and falls back to JPEG when others are unavailable.
+ *
+ * ## Caching & COGs
+ *
+ * Pass the shared [OkHttpClient] from [HttpModule] so that the disk cache
+ * deduplicates requests. `/api/today` responses are cached for 5 minutes
+ * (`max-age=300`), so opening the app, previewing the image, and tapping
+ * "Set Now" in quick succession costs at most **one** CDN request.
+ *
+ * @param client Shared [OkHttpClient] with disk cache — obtain via [HttpModule.client].
+ */
+class BauhausApi(private val client: OkHttpClient) {
 
     companion object {
         private const val BASE_URL = "https://bauhaus.cascadiacollections.workers.dev"
+        private const val ACCEPT_HEADER = "image/avif, image/webp, image/jpeg"
     }
 
-    suspend fun fetchTodayImage(): Bitmap = withContext(Dispatchers.IO) {
+    /**
+     * Fetches today's artwork as a [Bitmap], optionally downsampled to fit
+     * within [maxWidth] x [maxHeight] pixels.
+     *
+     * Downsampling prevents OOM on high-resolution source images and reduces
+     * memory pressure — especially important in the background [WallpaperWorker][com.cascadiacollections.bauhaus.worker.WallpaperWorker]
+     * where there is no UI to reclaim memory from.
+     *
+     * @param maxWidth  Target width in pixels (0 = no downsampling).
+     * @param maxHeight Target height in pixels (0 = no downsampling).
+     * @return Decoded bitmap, sized to fit within the requested bounds.
+     * @throws IllegalStateException if the CDN response cannot be decoded.
+     */
+    suspend fun fetchTodayImage(
+        maxWidth: Int = 0,
+        maxHeight: Int = 0,
+    ): Bitmap = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("$BASE_URL/api/today")
-            .header("Accept", "image/avif, image/webp, image/jpeg")
+            .header("Accept", ACCEPT_HEADER)
             .build()
-        val response = client.newCall(request).execute()
-        val bytes = response.body.bytes()
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            ?: throw IllegalStateException("Failed to decode image")
+
+        val bytes = client.newCall(request).execute().use { response ->
+            response.body.bytes()
+        }
+
+        decodeSampled(bytes, maxWidth, maxHeight)
     }
 
+    /**
+     * Fetches today's artwork metadata (title, artist, source, license).
+     *
+     * This is a lightweight JSON call (~200 bytes) and is safe to call on
+     * every app open. The CDN caches the response for 5 minutes.
+     */
     suspend fun fetchTodayMetadata(): ArtworkMetadata = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("$BASE_URL/api/today.json")
             .build()
-        val response = client.newCall(request).execute()
-        json.decodeFromString<ArtworkMetadata>(response.body.string())
+
+        client.newCall(request).execute().use { response ->
+            json.decodeFromString<ArtworkMetadata>(response.body.string())
+        }
     }
+}
+
+/**
+ * Decodes [bytes] into a [Bitmap], downsampling if [maxWidth]/[maxHeight] > 0.
+ *
+ * Uses a two-pass approach: first decode bounds only, then compute an
+ * appropriate `inSampleSize` power-of-two and decode at reduced resolution.
+ */
+private fun decodeSampled(bytes: ByteArray, maxWidth: Int, maxHeight: Int): Bitmap {
+    if (maxWidth <= 0 || maxHeight <= 0) {
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            ?: throw IllegalStateException("Failed to decode image")
+    }
+
+    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+
+    options.inSampleSize = calculateInSampleSize(options.outWidth, options.outHeight, maxWidth, maxHeight)
+    options.inJustDecodeBounds = false
+
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        ?: throw IllegalStateException("Failed to decode image")
+}
+
+/**
+ * Computes the largest power-of-two `inSampleSize` such that the decoded
+ * dimensions are still >= [reqWidth] x [reqHeight].
+ */
+private fun calculateInSampleSize(
+    rawWidth: Int,
+    rawHeight: Int,
+    reqWidth: Int,
+    reqHeight: Int,
+): Int {
+    var inSampleSize = 1
+    if (rawHeight > reqHeight || rawWidth > reqWidth) {
+        val halfHeight = rawHeight / 2
+        val halfWidth = rawWidth / 2
+        while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+            inSampleSize *= 2
+        }
+    }
+    return inSampleSize
 }

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Data extraction rules for Android 12+ (API 31+).
+
+    DataStore preferences are device-specific (wallpaper target, scheduling state)
+    and should not be restored from cloud backup on a different device. We do allow
+    device-to-device transfer so that migrating to a new phone preserves settings.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="." />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="." />
+    </device-transfer>
+</data-extraction-rules>

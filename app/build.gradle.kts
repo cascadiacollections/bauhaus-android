@@ -1,12 +1,40 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
 
+// Load keystore.properties for local development (CI uses env vars instead)
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(keystorePropertiesFile.inputStream())
+}
+
 android {
     namespace = "com.cascadiacollections.bauhaus"
     compileSdk = libs.versions.compileSdk.get().toInt()
+
+    signingConfigs {
+        create("release") {
+            val alias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() }
+                ?: keystoreProperties["keyAlias"]?.toString()
+            val keyPwd = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+                ?: keystoreProperties["keyPassword"]?.toString()
+            val storePath = System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() }?.let { file(it) }
+                ?: keystoreProperties["storeFile"]?.toString()?.let { rootProject.file(it) }
+            val storePwd = System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
+                ?: keystoreProperties["storePassword"]?.toString()
+            if (alias != null && keyPwd != null && storePath != null && storePwd != null) {
+                keyAlias = alias
+                keyPassword = keyPwd
+                storeFile = storePath
+                storePassword = storePwd
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.cascadiacollections.bauhaus"
@@ -22,6 +50,8 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            val releaseSigningConfig = signingConfigs.getByName("release")
+            if (releaseSigningConfig.storeFile != null) signingConfig = releaseSigningConfig
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -45,6 +75,10 @@ android {
             excludes += "/DebugProbesKt.bin"
             excludes += "/*.txt"
             excludes += "/*.properties"
+        }
+        // Use native libraries compression for smaller APK, faster load on Android 6+
+        jniLibs {
+            useLegacyPackaging = false
         }
     }
 
