@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bauhaus</title>
+  <meta name="description" content="Daily bauhaus-stylized wallpaper for Android">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f5f0eb;
+      color: #1a1a1a;
+    }
+    .container {
+      max-width: 640px;
+      padding: 2rem;
+      text-align: center;
+    }
+    .artwork {
+      width: 100%;
+      max-width: 400px;
+      aspect-ratio: 1;
+      border-radius: 16px;
+      object-fit: cover;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+      margin-bottom: 2rem;
+    }
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+    }
+    .tagline {
+      font-size: 1.1rem;
+      color: #555;
+      margin-bottom: 2rem;
+    }
+    .links {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .links a {
+      display: inline-block;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 500;
+      transition: opacity 0.2s;
+    }
+    .links a:hover { opacity: 0.85; }
+    .links .primary {
+      background: #1a1a1a;
+      color: #fff;
+    }
+    .links .secondary {
+      background: #e8e0d8;
+      color: #1a1a1a;
+    }
+    .credit {
+      margin-top: 2rem;
+      font-size: 0.85rem;
+      color: #888;
+    }
+    .credit a { color: #666; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <img class="artwork" id="artwork" alt="Today's artwork" src="https://bauhaus.cascadiacollections.workers.dev/api/today">
+    <h1>Bauhaus</h1>
+    <p class="tagline">Daily artwork wallpaper for Android</p>
+    <div class="links">
+      <a class="primary" href="https://github.com/cascadiacollections/bauhaus-android">GitHub</a>
+      <a class="secondary" href="https://bauhaus.cascadiacollections.workers.dev/api/today.json">Today's Metadata</a>
+    </div>
+    <p class="credit">
+      CC0 artwork via <a href="https://bauhaus.cascadiacollections.workers.dev">Cloudflare Workers CDN</a>
+    </p>
+  </div>
+</body>
+</html>
