@@ -23,8 +23,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - language: java-kotlin
-            build-mode: manual
+          # java-kotlin disabled: CodeQL does not yet support Kotlin 2.3.20
+          # Re-enable once https://github.com/github/codeql/issues is updated
           - language: actions
             build-mode: none
 
@@ -32,22 +32,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Set up JDK 21
-        if: matrix.language == 'java-kotlin'
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-
-      - name: Build for CodeQL
-        if: matrix.build-mode == 'manual'
-        run: ./gradlew assembleDebug --no-daemon -Dkotlin.compiler.execution.strategy=in-process
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
