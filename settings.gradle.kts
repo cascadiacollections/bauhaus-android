@@ -25,3 +25,4 @@ dependencyResolutionManagement {
 rootProject.name = "bauhaus"
 
 include(":app")
+include(":benchmark")
