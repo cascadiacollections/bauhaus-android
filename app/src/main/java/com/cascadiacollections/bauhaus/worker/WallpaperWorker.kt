@@ -21,6 +21,13 @@ import java.time.LocalDate
  * - A **periodic** request (24 h interval, 1 h flex window) for daily updates.
  * - A one-time **expedited** request on the very first app launch.
  *
+ * ## COGs-conscious skip
+ *
+ * If `lastUpdated` already matches today's date, the worker short-circuits
+ * with [Result.success] — no CDN request at all. This handles the case where
+ * the user manually tapped "Set Now" earlier in the day, or the worker runs
+ * twice within the flex window.
+ *
  * ## Retry Policy
  *
  * On failure the worker returns [Result.retry] with exponential backoff
@@ -51,8 +58,18 @@ class WallpaperWorker(
             return Result.failure()
         }
 
-        val api = BauhausApi(HttpModule.client(applicationContext))
         val settings = SettingsRepository(applicationContext)
+
+        // Skip if we already set today's wallpaper (e.g. user tapped "Set Now",
+        // or the worker ran twice within the flex window). Saves a CDN request.
+        val today = LocalDate.now().toString()
+        val lastUpdated = settings.lastUpdated.first()
+        if (lastUpdated == today) {
+            Log.i(TAG, "Wallpaper already set for $today, skipping CDN fetch")
+            return Result.success()
+        }
+
+        val api = BauhausApi(HttpModule.client(applicationContext))
 
         return try {
             val metrics = applicationContext.resources.displayMetrics
