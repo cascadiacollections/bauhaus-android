@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Bauhaus</string>
+    <string name="todays_artwork">Today\'s artwork</string>
+    <string name="daily_bauhaus">Daily Bauhaus</string>
+    <string name="wallpaper_target">Apply to</string>
+    <string name="daily_updates">Daily updates</string>
+    <string name="last_updated">Last updated: %1$s</string>
+    <string name="set_now">Set Wallpaper Now</string>
+</resources>
