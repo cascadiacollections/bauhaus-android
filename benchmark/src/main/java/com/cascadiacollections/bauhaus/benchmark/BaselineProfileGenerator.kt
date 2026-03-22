@@ -17,7 +17,9 @@ import org.junit.runner.RunWith
  * ```
  * ./gradlew :benchmark:connectedBenchmarkAndroidTest
  * ```
- * The generated profile is written to `app/src/main/baseline-prof.txt`.
+ * The generated profile is written under the benchmark module's build outputs directory
+ * (e.g. `benchmark/build/outputs/...`). Copy or merge it into `app/src/main/baseline-prof.txt`
+ * to commit an updated profile.
  */
 @RunWith(AndroidJUnit4::class)
 @LargeTest
@@ -31,10 +33,15 @@ class BaselineProfileGenerator {
         pressHome()
         startActivityAndWait()
 
-        // Wait for the Coil artwork image to finish loading
-        device.wait(Until.hasObject(By.desc("Today's artwork")), 5_000L)
+        // Wait for the Coil artwork image to finish loading; fail fast if it never appears
+        val artworkLoaded = device.wait(Until.hasObject(By.desc("Today's artwork")), 5_000L)
+        check(artworkLoaded) { "Timed out waiting for 'Today's artwork' image to appear in the UI" }
 
         // Scroll the settings screen to exercise scroll-path rendering
-        device.findObject(By.scrollable(true))?.scroll(Direction.DOWN, 1.0f)
+        device.wait(Until.hasObject(By.scrollable(true)), 5_000L)
+        val scrollable = requireNotNull(device.findObject(By.scrollable(true))) {
+            "Timed out waiting for or could not find a scrollable container for baseline profile generation."
+        }
+        scrollable.scroll(Direction.DOWN, 1.0f)
     }
 }
