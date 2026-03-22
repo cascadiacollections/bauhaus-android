@@ -27,13 +27,32 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 
 /**
- * Main (and only) screen — shows today's bauhaus artwork and wallpaper controls.
+ * Semantic test tags for nodes in [SettingsScreen].
+ *
+ * Keeping tags here (in main source) lets both the production composable and
+ * the instrumented tests reference the same constants without duplicating
+ * strings, and without a test-only dependency on the test sources.
+ */
+object SettingsScreenTestTags {
+    const val ARTWORK_PREVIEW = "artwork_preview"
+    const val DAILY_UPDATES_SWITCH = "daily_updates_switch"
+    const val SET_NOW_BUTTON = "set_now_button"
+}
+
+/**
+ * Stateless settings screen — accepts [UiState] and event callbacks directly.
+ *
+ * Keeping state out of this composable makes it straightforward to test: callers
+ * (and tests) supply a fixed [UiState] snapshot and capture callbacks to verify
+ * interactions without standing up a real [BauhausViewModel].
  *
  * ## Layout
  *
@@ -48,11 +67,12 @@ import com.cascadiacollections.bauhaus.data.WallpaperTarget
  */
 @Composable
 fun SettingsScreen(
-    viewModel: BauhausViewModel,
+    uiState: UiState,
+    onWallpaperTargetChange: (WallpaperTarget) -> Unit,
+    onSchedulingToggle: (Boolean) -> Unit,
+    onSetWallpaperNow: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -68,7 +88,8 @@ fun SettingsScreen(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(4f / 3f),
+                    .aspectRatio(4f / 3f)
+                    .semantics { testTag = SettingsScreenTestTags.ARTWORK_PREVIEW },
             )
         }
 
@@ -99,7 +120,7 @@ fun SettingsScreen(
             WallpaperTarget.entries.forEachIndexed { index, target ->
                 SegmentedButton(
                     selected = uiState.wallpaperTarget == target,
-                    onClick = { viewModel.setWallpaperTarget(target) },
+                    onClick = { onWallpaperTargetChange(target) },
                     shape = SegmentedButtonDefaults.itemShape(
                         index = index,
                         count = WallpaperTarget.entries.size,
@@ -122,7 +143,8 @@ fun SettingsScreen(
             )
             Switch(
                 checked = uiState.schedulingEnabled,
-                onCheckedChange = { viewModel.setSchedulingEnabled(it) },
+                onCheckedChange = onSchedulingToggle,
+                modifier = Modifier.semantics { testTag = SettingsScreenTestTags.DAILY_UPDATES_SWITCH },
             )
         }
 
@@ -138,8 +160,10 @@ fun SettingsScreen(
 
         // -- Set wallpaper now --
         Button(
-            onClick = { viewModel.setWallpaperNow() },
-            modifier = Modifier.fillMaxWidth(),
+            onClick = onSetWallpaperNow,
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics { testTag = SettingsScreenTestTags.SET_NOW_BUTTON },
             enabled = !uiState.isSettingWallpaper,
         ) {
             if (uiState.isSettingWallpaper) {
@@ -160,4 +184,23 @@ fun SettingsScreen(
             )
         }
     }
+}
+
+/**
+ * Convenience overload that wires a [BauhausViewModel] into the stateless
+ * [SettingsScreen]. Used by [com.cascadiacollections.bauhaus.MainActivity].
+ */
+@Composable
+fun SettingsScreen(
+    viewModel: BauhausViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    SettingsScreen(
+        uiState = uiState,
+        onWallpaperTargetChange = viewModel::setWallpaperTarget,
+        onSchedulingToggle = viewModel::setSchedulingEnabled,
+        onSetWallpaperNow = viewModel::setWallpaperNow,
+        modifier = modifier,
+    )
 }
