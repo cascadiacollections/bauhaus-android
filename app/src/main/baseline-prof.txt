@@ -1,0 +1,6 @@
+HSPLcom/cascadiacollections/bauhaus/MainActivity;->onCreate(Landroid/os/Bundle;)V
+HSPLcom/cascadiacollections/bauhaus/BauhausApplication;->onCreate()V
+HSPLcom/cascadiacollections/bauhaus/ui/BauhausViewModel;-><init>(Landroid/app/Application;)V
+HSPLcom/cascadiacollections/bauhaus/ui/BauhausViewModel;->getUiState()Lkotlinx/coroutines/flow/StateFlow;
+HSPLcom/cascadiacollections/bauhaus/ui/SettingsScreenKt;->SettingsScreen(Lcom/cascadiacollections/bauhaus/ui/BauhausViewModel;Landroidx/compose/ui/Modifier;Landroidx/compose/runtime/Composer;II)V
+HSPLcom/cascadiacollections/bauhaus/ui/theme/BauhausThemeKt;->BauhausTheme(ZLkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;II)V

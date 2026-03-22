@@ -57,6 +57,14 @@ android {
                 "proguard-rules.pro"
             )
         }
+        create("benchmark") {
+            initWith(buildTypes.getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = false
+            isShrinkResources = false
+            isDebuggable = true
+            matchingFallbacks += listOf("release")
+        }
     }
 
     buildFeatures {
@@ -122,6 +130,7 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.androidx.profileinstaller)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
