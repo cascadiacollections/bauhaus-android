@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Bauhaus</title>
   <meta name="description" content="Daily bauhaus-stylized wallpaper for Android">
+  <meta name="theme-color" content="#f5f0eb">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎨</text></svg>">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -70,13 +72,17 @@
       color: #888;
     }
     .credit a { color: #666; }
+    .meta { margin-top: 1.5rem; font-size: 0.95rem; color: #444; }
+    .meta strong { color: #1a1a1a; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
   <div class="container">
-    <img class="artwork" id="artwork" alt="Today's artwork" src="https://bauhaus.cascadiacollections.workers.dev/api/today">
+    <img class="artwork" id="artwork" alt="Today's artwork">
     <h1>Bauhaus</h1>
     <p class="tagline">Daily artwork wallpaper for Android</p>
+    <p class="meta hidden" id="meta"></p>
     <div class="links">
       <a class="primary" href="https://github.com/cascadiacollections/bauhaus-android">GitHub</a>
       <a class="secondary" href="https://bauhaus.cascadiacollections.workers.dev/api/today.json">Today's Metadata</a>
@@ -85,5 +91,65 @@
       CC0 artwork via <a href="https://bauhaus.cascadiacollections.workers.dev">Cloudflare Workers CDN</a>
     </p>
   </div>
+  <script>
+    (function () {
+      var CACHE_KEY = 'bauhaus_artwork';
+      var ONE_DAY_MS = 86400000;
+      var CDN = 'https://bauhaus.cascadiacollections.workers.dev';
+
+      function todayDateStr() {
+        return new Date().toISOString().slice(0, 10);
+      }
+
+      function getCached() {
+        try {
+          var raw = localStorage.getItem(CACHE_KEY);
+          if (!raw) return null;
+          var entry = JSON.parse(raw);
+          if (entry.date !== todayDateStr()) return null;
+          return entry;
+        } catch (_) { return null; }
+      }
+
+      function setCache(entry) {
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(entry)); } catch (_) {}
+      }
+
+      var img = document.getElementById('artwork');
+      var metaEl = document.getElementById('meta');
+      var cached = getCached();
+
+      function showMeta(data) {
+        if (data && data.title) {
+          metaEl.innerHTML = '<strong>' + data.title + '</strong>' +
+            (data.artist ? ' by ' + data.artist : '');
+          metaEl.classList.remove('hidden');
+        }
+      }
+
+      if (cached && cached.imageUrl) {
+        // Serve from cache — zero network requests for the daily photo
+        img.src = cached.imageUrl;
+        showMeta(cached.meta);
+        return;
+      }
+
+      // Fetch metadata first (small JSON), then load the image
+      fetch(CDN + '/api/today.json')
+        .then(function (r) { return r.json(); })
+        .then(function (meta) {
+          var imageUrl = CDN + '/api/today';
+          img.src = imageUrl;
+          showMeta(meta);
+
+          // Cache the URL and metadata for the rest of the day
+          setCache({ date: todayDateStr(), imageUrl: imageUrl, meta: meta });
+        })
+        .catch(function () {
+          // Fallback: load image directly if JSON fetch fails
+          img.src = CDN + '/api/today';
+        });
+    })();
+  </script>
 </body>
 </html>
