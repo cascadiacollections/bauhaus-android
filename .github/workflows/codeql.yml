@@ -24,11 +24,20 @@ jobs:
       matrix:
         include:
           - language: java-kotlin
+            build-mode: autobuild
+          - language: actions
             build-mode: none
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
+      - name: Set up JDK 21
+        if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
