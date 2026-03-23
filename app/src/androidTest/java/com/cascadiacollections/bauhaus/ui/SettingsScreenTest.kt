@@ -66,6 +66,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onRefresh = {},
             )
         }
 
@@ -88,6 +89,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onRefresh = {},
             )
         }
 
@@ -110,6 +112,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = { capturedTarget = it },
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onRefresh = {},
             )
         }
 
@@ -133,6 +136,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onRefresh = {},
             )
         }
 
@@ -153,6 +157,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = { capturedEnabled = it },
                 onSetWallpaperNow = {},
+                onRefresh = {},
             )
         }
 
@@ -177,6 +182,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onRefresh = {},
             )
         }
 
@@ -200,6 +206,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = { callbackInvoked = true },
+                onRefresh = {},
             )
         }
 
@@ -222,6 +229,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onRefresh = {},
             )
         }
 
@@ -239,6 +247,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onRefresh = {},
             )
         }
 
@@ -259,6 +268,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onRefresh = {},
             )
         }
 
@@ -277,10 +287,36 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onRefresh = {},
             )
         }
 
         composeTestRule.onNodeWithText(TEST_METADATA.title).assertDoesNotExist()
         composeTestRule.onNodeWithText(TEST_METADATA.artist).assertDoesNotExist()
     }
-}
+
+    // ── Test 7: Pull-to-refresh ───────────────────────────────────────────────
+
+    /**
+     * When [UiState.isRefreshing] is `true` the screen must still render all
+     * core content (the pull-to-refresh indicator overlays it without replacing it).
+     */
+    @Test
+    fun settingsScreen_rendersContentDuringRefresh() {
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState.copy(isRefreshing = true),
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onRefresh = {},
+            )
+        }
+
+        composeTestRule
+            .onNodeWithTag(SettingsScreenTestTags.ARTWORK_PREVIEW)
+            .assertIsDisplayed()
+        composeTestRule
+            .onNodeWithTag(SettingsScreenTestTags.SET_NOW_BUTTON)
+            .assertIsDisplayed()
+    }
