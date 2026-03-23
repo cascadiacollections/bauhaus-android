@@ -320,3 +320,4 @@ class SettingsScreenTest {
             .onNodeWithTag(SettingsScreenTestTags.SET_NOW_BUTTON)
             .assertIsDisplayed()
     }
+}
