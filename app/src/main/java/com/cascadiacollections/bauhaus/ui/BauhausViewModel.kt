@@ -2,6 +2,7 @@ package com.cascadiacollections.bauhaus.ui
 
 import android.app.Application
 import android.app.WallpaperManager
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.cascadiacollections.bauhaus.BauhausApplication
@@ -29,6 +30,7 @@ data class UiState(
     val lastUpdated: String? = null,
     val metadata: ArtworkMetadata? = null,
     val isSettingWallpaper: Boolean = false,
+    val isRefreshing: Boolean = false,
     val error: String? = null,
 )
 
@@ -50,6 +52,10 @@ class BauhausViewModel(application: Application) : AndroidViewModel(application)
 
     private val settings = SettingsRepository(application)
     private val api = BauhausApi(HttpModule.client(application))
+
+    /** Minimum milliseconds between user-initiated refreshes (DOS guard). */
+    private val refreshCooldownMs: Long = 30_000L
+    private var lastRefreshAt: Long = 0L
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -128,6 +134,35 @@ class BauhausViewModel(application: Application) : AndroidViewModel(application)
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(isSettingWallpaper = false, error = e.message ?: "Failed to set wallpaper")
+                }
+            }
+        }
+    }
+
+    /**
+     * Refreshes today's artwork metadata via a pull-to-refresh gesture.
+     *
+     * Includes two abuse/DOS guards:
+     * 1. **In-flight guard**: drops the call immediately if a refresh is already
+     *    in progress, preventing concurrent network requests.
+     * 2. **Cooldown guard**: successive calls within [refreshCooldownMs] are
+     *    silently dropped to prevent hammering the upstream Bauhaus service.
+     *    Uses [SystemClock.elapsedRealtime] (monotonic) so the check is immune
+     *    to wall-clock adjustments (NTP, manual time changes).
+     */
+    fun refresh() {
+        if (_uiState.value.isRefreshing) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastRefreshAt < refreshCooldownMs) return
+        lastRefreshAt = now
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshing = true, error = null) }
+            try {
+                val metadata = api.fetchTodayMetadata()
+                _uiState.update { it.copy(metadata = metadata, isRefreshing = false) }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(isRefreshing = false, error = e.message ?: "Failed to refresh")
                 }
             }
         }

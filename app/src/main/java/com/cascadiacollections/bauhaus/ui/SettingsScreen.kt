@@ -20,6 +20,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -64,6 +65,9 @@ object SettingsScreenTestTags {
  * 3. **Wallpaper target** — Material 3 segmented button row (Home / Lock / Both).
  * 4. **Daily updates toggle** — enables or disables the [WorkManager][androidx.work.WorkManager] periodic job.
  * 5. **"Set Now" button** — immediate wallpaper apply with loading state.
+ *
+ * Pull-to-refresh triggers [onRefresh]. Repeated calls within the cooldown window
+ * defined in [BauhausViewModel] are silently dropped to guard the upstream service.
  */
 @Composable
 fun SettingsScreen(
@@ -71,117 +75,124 @@ fun SettingsScreen(
     onWallpaperTargetChange: (WallpaperTarget) -> Unit,
     onSchedulingToggle: (Boolean) -> Unit,
     onSetWallpaperNow: () -> Unit,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+    PullToRefreshBox(
+        isRefreshing = uiState.isRefreshing,
+        onRefresh = onRefresh,
+        modifier = modifier.fillMaxSize(),
     ) {
-        // -- Artwork preview --
-        Card(modifier = Modifier.fillMaxWidth()) {
-            AsyncImage(
-                model = "https://bauhaus.cascadiacollections.workers.dev/api/today",
-                contentDescription = stringResource(R.string.todays_artwork),
-                contentScale = ContentScale.Crop,
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            // -- Artwork preview --
+            Card(modifier = Modifier.fillMaxWidth()) {
+                AsyncImage(
+                    model = "https://bauhaus.cascadiacollections.workers.dev/api/today",
+                    contentDescription = stringResource(R.string.todays_artwork),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(4f / 3f)
+                        .semantics { testTag = SettingsScreenTestTags.ARTWORK_PREVIEW },
+                )
+            }
+
+            // -- Metadata (title + artist) --
+            uiState.metadata?.let { metadata ->
+                Column {
+                    Text(
+                        text = metadata.title.ifEmpty { stringResource(R.string.daily_bauhaus) },
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    if (metadata.artist.isNotEmpty()) {
+                        Text(
+                            text = metadata.artist,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+
+            // -- Wallpaper target selector --
+            Text(
+                text = stringResource(R.string.wallpaper_target),
+                style = MaterialTheme.typography.labelLarge,
+            )
+
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                WallpaperTarget.entries.forEachIndexed { index, target ->
+                    SegmentedButton(
+                        selected = uiState.wallpaperTarget == target,
+                        onClick = { onWallpaperTargetChange(target) },
+                        shape = SegmentedButtonDefaults.itemShape(
+                            index = index,
+                            count = WallpaperTarget.entries.size,
+                        ),
+                    ) {
+                        Text(target.label)
+                    }
+                }
+            }
+
+            // -- Daily updates toggle --
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.daily_updates),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Switch(
+                    checked = uiState.schedulingEnabled,
+                    onCheckedChange = onSchedulingToggle,
+                    modifier = Modifier.semantics { testTag = SettingsScreenTestTags.DAILY_UPDATES_SWITCH },
+                )
+            }
+
+            uiState.lastUpdated?.let { date ->
+                Text(
+                    text = stringResource(R.string.last_updated, date),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // -- Set wallpaper now --
+            Button(
+                onClick = onSetWallpaperNow,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(4f / 3f)
-                    .semantics { testTag = SettingsScreenTestTags.ARTWORK_PREVIEW },
-            )
-        }
-
-        // -- Metadata (title + artist) --
-        uiState.metadata?.let { metadata ->
-            Column {
-                Text(
-                    text = metadata.title.ifEmpty { stringResource(R.string.daily_bauhaus) },
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                if (metadata.artist.isNotEmpty()) {
-                    Text(
-                        text = metadata.artist,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    .semantics { testTag = SettingsScreenTestTags.SET_NOW_BUTTON },
+                enabled = !uiState.isSettingWallpaper,
+            ) {
+                if (uiState.isSettingWallpaper) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.height(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
                     )
+                } else {
+                    Text(stringResource(R.string.set_now))
                 }
             }
-        }
 
-        // -- Wallpaper target selector --
-        Text(
-            text = stringResource(R.string.wallpaper_target),
-            style = MaterialTheme.typography.labelLarge,
-        )
-
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            WallpaperTarget.entries.forEachIndexed { index, target ->
-                SegmentedButton(
-                    selected = uiState.wallpaperTarget == target,
-                    onClick = { onWallpaperTargetChange(target) },
-                    shape = SegmentedButtonDefaults.itemShape(
-                        index = index,
-                        count = WallpaperTarget.entries.size,
-                    ),
-                ) {
-                    Text(target.label)
-                }
-            }
-        }
-
-        // -- Daily updates toggle --
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.daily_updates),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Switch(
-                checked = uiState.schedulingEnabled,
-                onCheckedChange = onSchedulingToggle,
-                modifier = Modifier.semantics { testTag = SettingsScreenTestTags.DAILY_UPDATES_SWITCH },
-            )
-        }
-
-        uiState.lastUpdated?.let { date ->
-            Text(
-                text = stringResource(R.string.last_updated, date),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // -- Set wallpaper now --
-        Button(
-            onClick = onSetWallpaperNow,
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { testTag = SettingsScreenTestTags.SET_NOW_BUTTON },
-            enabled = !uiState.isSettingWallpaper,
-        ) {
-            if (uiState.isSettingWallpaper) {
-                CircularProgressIndicator(
-                    modifier = Modifier.height(24.dp),
-                    color = MaterialTheme.colorScheme.onPrimary,
+            uiState.error?.let { error ->
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
                 )
-            } else {
-                Text(stringResource(R.string.set_now))
             }
-        }
-
-        uiState.error?.let { error ->
-            Text(
-                text = error,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-            )
         }
     }
 }
@@ -201,6 +212,7 @@ fun SettingsScreen(
         onWallpaperTargetChange = viewModel::setWallpaperTarget,
         onSchedulingToggle = viewModel::setSchedulingEnabled,
         onSetWallpaperNow = viewModel::setWallpaperNow,
+        onRefresh = viewModel::refresh,
         modifier = modifier,
     )
 }
