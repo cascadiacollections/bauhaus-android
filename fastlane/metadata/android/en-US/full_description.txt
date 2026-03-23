@@ -1,0 +1,16 @@
+Bauhaus brings the Bauhaus art movement to your Android home screen and lock screen. Each day a new artwork is fetched and ready to set as your wallpaper — no account required, no ads, no tracking.
+
+Features:
+• Daily artwork delivered via a public CDN
+• Set artwork as your home screen wallpaper, lock screen wallpaper, or both
+• Browse archived artworks by date
+• Automatic background updates via WorkManager
+• Fully offline-capable once an image is cached
+
+Privacy:
+• No account or sign-in required
+• No analytics or tracking of any kind
+• Only the INTERNET permission (to fetch artwork) and SET_WALLPAPER permission are used
+• No data is collected or shared
+
+Open source under the MIT license: https://github.com/cascadiacollections/bauhaus-android
