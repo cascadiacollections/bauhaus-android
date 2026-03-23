@@ -2,6 +2,7 @@ package com.cascadiacollections.bauhaus.ui
 
 import android.app.Application
 import android.app.WallpaperManager
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.cascadiacollections.bauhaus.BauhausApplication
@@ -141,13 +142,17 @@ class BauhausViewModel(application: Application) : AndroidViewModel(application)
     /**
      * Refreshes today's artwork metadata via a pull-to-refresh gesture.
      *
-     * Includes an abuse/DOS guard: successive calls within [refreshCooldownMs]
-     * are silently dropped to prevent hammering the upstream Bauhaus service.
-     * The CDN caches `/api/today.json` for 5 minutes; the OkHttp disk cache
-     * will serve stale content within that window at no network cost anyway.
+     * Includes two abuse/DOS guards:
+     * 1. **In-flight guard**: drops the call immediately if a refresh is already
+     *    in progress, preventing concurrent network requests.
+     * 2. **Cooldown guard**: successive calls within [refreshCooldownMs] are
+     *    silently dropped to prevent hammering the upstream Bauhaus service.
+     *    Uses [SystemClock.elapsedRealtime] (monotonic) so the check is immune
+     *    to wall-clock adjustments (NTP, manual time changes).
      */
     fun refresh() {
-        val now = System.currentTimeMillis()
+        if (_uiState.value.isRefreshing) return
+        val now = SystemClock.elapsedRealtime()
         if (now - lastRefreshAt < refreshCooldownMs) return
         lastRefreshAt = now
         viewModelScope.launch {
