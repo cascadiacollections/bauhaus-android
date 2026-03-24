@@ -1,0 +1,6 @@
+Initial release.
+
+• Daily artwork wallpaper delivered via a public CDN
+• Set as home screen, lock screen, or both
+• Browse archived artworks by date
+• Automatic background updates via WorkManager
