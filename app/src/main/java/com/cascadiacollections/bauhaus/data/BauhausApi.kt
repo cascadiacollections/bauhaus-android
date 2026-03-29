@@ -88,6 +88,25 @@ class BauhausApi(private val client: OkHttpClient) {
     }
 
     /**
+     * Fetches today's artwork as raw bytes, preserving the original format
+     * (AVIF, WebP, or JPEG) negotiated by the CDN.
+     *
+     * @return The image bytes paired with the MIME type from the `Content-Type` header.
+     */
+    suspend fun fetchTodayImageRaw(): Pair<ByteArray, String> = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url("$BASE_URL/api/today")
+            .header("Accept", ACCEPT_HEADER)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val mimeType = response.header("Content-Type")?.substringBefore(";")?.trim() ?: "image/jpeg"
+            val bytes = response.body.bytes()
+            bytes to mimeType
+        }
+    }
+
+    /**
      * Fetches today's artwork metadata (title, artist, source, license).
      *
      * This is a lightweight JSON call (~200 bytes) and is safe to call on

@@ -11,6 +11,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.cascadiacollections.bauhaus.R
@@ -66,6 +68,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onSaveImage = {},
                 onRefresh = {},
             )
         }
@@ -89,6 +92,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onSaveImage = {},
                 onRefresh = {},
             )
         }
@@ -112,6 +116,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = { capturedTarget = it },
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onSaveImage = {},
                 onRefresh = {},
             )
         }
@@ -136,6 +141,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onSaveImage = {},
                 onRefresh = {},
             )
         }
@@ -157,6 +163,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = { capturedEnabled = it },
                 onSetWallpaperNow = {},
+                onSaveImage = {},
                 onRefresh = {},
             )
         }
@@ -182,6 +189,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onSaveImage = {},
                 onRefresh = {},
             )
         }
@@ -206,6 +214,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = { callbackInvoked = true },
+                onSaveImage = {},
                 onRefresh = {},
             )
         }
@@ -229,6 +238,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onSaveImage = {},
                 onRefresh = {},
             )
         }
@@ -247,6 +257,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onSaveImage = {},
                 onRefresh = {},
             )
         }
@@ -268,6 +279,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onSaveImage = {},
                 onRefresh = {},
             )
         }
@@ -287,6 +299,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onSaveImage = {},
                 onRefresh = {},
             )
         }
@@ -309,6 +322,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onSaveImage = {},
                 onRefresh = {},
             )
         }
@@ -336,6 +350,7 @@ class SettingsScreenTest {
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
+                onSaveImage = {},
                 onRefresh = {},
             )
         }
@@ -343,5 +358,32 @@ class SettingsScreenTest {
         composeTestRule
             .onNodeWithTag(SettingsScreenTestTags.ARTWORK_PREVIEW)
             .assertIsDisplayed()
+    }
+
+    // ── Test 9: Long-press save image ────────────────────────────────────────
+
+    /**
+     * Long-pressing the artwork preview card must invoke [onSaveImage].
+     */
+    @Test
+    fun settingsScreen_longPressCard_invokesOnSaveImageCallback() {
+        var callbackInvoked = false
+
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState,
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = { callbackInvoked = true },
+                onRefresh = {},
+            )
+        }
+
+        composeTestRule
+            .onNodeWithTag(SettingsScreenTestTags.ARTWORK_PREVIEW)
+            .performTouchInput { longClick() }
+
+        assertTrue("onSaveImage callback should be invoked on long press", callbackInvoked)
     }
 }

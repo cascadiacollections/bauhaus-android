@@ -20,6 +20,7 @@ class UiStateTest {
         assertNull(state.metadata)
         assertFalse(state.isSettingWallpaper)
         assertFalse(state.isRefreshing)
+        assertFalse(state.isSavingImage)
         assertNull(state.error)
         assertEquals(0, state.imageRevision)
     }
@@ -42,6 +43,7 @@ class UiStateTest {
             metadata = metadata,
             isSettingWallpaper = true,
             isRefreshing = true,
+            isSavingImage = true,
             error = "some error",
             imageRevision = 5,
         )
@@ -53,6 +55,7 @@ class UiStateTest {
         assertEquals(metadata, updated.metadata)
         assertTrue(updated.isSettingWallpaper)
         assertTrue(updated.isRefreshing)
+        assertTrue(updated.isSavingImage)
         assertEquals("some error", updated.error)
         assertEquals(6, updated.imageRevision)
     }
@@ -83,5 +86,22 @@ class UiStateTest {
         assertEquals(3, afterFailure.imageRevision)
         assertFalse(afterFailure.isRefreshing)
         assertEquals("Network error", afterFailure.error)
+    }
+
+    @Test
+    fun `save in progress clears error`() {
+        val state = UiState(error = "previous error")
+        val saving = state.copy(isSavingImage = true, error = null)
+
+        assertTrue(saving.isSavingImage)
+        assertNull(saving.error)
+    }
+
+    @Test
+    fun `save failure clears isSavingImage`() {
+        val state = UiState(isSavingImage = true)
+        val afterFailure = state.copy(isSavingImage = false)
+
+        assertFalse(afterFailure.isSavingImage)
     }
 }

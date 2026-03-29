@@ -2,7 +2,11 @@ package com.cascadiacollections.bauhaus.ui
 
 import android.app.Application
 import android.app.WallpaperManager
+import android.content.ContentValues
+import android.net.Uri
+import android.os.Environment
 import android.os.SystemClock
+import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.cascadiacollections.bauhaus.BauhausApplication
@@ -11,12 +15,18 @@ import com.cascadiacollections.bauhaus.data.BauhausApi
 import com.cascadiacollections.bauhaus.data.HttpModule
 import com.cascadiacollections.bauhaus.data.SettingsRepository
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+
+/** One-shot event for [SnackbarHost][androidx.compose.material3.SnackbarHost] display. */
+data class SnackbarEvent(val message: String, val uri: Uri? = null)
 
 /**
  * Immutable snapshot of the settings screen.
@@ -31,6 +41,7 @@ data class UiState(
     val metadata: ArtworkMetadata? = null,
     val isSettingWallpaper: Boolean = false,
     val isRefreshing: Boolean = false,
+    val isSavingImage: Boolean = false,
     val error: String? = null,
     val imageRevision: Int = 0,
 )
@@ -60,6 +71,9 @@ class BauhausViewModel(application: Application) : AndroidViewModel(application)
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    private val _snackbarEvent = MutableSharedFlow<SnackbarEvent>(extraBufferCapacity = 1)
+    val snackbarEvent: SharedFlow<SnackbarEvent> = _snackbarEvent.asSharedFlow()
 
     init {
         viewModelScope.launch {
@@ -136,6 +150,52 @@ class BauhausViewModel(application: Application) : AndroidViewModel(application)
                 _uiState.update {
                     it.copy(isSettingWallpaper = false, error = e.message ?: "Failed to set wallpaper")
                 }
+            }
+        }
+    }
+
+    /**
+     * Saves today's artwork to the device gallery in its original format.
+     *
+     * Uses [MediaStore] to write into `Pictures/Bauhaus/` without requiring
+     * storage permissions (minSdk 35). The `IS_PENDING` flag prevents the
+     * media scanner from indexing a partially-written file.
+     */
+    fun saveImageToGallery() {
+        if (_uiState.value.isSavingImage) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSavingImage = true, error = null) }
+            try {
+                val (bytes, mimeType) = api.fetchTodayImageRaw()
+                val extension = when (mimeType) {
+                    "image/avif" -> "avif"
+                    "image/webp" -> "webp"
+                    else -> "jpg"
+                }
+                val displayName = "bauhaus_${LocalDate.now()}.$extension"
+
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
+                    put(MediaStore.Images.Media.MIME_TYPE, mimeType)
+                    put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/Bauhaus")
+                    put(MediaStore.Images.Media.IS_PENDING, 1)
+                }
+
+                val resolver = getApplication<Application>().contentResolver
+                val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+                    ?: throw IllegalStateException("MediaStore insert returned null")
+
+                resolver.openOutputStream(uri)!!.use { it.write(bytes) }
+
+                contentValues.clear()
+                contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
+                resolver.update(uri, contentValues, null, null)
+
+                _uiState.update { it.copy(isSavingImage = false) }
+                _snackbarEvent.tryEmit(SnackbarEvent("Image saved", uri))
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isSavingImage = false) }
+                _snackbarEvent.tryEmit(SnackbarEvent(e.message ?: "Failed to save image"))
             }
         }
     }

@@ -31,7 +31,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import android.view.HapticFeedbackConstants
 import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
@@ -50,6 +54,7 @@ object SettingsScreenTestTags {
     const val ARTWORK_PREVIEW = "artwork_preview"
     const val DAILY_UPDATES_SWITCH = "daily_updates_switch"
     const val SET_NOW_BUTTON = "set_now_button"
+    const val DOWNLOAD_ICON = "download_icon"
 }
 
 /**
@@ -73,12 +78,14 @@ object SettingsScreenTestTags {
  * Pull-to-refresh triggers [onRefresh]. Repeated calls within the cooldown window
  * defined in [BauhausViewModel] are silently dropped to guard the upstream service.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SettingsScreen(
     uiState: UiState,
     onWallpaperTargetChange: (WallpaperTarget) -> Unit,
     onSchedulingToggle: (Boolean) -> Unit,
     onSetWallpaperNow: () -> Unit,
+    onSaveImage: () -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -95,7 +102,18 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // -- Artwork preview --
-            Card(modifier = Modifier.fillMaxWidth()) {
+            val view = LocalView.current
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .combinedClickable(
+                        onClick = {},
+                        onLongClick = {
+                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                            onSaveImage()
+                        },
+                    ),
+            ) {
                 val cacheKey = "${LocalDate.now()}-${uiState.imageRevision}"
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
@@ -221,6 +239,7 @@ fun SettingsScreen(
         onWallpaperTargetChange = viewModel::setWallpaperTarget,
         onSchedulingToggle = viewModel::setSchedulingEnabled,
         onSetWallpaperNow = viewModel::setWallpaperNow,
+        onSaveImage = viewModel::saveImageToGallery,
         onRefresh = viewModel::refresh,
         modifier = modifier,
     )
