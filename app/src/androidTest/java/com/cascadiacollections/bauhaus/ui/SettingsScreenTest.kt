@@ -46,7 +46,6 @@ class SettingsScreenTest {
         InstrumentationRegistry.getInstrumentation().targetContext.getString(resId)
 
     companion object {
-        private const val TEST_ERROR_MESSAGE = "Failed to set wallpaper"
         private val TEST_METADATA = ArtworkMetadata(
             title = "Composition VIII",
             artist = "Wassily Kandinsky",
@@ -55,11 +54,6 @@ class SettingsScreenTest {
 
     // ── Test 1: Preview ───────────────────────────────────────────────────────
 
-    /**
-     * The artwork preview card must always be present in the composition.
-     * The node is located by its semantic testTag so the test is not coupled
-     * to the locale-specific content description text.
-     */
     @Test
     fun settingsScreen_artworkPreview_isDisplayed() {
         composeTestRule.setContent {
@@ -80,10 +74,6 @@ class SettingsScreenTest {
 
     // ── Test 2: Segmented button ──────────────────────────────────────────────
 
-    /**
-     * The segmented button row must reflect the selected [WallpaperTarget] from
-     * the current [UiState].
-     */
     @Test
     fun settingsScreen_segmentedButton_reflectsWallpaperTarget() {
         composeTestRule.setContent {
@@ -102,10 +92,6 @@ class SettingsScreenTest {
         composeTestRule.onNodeWithText("Both").assertIsNotSelected()
     }
 
-    /**
-     * Tapping a segmented button must invoke [onWallpaperTargetChange] with the
-     * tapped [WallpaperTarget].
-     */
     @Test
     fun settingsScreen_segmentedButton_invokesCallbackOnTap() {
         var capturedTarget: WallpaperTarget? = null
@@ -128,11 +114,6 @@ class SettingsScreenTest {
 
     // ── Test 3: Daily updates toggle ──────────────────────────────────────────
 
-    /**
-     * The daily-updates switch must reflect the [UiState.schedulingEnabled] flag.
-     * The node is located by its semantic testTag to avoid ambiguity with the
-     * segmented buttons, which are also toggleable.
-     */
     @Test
     fun settingsScreen_dailyUpdatesSwitch_reflectsSchedulingState() {
         composeTestRule.setContent {
@@ -149,10 +130,6 @@ class SettingsScreenTest {
         composeTestRule.onNodeWithTag(SettingsScreenTestTags.DAILY_UPDATES_SWITCH).assertIsOff()
     }
 
-    /**
-     * Toggling the daily-updates switch must invoke [onSchedulingToggle] with the
-     * new boolean value.
-     */
     @Test
     fun settingsScreen_dailyUpdatesSwitch_invokesCallbackOnToggle() {
         var capturedEnabled: Boolean? = null
@@ -175,12 +152,8 @@ class SettingsScreenTest {
         assertFalse("Callback should be called with false when toggling off", capturedEnabled!!)
     }
 
-    // ── Test 4: Set Now button – loading state ────────────────────────────────
+    // ── Test 4: Set Now button ────────────────────────────────────────────────
 
-    /**
-     * While [UiState.isSettingWallpaper] is `true` the button must be disabled
-     * and its text label must be replaced by the loading indicator.
-     */
     @Test
     fun settingsScreen_setNowButton_showsLoadingStateWhenSettingWallpaper() {
         composeTestRule.setContent {
@@ -194,16 +167,10 @@ class SettingsScreenTest {
             )
         }
 
-        // Button is present but disabled while loading
         composeTestRule.onNodeWithTag(SettingsScreenTestTags.SET_NOW_BUTTON).assertIsNotEnabled()
-        // The text label is replaced by a CircularProgressIndicator
         composeTestRule.onNodeWithText(getString(R.string.set_now)).assertDoesNotExist()
     }
 
-    /**
-     * When not loading the "Set Wallpaper Now" button must be visible, enabled,
-     * and invoke the callback on click.
-     */
     @Test
     fun settingsScreen_setNowButton_isEnabledWhenNotLoading() {
         var callbackInvoked = false
@@ -225,52 +192,8 @@ class SettingsScreenTest {
         assertTrue("onSetWallpaperNow callback should be invoked on button click", callbackInvoked)
     }
 
-    // ── Test 5: Error state ───────────────────────────────────────────────────
+    // ── Test 5: Metadata display ──────────────────────────────────────────────
 
-    /**
-     * When [UiState.error] is non-null the error message must be visible.
-     */
-    @Test
-    fun settingsScreen_displaysErrorMessage_whenErrorStateIsSet() {
-        composeTestRule.setContent {
-            SettingsScreen(
-                uiState = defaultState.copy(error = TEST_ERROR_MESSAGE),
-                onWallpaperTargetChange = {},
-                onSchedulingToggle = {},
-                onSetWallpaperNow = {},
-                onSaveImage = {},
-                onRefresh = {},
-            )
-        }
-
-        composeTestRule.onNodeWithText(TEST_ERROR_MESSAGE).assertIsDisplayed()
-    }
-
-    /**
-     * When [UiState.error] is null no error text must be shown.
-     */
-    @Test
-    fun settingsScreen_doesNotDisplayErrorMessage_whenErrorStateIsNull() {
-        composeTestRule.setContent {
-            SettingsScreen(
-                uiState = defaultState.copy(error = null),
-                onWallpaperTargetChange = {},
-                onSchedulingToggle = {},
-                onSetWallpaperNow = {},
-                onSaveImage = {},
-                onRefresh = {},
-            )
-        }
-
-        composeTestRule.onNodeWithText(TEST_ERROR_MESSAGE).assertDoesNotExist()
-    }
-
-    // ── Test 6: Metadata display ──────────────────────────────────────────────
-
-    /**
-     * When [UiState.metadata] is non-null both the artwork title and the artist
-     * name must be rendered.
-     */
     @Test
     fun settingsScreen_displaysMetadata_whenMetadataIsAvailable() {
         composeTestRule.setContent {
@@ -288,9 +211,6 @@ class SettingsScreenTest {
         composeTestRule.onNodeWithText(TEST_METADATA.artist).assertIsDisplayed()
     }
 
-    /**
-     * When [UiState.metadata] is null neither title nor artist text must be shown.
-     */
     @Test
     fun settingsScreen_doesNotDisplayMetadata_whenMetadataIsNull() {
         composeTestRule.setContent {
@@ -308,12 +228,8 @@ class SettingsScreenTest {
         composeTestRule.onNodeWithText(TEST_METADATA.artist).assertDoesNotExist()
     }
 
-    // ── Test 7: Pull-to-refresh ───────────────────────────────────────────────
+    // ── Test 6: Pull-to-refresh ───────────────────────────────────────────────
 
-    /**
-     * When [UiState.isRefreshing] is `true` the screen must still render all
-     * core content (the pull-to-refresh indicator overlays it without replacing it).
-     */
     @Test
     fun settingsScreen_rendersContentDuringRefresh() {
         composeTestRule.setContent {
@@ -335,13 +251,8 @@ class SettingsScreenTest {
             .assertIsDisplayed()
     }
 
-    // ── Test 8: Image cache invalidation ─────────────────────────────────────
+    // ── Test 7: Image cache invalidation ─────────────────────────────────────
 
-    /**
-     * After a pull-to-refresh the artwork preview must still render when
-     * [UiState.imageRevision] is non-zero (i.e. the Coil [ImageRequest] with
-     * a new cache key does not break the composable).
-     */
     @Test
     fun settingsScreen_artworkPreview_rendersAfterImageRevisionChange() {
         composeTestRule.setContent {
@@ -360,11 +271,8 @@ class SettingsScreenTest {
             .assertIsDisplayed()
     }
 
-    // ── Test 9: Long-press save image ────────────────────────────────────────
+    // ── Test 8: Long-press save image ────────────────────────────────────────
 
-    /**
-     * Long-pressing the artwork preview card must invoke [onSaveImage].
-     */
     @Test
     fun settingsScreen_longPressCard_invokesOnSaveImageCallback() {
         var callbackInvoked = false

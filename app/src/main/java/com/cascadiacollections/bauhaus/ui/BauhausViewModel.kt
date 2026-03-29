@@ -8,9 +8,11 @@ import android.os.Environment
 import android.os.SystemClock
 import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cascadiacollections.bauhaus.BauhausApplication
-import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
 import com.cascadiacollections.bauhaus.data.HttpModule
 import com.cascadiacollections.bauhaus.data.SettingsRepository
@@ -38,17 +40,22 @@ data class UiState(
     val wallpaperTarget: WallpaperTarget = WallpaperTarget.BOTH,
     val schedulingEnabled: Boolean = true,
     val lastUpdated: String? = null,
-    val metadata: ArtworkMetadata? = null,
+    val metadata: com.cascadiacollections.bauhaus.data.ArtworkMetadata? = null,
     val isSettingWallpaper: Boolean = false,
     val isRefreshing: Boolean = false,
     val isSavingImage: Boolean = false,
-    val error: String? = null,
     val imageRevision: Int = 0,
 )
 
 /**
  * Drives the [SettingsScreen] UI by combining [SettingsRepository] flows with
- * transient action state (loading, error).
+ * transient action state (loading spinners, snackbar events).
+ *
+ * ## Dependency injection
+ *
+ * [settings] and [api] are constructor parameters so the ViewModel can be
+ * tested with fakes. Production construction goes through [Factory], which
+ * reads the [Application] from [CreationExtras][androidx.lifecycle.viewmodel.CreationExtras].
  *
  * ## COGs Note
  *
@@ -60,10 +67,11 @@ data class UiState(
  * [OkHttpClient][okhttp3.OkHttpClient], so if the Coil preview already loaded
  * the image it may already be in the HTTP cache.
  */
-class BauhausViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val settings = SettingsRepository(application)
-    private val api = BauhausApi(HttpModule.client(application))
+class BauhausViewModel(
+    application: Application,
+    private val settings: SettingsRepository,
+    private val api: BauhausApi,
+) : AndroidViewModel(application) {
 
     /** Minimum milliseconds between user-initiated refreshes (DOS guard). */
     private val refreshCooldownMs: Long = 30_000L
@@ -130,7 +138,7 @@ class BauhausViewModel(application: Application) : AndroidViewModel(application)
      */
     fun setWallpaperNow() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isSettingWallpaper = true, error = null) }
+            _uiState.update { it.copy(isSettingWallpaper = true) }
             try {
                 val metrics = getApplication<Application>().resources.displayMetrics
                 val bitmap = api.fetchTodayImage(
@@ -147,9 +155,8 @@ class BauhausViewModel(application: Application) : AndroidViewModel(application)
                     bitmap.recycle()
                 }
             } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(isSettingWallpaper = false, error = e.message ?: "Failed to set wallpaper")
-                }
+                _uiState.update { it.copy(isSettingWallpaper = false) }
+                _snackbarEvent.tryEmit(SnackbarEvent(e.message ?: "Failed to set wallpaper"))
             }
         }
     }
@@ -164,7 +171,7 @@ class BauhausViewModel(application: Application) : AndroidViewModel(application)
     fun saveImageToGallery() {
         if (_uiState.value.isSavingImage) return
         viewModelScope.launch {
-            _uiState.update { it.copy(isSavingImage = true, error = null) }
+            _uiState.update { it.copy(isSavingImage = true) }
             try {
                 val (bytes, mimeType) = api.fetchTodayImageRaw()
                 val extension = when (mimeType) {
@@ -217,14 +224,26 @@ class BauhausViewModel(application: Application) : AndroidViewModel(application)
         if (now - lastRefreshAt < refreshCooldownMs) return
         lastRefreshAt = now
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshing = true, error = null) }
+            _uiState.update { it.copy(isRefreshing = true) }
             try {
                 val metadata = api.fetchTodayMetadata()
                 _uiState.update { it.copy(metadata = metadata, isRefreshing = false, imageRevision = it.imageRevision + 1) }
             } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(isRefreshing = false, error = e.message ?: "Failed to refresh")
-                }
+                _uiState.update { it.copy(isRefreshing = false) }
+                _snackbarEvent.tryEmit(SnackbarEvent(e.message ?: "Failed to refresh"))
+            }
+        }
+    }
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]!!
+                BauhausViewModel(
+                    app,
+                    SettingsRepository(app),
+                    BauhausApi(HttpModule.client(app)),
+                )
             }
         }
     }

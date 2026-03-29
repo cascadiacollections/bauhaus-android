@@ -28,13 +28,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.Role
 import android.view.HapticFeedbackConstants
 import coil3.compose.AsyncImage
 import coil3.request.CachePolicy
@@ -112,6 +115,7 @@ fun SettingsScreen(
                             view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                             onSaveImage()
                         },
+                        onLongClickLabel = stringResource(R.string.save_image),
                     ),
             ) {
                 val cacheKey = "${LocalDate.now()}-${uiState.imageRevision}"
@@ -136,6 +140,7 @@ fun SettingsScreen(
                     Text(
                         text = metadata.title.ifEmpty { stringResource(R.string.daily_bauhaus) },
                         style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.semantics { heading() },
                     )
                     if (metadata.artist.isNotEmpty()) {
                         Text(
@@ -170,7 +175,14 @@ fun SettingsScreen(
 
             // -- Daily updates toggle --
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = uiState.schedulingEnabled,
+                        onValueChange = onSchedulingToggle,
+                        role = Role.Switch,
+                    )
+                    .semantics { testTag = SettingsScreenTestTags.DAILY_UPDATES_SWITCH },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -180,8 +192,7 @@ fun SettingsScreen(
                 )
                 Switch(
                     checked = uiState.schedulingEnabled,
-                    onCheckedChange = onSchedulingToggle,
-                    modifier = Modifier.semantics { testTag = SettingsScreenTestTags.DAILY_UPDATES_SWITCH },
+                    onCheckedChange = null,
                 )
             }
 
@@ -213,14 +224,7 @@ fun SettingsScreen(
                 }
             }
 
-            uiState.error?.let { error ->
-                Text(
-                    text = error,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
+}
     }
 }
 

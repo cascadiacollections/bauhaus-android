@@ -43,7 +43,7 @@ import com.cascadiacollections.bauhaus.ui.theme.BauhausTheme
  */
 class MainActivity : ComponentActivity() {
 
-    private val viewModel: BauhausViewModel by viewModels()
+    private val viewModel: BauhausViewModel by viewModels { BauhausViewModel.Factory }
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
