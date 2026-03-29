@@ -43,7 +43,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import android.view.HapticFeedbackConstants
 import coil3.compose.AsyncImage
-import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import java.time.LocalDate
 import com.cascadiacollections.bauhaus.R
