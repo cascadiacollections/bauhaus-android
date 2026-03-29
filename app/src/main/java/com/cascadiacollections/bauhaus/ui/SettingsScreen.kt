@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -208,20 +210,20 @@ fun SettingsScreen(
 
             // -- Set wallpaper now --
             Button(
-                onClick = onSetWallpaperNow,
+                onClick = { if (!uiState.isSettingWallpaper) onSetWallpaperNow() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .semantics { testTag = SettingsScreenTestTags.SET_NOW_BUTTON },
-                enabled = !uiState.isSettingWallpaper,
             ) {
                 if (uiState.isSettingWallpaper) {
                     CircularProgressIndicator(
-                        modifier = Modifier.height(24.dp),
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
                         color = MaterialTheme.colorScheme.onPrimary,
                     )
-                } else {
-                    Text(stringResource(R.string.set_now))
+                    Spacer(modifier = Modifier.width(8.dp))
                 }
+                Text(stringResource(R.string.set_now))
             }
 
 }

@@ -2,7 +2,6 @@ package com.cascadiacollections.bauhaus.ui
 
 import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -167,8 +166,8 @@ class SettingsScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithTag(SettingsScreenTestTags.SET_NOW_BUTTON).assertIsNotEnabled()
-        composeTestRule.onNodeWithText(getString(R.string.set_now)).assertDoesNotExist()
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.SET_NOW_BUTTON).assertIsDisplayed()
+        composeTestRule.onNodeWithText(getString(R.string.set_now)).assertIsDisplayed()
     }
 
     @Test
