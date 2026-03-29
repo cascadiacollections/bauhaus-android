@@ -320,4 +320,28 @@ class SettingsScreenTest {
             .onNodeWithTag(SettingsScreenTestTags.SET_NOW_BUTTON)
             .assertIsDisplayed()
     }
+
+    // ── Test 8: Image cache invalidation ─────────────────────────────────────
+
+    /**
+     * After a pull-to-refresh the artwork preview must still render when
+     * [UiState.imageRevision] is non-zero (i.e. the Coil [ImageRequest] with
+     * a new cache key does not break the composable).
+     */
+    @Test
+    fun settingsScreen_artworkPreview_rendersAfterImageRevisionChange() {
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState.copy(imageRevision = 5),
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onRefresh = {},
+            )
+        }
+
+        composeTestRule
+            .onNodeWithTag(SettingsScreenTestTags.ARTWORK_PREVIEW)
+            .assertIsDisplayed()
+    }
 }

@@ -32,6 +32,7 @@ data class UiState(
     val isSettingWallpaper: Boolean = false,
     val isRefreshing: Boolean = false,
     val error: String? = null,
+    val imageRevision: Int = 0,
 )
 
 /**
@@ -159,7 +160,7 @@ class BauhausViewModel(application: Application) : AndroidViewModel(application)
             _uiState.update { it.copy(isRefreshing = true, error = null) }
             try {
                 val metadata = api.fetchTodayMetadata()
-                _uiState.update { it.copy(metadata = metadata, isRefreshing = false) }
+                _uiState.update { it.copy(metadata = metadata, isRefreshing = false, imageRevision = it.imageRevision + 1) }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(isRefreshing = false, error = e.message ?: "Failed to refresh")

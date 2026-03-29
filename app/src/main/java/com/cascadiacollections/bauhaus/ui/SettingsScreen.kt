@@ -31,7 +31,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import coil3.compose.AsyncImage
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
+import java.time.LocalDate
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 
@@ -92,8 +96,13 @@ fun SettingsScreen(
         ) {
             // -- Artwork preview --
             Card(modifier = Modifier.fillMaxWidth()) {
+                val cacheKey = "${LocalDate.now()}-${uiState.imageRevision}"
                 AsyncImage(
-                    model = "https://bauhaus.cascadiacollections.workers.dev/api/today",
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data("https://bauhaus.cascadiacollections.workers.dev/api/today")
+                        .memoryCacheKey(cacheKey)
+                        .diskCacheKey(cacheKey)
+                        .build(),
                     contentDescription = stringResource(R.string.todays_artwork),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
