@@ -33,7 +33,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
  *                private data directory and is excluded from cloud backup via
  *                `backup_rules.xml`.
  */
-class SettingsRepository(private val context: Context) {
+open class SettingsRepository(private val context: Context) {
 
     private object Keys {
         val WALLPAPER_TARGET = stringPreferencesKey("wallpaper_target")
@@ -43,17 +43,17 @@ class SettingsRepository(private val context: Context) {
     }
 
     /** Which screen(s) the wallpaper should be applied to. */
-    val wallpaperTarget: Flow<WallpaperTarget> = context.dataStore.data.map { prefs ->
+    open val wallpaperTarget: Flow<WallpaperTarget> = context.dataStore.data.map { prefs ->
         prefs[Keys.WALLPAPER_TARGET]?.let { WallpaperTarget.valueOf(it) } ?: WallpaperTarget.BOTH
     }
 
     /** Whether the daily periodic WorkManager job is enabled. */
-    val schedulingEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+    open val schedulingEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[Keys.SCHEDULING_ENABLED] ?: true
     }
 
     /** ISO-8601 date string of the last successful wallpaper update, or `null`. */
-    val lastUpdated: Flow<String?> = context.dataStore.data.map { prefs ->
+    open val lastUpdated: Flow<String?> = context.dataStore.data.map { prefs ->
         prefs[Keys.LAST_UPDATED]
     }
 
@@ -61,15 +61,15 @@ class SettingsRepository(private val context: Context) {
     suspend fun isFirstRun(): Boolean =
         context.dataStore.data.first()[Keys.FIRST_RUN] ?: true
 
-    suspend fun setWallpaperTarget(target: WallpaperTarget) {
+    open suspend fun setWallpaperTarget(target: WallpaperTarget) {
         context.dataStore.edit { it[Keys.WALLPAPER_TARGET] = target.name }
     }
 
-    suspend fun setSchedulingEnabled(enabled: Boolean) {
+    open suspend fun setSchedulingEnabled(enabled: Boolean) {
         context.dataStore.edit { it[Keys.SCHEDULING_ENABLED] = enabled }
     }
 
-    suspend fun setLastUpdated(date: String) {
+    open suspend fun setLastUpdated(date: String) {
         context.dataStore.edit { it[Keys.LAST_UPDATED] = date }
     }
 

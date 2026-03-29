@@ -51,7 +51,7 @@ data class ArtworkMetadata(
  *
  * @param client Shared [OkHttpClient] with disk cache — obtain via [HttpModule.client].
  */
-class BauhausApi(private val client: OkHttpClient) {
+open class BauhausApi(private val client: OkHttpClient) {
 
     companion object {
         private const val BASE_URL = "https://bauhaus.cascadiacollections.workers.dev"
@@ -71,7 +71,7 @@ class BauhausApi(private val client: OkHttpClient) {
      * @return Decoded bitmap, sized to fit within the requested bounds.
      * @throws IllegalStateException if the CDN response cannot be decoded.
      */
-    suspend fun fetchTodayImage(
+    open suspend fun fetchTodayImage(
         maxWidth: Int = 0,
         maxHeight: Int = 0,
     ): Bitmap = withContext(Dispatchers.IO) {
@@ -93,7 +93,7 @@ class BauhausApi(private val client: OkHttpClient) {
      *
      * @return The image bytes paired with the MIME type from the `Content-Type` header.
      */
-    suspend fun fetchTodayImageRaw(): Pair<ByteArray, String> = withContext(Dispatchers.IO) {
+    open suspend fun fetchTodayImageRaw(): Pair<ByteArray, String> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("$BASE_URL/api/today")
             .header("Accept", ACCEPT_HEADER)
@@ -112,7 +112,7 @@ class BauhausApi(private val client: OkHttpClient) {
      * This is a lightweight JSON call (~200 bytes) and is safe to call on
      * every app open. The CDN caches the response for 5 minutes.
      */
-    suspend fun fetchTodayMetadata(): ArtworkMetadata = withContext(Dispatchers.IO) {
+    open suspend fun fetchTodayMetadata(): ArtworkMetadata = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("$BASE_URL/api/today.json")
             .build()
