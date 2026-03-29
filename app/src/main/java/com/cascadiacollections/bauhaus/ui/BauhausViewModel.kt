@@ -17,6 +17,7 @@ import com.cascadiacollections.bauhaus.data.BauhausApi
 import com.cascadiacollections.bauhaus.data.HttpModule
 import com.cascadiacollections.bauhaus.data.SettingsRepository
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 /** One-shot event for [SnackbarHost][androidx.compose.material3.SnackbarHost] display. */
@@ -147,8 +149,10 @@ class BauhausViewModel(
                 )
                 try {
                     val target = _uiState.value.wallpaperTarget
-                    val wallpaperManager = WallpaperManager.getInstance(getApplication())
-                    wallpaperManager.setBitmap(bitmap, null, true, target.flag)
+                    withContext(Dispatchers.IO) {
+                        val wallpaperManager = WallpaperManager.getInstance(getApplication())
+                        wallpaperManager.setBitmap(bitmap, null, true, target.flag)
+                    }
                     settings.setLastUpdated(LocalDate.now().toString())
                     _uiState.update { it.copy(isSettingWallpaper = false) }
                 } finally {

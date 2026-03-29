@@ -15,7 +15,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -83,7 +84,7 @@ object SettingsScreenTestTags {
  * Pull-to-refresh triggers [onRefresh]. Repeated calls within the cooldown window
  * defined in [BauhausViewModel] are silently dropped to guard the upstream service.
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsScreen(
     uiState: UiState,
@@ -210,17 +211,14 @@ fun SettingsScreen(
 
             // -- Set wallpaper now --
             Button(
-                onClick = { if (!uiState.isSettingWallpaper) onSetWallpaperNow() },
+                onClick = onSetWallpaperNow,
                 modifier = Modifier
                     .fillMaxWidth()
                     .semantics { testTag = SettingsScreenTestTags.SET_NOW_BUTTON },
+                enabled = !uiState.isSettingWallpaper,
             ) {
                 if (uiState.isSettingWallpaper) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
+                    LoadingIndicator(modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                 }
                 Text(stringResource(R.string.set_now))
