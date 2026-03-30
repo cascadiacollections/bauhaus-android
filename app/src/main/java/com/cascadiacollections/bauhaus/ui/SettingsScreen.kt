@@ -2,7 +2,6 @@ package com.cascadiacollections.bauhaus.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
@@ -176,27 +176,22 @@ fun SettingsScreen(
             }
 
             // -- Daily updates toggle --
-            Row(
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.daily_updates)) },
+                trailingContent = {
+                    Switch(
+                        checked = uiState.schedulingEnabled,
+                        onCheckedChange = null,
+                    )
+                },
                 modifier = Modifier
-                    .fillMaxWidth()
                     .toggleable(
                         value = uiState.schedulingEnabled,
                         onValueChange = onSchedulingToggle,
                         role = Role.Switch,
                     )
                     .semantics { testTag = SettingsScreenTestTags.DAILY_UPDATES_SWITCH },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.daily_updates),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Switch(
-                    checked = uiState.schedulingEnabled,
-                    onCheckedChange = null,
-                )
-            }
+            )
 
             uiState.lastUpdated?.let { date ->
                 Text(

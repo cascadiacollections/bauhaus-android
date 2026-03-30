@@ -2,7 +2,9 @@ package com.cascadiacollections.bauhaus.ui.theme
 
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
@@ -23,6 +25,7 @@ import androidx.core.view.WindowCompat
  * Status bar appearance is synchronized with the theme so icons remain
  * legible in both light and dark modes.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun BauhausTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
@@ -43,8 +46,9 @@ fun BauhausTheme(
         }
     }
 
-    MaterialTheme(
+    MaterialExpressiveTheme(
         colorScheme = colorScheme,
+        motionScheme = MotionScheme.expressive(),
         content = content,
     )
 }
