@@ -4,6 +4,9 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.aboutlibraries)
+    alias(libs.plugins.google.services)
+    alias(libs.plugins.firebase.crashlytics)
 }
 
 // Load keystore.properties for local development (CI uses env vars instead)
@@ -69,6 +72,17 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    flavorDimensions += "mode"
+    productFlavors {
+        create("foss") {
+            dimension = "mode"
+        }
+        create("full") {
+            dimension = "mode"
+        }
     }
 
     packaging {
@@ -133,6 +147,17 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.profileinstaller)
 
+    // OSS license screen
+    implementation(libs.aboutlibraries.compose)
+
+    // Memory leak detection in debug builds (runs in separate process)
+    debugImplementation(libs.leakcanary.android)
+
+    // Firebase Crashlytics — full flavor only
+    "fullImplementation"(platform(libs.firebase.bom))
+    "fullImplementation"(libs.firebase.crashlytics)
+    "fullImplementation"(libs.firebase.analytics)
+
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -142,4 +167,13 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+// Disable google-services and crashlytics tasks for FOSS variants
+tasks.configureEach {
+    if (name.contains("Foss", ignoreCase = true) &&
+        (name.contains("GoogleServices") || name.contains("Crashlytics"))
+    ) {
+        enabled = false
+    }
 }

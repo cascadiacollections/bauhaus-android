@@ -41,6 +41,7 @@ class BauhausApplication : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        CrashReporter.init(this)
         scheduleWallpaperWorker()
         enqueueFirstRunIfNeeded()
     }

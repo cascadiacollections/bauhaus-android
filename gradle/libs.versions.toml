@@ -21,6 +21,11 @@ coil = "3.4.0"
 coroutines = "1.10.2"
 serialization = "1.10.0"
 robolectric = "4.14.1"
+aboutlibraries = "14.0.0-b03"
+leakcanary = "2.14"
+firebaseBom = "34.11.0"
+googleServices = "4.4.4"
+firebaseCrashlyticsPlugin = "3.0.6"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -54,6 +59,11 @@ benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchmark-macro
 androidx-test-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "uiautomator" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version = "1.7.0" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+aboutlibraries-compose = { group = "com.mikepenz", name = "aboutlibraries-compose-m3", version.ref = "aboutlibraries" }
+leakcanary-android = { group = "com.squareup.leakcanary", name = "leakcanary-android-process", version.ref = "leakcanary" }
+firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
+firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }
+firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -61,3 +71,6 @@ android-test = { id = "com.android.test", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+aboutlibraries = { id = "com.mikepenz.aboutlibraries.plugin", version.ref = "aboutlibraries" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }

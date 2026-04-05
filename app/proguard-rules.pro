@@ -36,3 +36,10 @@
     public static **[] values();
     public static ** valueOf(java.lang.String);
 }
+
+# Firebase Crashlytics: keep annotation attributes for symbolication
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+
+# AboutLibraries: keep generated library metadata
+-keep class com.mikepenz.aboutlibraries.** { *; }
