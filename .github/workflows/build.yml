@@ -43,8 +43,8 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
-      - name: Build APKs, AAB and Run Tests
-        run: ./gradlew assembleRelease assembleDebug bundleRelease testDebugUnitTest --no-daemon --parallel --build-cache
+      - name: Build, Lint, and Test
+        run: ./gradlew assembleFossRelease assembleFullRelease assembleFossDebug lintFossDebug testFossDebugUnitTest --no-daemon --parallel --build-cache
         env:
           KEYSTORE_PATH: ${{ env.KEYSTORE_PATH }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -56,15 +56,16 @@ jobs:
         with:
           name: apks-${{ github.sha }}
           path: |
-            app/build/outputs/apk/release/app-release*.apk
-            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/foss/release/app-foss-release*.apk
+            app/build/outputs/apk/full/release/app-full-release*.apk
+            app/build/outputs/apk/foss/debug/app-foss-debug.apk
           retention-days: 1
 
       - name: Upload AAB Artifact
         uses: actions/upload-artifact@v7
         with:
           name: aab-${{ github.sha }}
-          path: app/build/outputs/bundle/release/app-release.aab
+          path: app/build/outputs/bundle/fossRelease/app-foss-release.aab
           retention-days: 1
 
   check-nightly:
@@ -128,10 +129,9 @@ jobs:
             ### Downloads
             | Variant | Description |
             |---------|-------------|
-            | `app-release.aab` | Signed AAB for Play Store upload |
-            | `app-release.apk` | Signed release APK (when signing secrets are set) |
-            | `app-release-unsigned.apk` | Unsigned release APK (when signing secrets are absent) |
-            | `app-debug.apk` | Debug build |
+            | `app-foss-release.apk` | FOSS release (no Google dependencies) |
+            | `app-full-release.apk` | Full release with Firebase Crashlytics |
+            | `app-foss-debug.apk` | Debug build with LeakCanary |
 
             ### Installation
             1. Download the APK for your use case
@@ -141,9 +141,10 @@ jobs:
             ---
             _This release is automatically replaced on each commit to main._
           files: |
-            apks/release/app-release*.apk
-            apks/debug/app-debug.apk
-            aab/app-release.aab
+            apks/foss/release/app-foss-release*.apk
+            apks/full/release/app-full-release*.apk
+            apks/foss/debug/app-foss-debug.apk
+            aab/app-foss-release.aab
           prerelease: true
           make_latest: false
         continue-on-error: true
