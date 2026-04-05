@@ -44,7 +44,7 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
       - name: Build, Lint, and Test
-        run: ./gradlew assembleFossRelease assembleFullRelease assembleFossDebug lintFossDebug testFossDebugUnitTest --no-daemon --parallel --build-cache
+        run: ./gradlew assembleFossRelease assembleFossDebug lintFossDebug testFossDebugUnitTest --no-daemon --parallel --build-cache
         env:
           KEYSTORE_PATH: ${{ env.KEYSTORE_PATH }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -57,7 +57,6 @@ jobs:
           name: apks-${{ github.sha }}
           path: |
             app/build/outputs/apk/foss/release/app-foss-release*.apk
-            app/build/outputs/apk/full/release/app-full-release*.apk
             app/build/outputs/apk/foss/debug/app-foss-debug.apk
           retention-days: 1
 
