@@ -28,7 +28,7 @@ jobs:
           cache: true
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
@@ -44,12 +44,61 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
       - name: Build, Lint, and Test
-        run: ./gradlew assembleFossRelease assembleFossDebug lintFossDebug testFossDebugUnitTest --no-daemon --parallel --build-cache
+        run: ./gradlew assembleFossRelease assembleFossDebug lintFossDebug testFossDebugUnitTest jacocoTestReport --no-daemon --parallel --build-cache
         env:
           KEYSTORE_PATH: ${{ env.KEYSTORE_PATH }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Test Report
+        if: always()
+        uses: dorny/test-reporter@v2
+        with:
+          name: Unit Tests
+          path: '**/build/test-results/**/TEST-*.xml'
+          reporter: java-junit
+
+      - name: Coverage Threshold
+        run: |
+          REPORT=app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml
+          if [ ! -f "$REPORT" ]; then echo "JaCoCo report not found"; exit 1; fi
+          LINE_COUNTER=$(grep -o 'type="LINE" missed="[0-9]*" covered="[0-9]*"' "$REPORT" | tail -1)
+          MISSED=$(echo "$LINE_COUNTER" | sed 's/.*missed="\([0-9]*\)".*/\1/')
+          COVERED=$(echo "$LINE_COUNTER" | sed 's/.*covered="\([0-9]*\)".*/\1/')
+          TOTAL=$((MISSED + COVERED))
+          if [ "$TOTAL" -eq 0 ]; then echo "No line data"; exit 1; fi
+          PCT=$((COVERED * 100 / TOTAL))
+          echo "Line coverage: ${PCT}% (${COVERED}/${TOTAL})"
+          if [ "$PCT" -lt 5 ]; then echo "::error::Coverage ${PCT}% is below 5% threshold"; exit 1; fi
+
+      - name: APK & AAB Size
+        run: |
+          echo "## Build Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "| Artifact | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|------|" >> $GITHUB_STEP_SUMMARY
+          for f in app/build/outputs/apk/foss/release/app-foss-release*.apk app/build/outputs/apk/foss/debug/app-foss-debug.apk; do
+            if [ -f "$f" ]; then
+              SIZE=$(du -h "$f" | cut -f1)
+              echo "| $(basename $f) | $SIZE |" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-${{ github.sha }}
+          path: app/build/reports/jacoco/jacocoTestReport/html/
+          retention-days: 7
+
+      - name: Upload Lint Report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-${{ github.sha }}
+          path: app/build/reports/lint-results-fossDebug*.html
+          retention-days: 7
 
       - name: Upload APK Artifacts
         uses: actions/upload-artifact@v7
@@ -107,7 +156,7 @@ jobs:
 
       - name: Get short SHA
         id: sha
-        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+        run: echo "short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Get current date
         id: date
@@ -120,10 +169,11 @@ jobs:
           token: ${{ secrets.GH_RELEASE_TOKEN }}
           name: "Nightly Build (${{ steps.date.outputs.date }})"
           body: |
-            ## Nightly Build
+            ## 🌙 Nightly Build
 
             **Commit:** ${{ github.sha }}
             **Date:** ${{ steps.date.outputs.date }}
+            **Short SHA:** ${{ steps.sha.outputs.short }}
 
             ### Downloads
             | Variant | Description |
@@ -154,3 +204,26 @@ jobs:
           name: |
             apks-${{ github.sha }}
             aab-${{ github.sha }}
+
+  deploy-internal:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Download AAB Artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: aab-${{ github.sha }}
+          path: aab
+
+      - name: Upload to Play Store internal track
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.cascadiacollections.bauhaus
+          releaseFiles: aab/app-release.aab
+          track: internal
+          status: completed
+        continue-on-error: true
+

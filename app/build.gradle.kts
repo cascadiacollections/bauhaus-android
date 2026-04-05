@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.aboutlibraries)
     alias(libs.plugins.google.services)
     alias(libs.plugins.firebase.crashlytics)
+    id("jacoco")
 }
 
 // Load keystore.properties for local development (CI uses env vars instead)
@@ -43,7 +44,8 @@ android {
         applicationId = "com.cascadiacollections.bauhaus"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 1
+        versionCode = providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }
+            .standardOutput.asText.get().trim().toIntOrNull() ?: 1
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -63,10 +65,9 @@ android {
         create("benchmark") {
             initWith(buildTypes.getByName("release"))
             signingConfig = signingConfigs.getByName("debug")
-            isMinifyEnabled = false
-            isShrinkResources = false
-            isDebuggable = true
             matchingFallbacks += listOf("release")
+            isDebuggable = false
+            proguardFiles("benchmark-rules.pro")
         }
     }
 
@@ -83,6 +84,16 @@ android {
         create("full") {
             dimension = "mode"
         }
+    }
+
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
+    lint {
+        baseline = file("lint-baseline.xml")
+        abortOnError = true
+        warningsAsErrors = true
     }
 
     packaging {
@@ -119,6 +130,11 @@ kotlin {
             "-Xno-receiver-assertions",
         )
     }
+}
+
+composeCompiler {
+    reportsDestination = layout.buildDirectory.dir("compose_compiler")
+    metricsDestination = layout.buildDirectory.dir("compose_compiler")
 }
 
 dependencies {
@@ -160,7 +176,9 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
+    testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.turbine)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
@@ -176,4 +194,29 @@ tasks.configureEach {
     ) {
         enabled = false
     }
+}
+
+tasks.register<JacocoReport>("jacocoTestReport") {
+    dependsOn("testFossDebugUnitTest")
+
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+
+    val kotlinClasses = fileTree("${layout.buildDirectory.get()}/intermediates/built_in_kotlinc/fossDebug/compileFossDebugKotlin/classes") {
+        exclude(
+            "**/R.class", "**/R$*.class",
+            "**/BuildConfig.class",
+            "**/ui/theme/**",
+            "**/*Preview*.class",
+        )
+    }
+
+    classDirectories.setFrom(kotlinClasses)
+    sourceDirectories.setFrom("${projectDir}/src/main/java")
+    executionData.setFrom(
+        fileTree(layout.buildDirectory) { include("jacoco/testFossDebugUnitTest.exec") }
+    )
 }

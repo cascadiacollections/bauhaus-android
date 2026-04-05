@@ -1,0 +1,44 @@
+{
+  "name": "Bauhaus Android",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    }
+  },
+  "postStartCommand": "npm install -g @anthropic-ai/claude-code || true",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "fwcd.kotlin",
+        "vscjava.vscode-gradle",
+        "mathiasfrohlich.Kotlin",
+        "naco-siren.gradle-language",
+        "esafirm.kotlin-formatter",
+        "anthropic.claude-code"
+      ],
+      "settings": {
+        "kotlin.languageServer.enabled": true,
+        "editor.formatOnSave": true
+      }
+    }
+  },
+  "postCreateCommand": "sudo chown -R vscode:vscode /home/vscode/.gradle && ./gradlew --version",
+  "containerEnv": {
+    "ANDROID_HOME": "/usr/local/android-sdk",
+    "GRADLE_USER_HOME": "/home/vscode/.gradle"
+  },
+  "mounts": [
+    "source=bauhaus-android-gradle-cache,target=/home/vscode/.gradle,type=volume"
+  ],
+  "forwardPorts": [5037],
+  "portsAttributes": {
+    "5037": {
+      "label": "ADB",
+      "onAutoForward": "silent"
+    }
+  }
+}

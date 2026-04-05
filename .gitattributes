@@ -1,0 +1,30 @@
+# Normalize line endings
+* text=auto
+
+# Kotlin/Java
+*.kt text diff=kotlin
+*.kts text diff=kotlin
+*.java text diff=java
+
+# Config
+*.xml text
+*.toml text
+*.yml text
+*.yaml text
+*.json text
+*.properties text
+*.pro text
+
+# Gradle wrapper
+gradlew text eol=lf
+gradlew.bat text eol=crlf
+gradle/wrapper/gradle-wrapper.jar binary
+
+# Images
+*.png binary
+*.jpg binary
+*.webp binary
+
+# Signing
+*.jks binary
+*.keystore binary
