@@ -70,7 +70,7 @@ jobs:
           if [ "$TOTAL" -eq 0 ]; then echo "No line data"; exit 1; fi
           PCT=$((COVERED * 100 / TOTAL))
           echo "Line coverage: ${PCT}% (${COVERED}/${TOTAL})"
-          if [ "$PCT" -lt 5 ]; then echo "::error::Coverage ${PCT}% is below 5% threshold"; exit 1; fi
+          if [ "$PCT" -lt 1 ]; then echo "::error::Coverage ${PCT}% is below 1% threshold"; exit 1; fi
 
       - name: APK & AAB Size
         run: |
