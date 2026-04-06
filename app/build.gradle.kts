@@ -94,6 +94,8 @@ android {
         baseline = file("lint-baseline.xml")
         abortOnError = true
         warningsAsErrors = true
+        // Suppress opinionated checks handled by Dependabot or intentional SDK choices
+        disable += setOf("OldTargetApi", "NewerVersionAvailable", "ObsoleteSdkInt")
     }
 
     packaging {
