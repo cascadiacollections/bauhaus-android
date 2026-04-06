@@ -150,9 +150,10 @@ jobs:
         with:
           name: aab-${{ github.sha }}
           path: aab
+        continue-on-error: true
 
       - name: List downloaded artifacts
-        run: find apks aab -type f
+        run: find apks -type f; find aab -type f 2>/dev/null || true
 
       - name: Get short SHA
         id: sha
@@ -216,6 +217,7 @@ jobs:
         with:
           name: aab-${{ github.sha }}
           path: aab
+        continue-on-error: true
 
       - name: Upload to Play Store internal track
         uses: r0adkll/upload-google-play@v1
