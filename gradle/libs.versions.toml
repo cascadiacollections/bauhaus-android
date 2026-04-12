@@ -28,7 +28,7 @@ googleServices = "4.4.4"
 firebaseCrashlyticsPlugin = "3.0.7"
 mockk = "1.14.9"
 turbine = "1.2.1"
-material3Expressive = "1.5.0-alpha16"
+material3Expressive = "1.5.0-alpha17"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
