@@ -3,6 +3,7 @@ package com.cascadiacollections.bauhaus.ui
 import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
+import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
 import com.cascadiacollections.bauhaus.data.SettingsRepository
@@ -143,7 +144,7 @@ class BauhausViewModelTest {
     }
 
     @Test
-    fun `refresh failure emits snackbar event`() = runTest {
+    fun `refresh unexpected failure emits snackbar event`() = runTest {
         val events = mutableListOf<SnackbarEvent>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             viewModel.snackbarEvent.collect { events.add(it) }
@@ -153,7 +154,24 @@ class BauhausViewModelTest {
         viewModel.refresh()
 
         assertEquals(1, events.size)
-        assertEquals("Network error", events[0].message)
+        val expected = RuntimeEnvironment.getApplication().getString(R.string.error_refresh)
+        assertEquals(expected, events[0].message)
+        assertFalse(viewModel.uiState.value.isRefreshing)
+    }
+
+    @Test
+    fun `refresh network failure shows friendly message`() = runTest {
+        val events = mutableListOf<SnackbarEvent>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.snackbarEvent.collect { events.add(it) }
+        }
+
+        fakeApi.throwIOException = true
+        viewModel.refresh()
+
+        assertEquals(1, events.size)
+        val expected = RuntimeEnvironment.getApplication().getString(R.string.error_network)
+        assertEquals(expected, events[0].message)
         assertFalse(viewModel.uiState.value.isRefreshing)
     }
 
@@ -193,19 +211,23 @@ class BauhausViewModelTest {
 
         var metadataToReturn: ArtworkMetadata = DEFAULT_METADATA
         var shouldThrow = false
+        var throwIOException = false
 
         override suspend fun fetchTodayMetadata(): ArtworkMetadata {
-            if (shouldThrow) throw RuntimeException("Network error")
+            if (throwIOException) throw java.io.IOException("Unable to resolve host")
+            if (shouldThrow) throw RuntimeException("Unexpected error")
             return metadataToReturn
         }
 
         override suspend fun fetchTodayImage(maxWidth: Int, maxHeight: Int): Bitmap {
-            if (shouldThrow) throw RuntimeException("Network error")
+            if (throwIOException) throw java.io.IOException("Unable to resolve host")
+            if (shouldThrow) throw RuntimeException("Unexpected error")
             return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
         }
 
         override suspend fun fetchTodayImageRaw(): Pair<ByteArray, String> {
-            if (shouldThrow) throw RuntimeException("Network error")
+            if (throwIOException) throw java.io.IOException("Unable to resolve host")
+            if (shouldThrow) throw RuntimeException("Unexpected error")
             return byteArrayOf(0) to "image/jpeg"
         }
     }

@@ -89,6 +89,9 @@ class WallpaperWorker(
             } finally {
                 bitmap.recycle()
             }
+        } catch (e: java.io.IOException) {
+            Log.e(TAG, "Network error setting wallpaper (attempt ${runAttemptCount + 1}/$MAX_RETRIES)", e)
+            Result.retry()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to set wallpaper (attempt ${runAttemptCount + 1}/$MAX_RETRIES)", e)
             CrashReporter.recordException(e)

@@ -8,6 +8,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.IOException
 
 private val json = Json { ignoreUnknownKeys = true }
 
@@ -83,7 +84,7 @@ open class BauhausApi(private val client: OkHttpClient) {
             .build()
 
         val bytes = client.newCall(request).execute().use { response ->
-            check(response.isSuccessful) { "CDN returned HTTP ${response.code}" }
+            if (!response.isSuccessful) throw IOException("CDN returned HTTP ${response.code}")
             response.body.bytes()
         }
 
@@ -103,7 +104,7 @@ open class BauhausApi(private val client: OkHttpClient) {
             .build()
 
         client.newCall(request).execute().use { response ->
-            check(response.isSuccessful) { "CDN returned HTTP ${response.code}" }
+            if (!response.isSuccessful) throw IOException("CDN returned HTTP ${response.code}")
             val mimeType = response.header("Content-Type")?.substringBefore(";")?.trim() ?: "image/jpeg"
             val bytes = response.body.bytes()
             bytes to mimeType
@@ -122,7 +123,7 @@ open class BauhausApi(private val client: OkHttpClient) {
             .build()
 
         client.newCall(request).execute().use { response ->
-            check(response.isSuccessful) { "CDN returned HTTP ${response.code}" }
+            if (!response.isSuccessful) throw IOException("CDN returned HTTP ${response.code}")
             json.decodeFromString<ArtworkMetadata>(response.body.string())
         }
     }

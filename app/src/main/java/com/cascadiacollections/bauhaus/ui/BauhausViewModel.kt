@@ -14,6 +14,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cascadiacollections.bauhaus.BauhausApplication
 import com.cascadiacollections.bauhaus.CrashReporter
+import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
 import com.cascadiacollections.bauhaus.data.HttpModule
@@ -29,6 +30,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.time.LocalDate
 
 /** One-shot event for [SnackbarHost][androidx.compose.material3.SnackbarHost] display. */
@@ -80,6 +82,9 @@ class BauhausViewModel(
     /** Minimum milliseconds between user-initiated refreshes (DOS guard). */
     private val refreshCooldownMs: Long = 30_000L
     private var lastRefreshAt: Long = 0L
+
+    private fun getString(@androidx.annotation.StringRes resId: Int): String =
+        getApplication<Application>().getString(resId)
 
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
@@ -160,10 +165,13 @@ class BauhausViewModel(
                 } finally {
                     bitmap.recycle()
                 }
+            } catch (e: IOException) {
+                _uiState.update { it.copy(isSettingWallpaper = false) }
+                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSettingWallpaper = false) }
                 CrashReporter.recordException(e)
-                _snackbarEvent.tryEmit(SnackbarEvent(e.message ?: "Failed to set wallpaper"))
+                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_set_wallpaper)))
             }
         }
     }
@@ -210,10 +218,13 @@ class BauhausViewModel(
 
                 _uiState.update { it.copy(isSavingImage = false) }
                 _snackbarEvent.tryEmit(SnackbarEvent("Image saved", uri))
+            } catch (e: IOException) {
+                _uiState.update { it.copy(isSavingImage = false) }
+                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSavingImage = false) }
                 CrashReporter.recordException(e)
-                _snackbarEvent.tryEmit(SnackbarEvent(e.message ?: "Failed to save image"))
+                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_save_image)))
             }
         }
     }
@@ -239,10 +250,13 @@ class BauhausViewModel(
             try {
                 val metadata = api.fetchTodayMetadata()
                 _uiState.update { it.copy(metadata = metadata, isRefreshing = false, imageRevision = it.imageRevision + 1) }
+            } catch (e: IOException) {
+                _uiState.update { it.copy(isRefreshing = false) }
+                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
             } catch (e: Exception) {
                 _uiState.update { it.copy(isRefreshing = false) }
                 CrashReporter.recordException(e)
-                _snackbarEvent.tryEmit(SnackbarEvent(e.message ?: "Failed to refresh"))
+                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
             }
         }
     }
