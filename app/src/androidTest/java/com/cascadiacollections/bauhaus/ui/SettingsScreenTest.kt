@@ -26,6 +26,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+private val TEST_METADATA = ArtworkMetadata(
+    title = "Composition VIII",
+    artist = "Wassily Kandinsky",
+)
+
 /**
  * Instrumented Compose UI tests for [SettingsScreen].
  *
@@ -44,13 +49,6 @@ class SettingsScreenTest {
      *  tests are not coupled to any particular English copy. */
     private fun getString(resId: Int): String =
         InstrumentationRegistry.getInstrumentation().targetContext.getString(resId)
-
-    companion object {
-        private val TEST_METADATA = ArtworkMetadata(
-            title = "Composition VIII",
-            artist = "Wassily Kandinsky",
-        )
-    }
 
     // ── Test 1: Preview ───────────────────────────────────────────────────────
 

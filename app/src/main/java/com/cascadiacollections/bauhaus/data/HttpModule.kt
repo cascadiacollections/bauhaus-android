@@ -32,7 +32,6 @@ object HttpModule {
 
     private const val CACHE_SIZE_BYTES = 50L * 1024 * 1024 // 50 MB
     private const val CDN_HOST = "bauhaus.cascadiacollections.workers.dev"
-    private const val IMAGE_ACCEPT = "image/avif, image/webp, image/jpeg"
 
     private var instance: OkHttpClient? = null
 
@@ -46,7 +45,7 @@ object HttpModule {
         if (request.url.host == CDN_HOST && !request.url.encodedPath.endsWith(".json")) {
             chain.proceed(
                 request.newBuilder()
-                    .header("Accept", IMAGE_ACCEPT)
+                    .header("Accept", IMAGE_ACCEPT_HEADER)
                     .build()
             )
         } else {

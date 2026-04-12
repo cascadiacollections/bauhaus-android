@@ -193,10 +193,13 @@ class BauhausViewModel(
                 }
 
                 val resolver = getApplication<Application>().contentResolver
-                val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-                    ?: throw IllegalStateException("MediaStore insert returned null")
+                val uri = checkNotNull(resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)) {
+                    "MediaStore insert returned null"
+                }
 
-                resolver.openOutputStream(uri)!!.use { it.write(bytes) }
+                checkNotNull(resolver.openOutputStream(uri)) {
+                    "Failed to open output stream for URI: $uri"
+                }.use { it.write(bytes) }
 
                 contentValues.clear()
                 contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
@@ -242,7 +245,9 @@ class BauhausViewModel(
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]!!
+                val app = checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]) {
+                    "APPLICATION_KEY not found in CreationExtras"
+                }
                 BauhausViewModel(
                     app,
                     SettingsRepository(app),

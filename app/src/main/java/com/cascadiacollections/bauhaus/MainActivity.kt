@@ -57,8 +57,8 @@ class MainActivity : ComponentActivity() {
                     viewModel.snackbarEvent.collect { event ->
                         val result = snackbarHostState.showSnackbar(
                             message = event.message,
-                            actionLabel = if (event.uri != null) "Open" else null,
-                            duration = if (event.uri != null) SnackbarDuration.Short else SnackbarDuration.Short,
+                            actionLabel = event.uri?.let { "Open" },
+                            duration = SnackbarDuration.Short,
                         )
                         if (result == SnackbarResult.ActionPerformed && event.uri != null) {
                             startActivity(Intent(Intent.ACTION_VIEW, event.uri))

@@ -22,6 +22,8 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.toJavaDuration
 
+private val NETWORK_REQUIRED = Constraints(requiredNetworkType = NetworkType.CONNECTED)
+
 /**
  * Application entry point. Responsible for:
  *
@@ -73,13 +75,11 @@ class BauhausApplication : Application(), SingletonImageLoader.Factory {
 
     /** Enqueues (or keeps) the daily periodic wallpaper worker. */
     fun scheduleWallpaperWorker() {
-        val constraints = Constraints(requiredNetworkType = NetworkType.CONNECTED)
-
         val workRequest = PeriodicWorkRequestBuilder<WallpaperWorker>(
             repeatInterval = 24.hours.toJavaDuration(),
             flexTimeInterval = 1.hours.toJavaDuration(),
         )
-            .setConstraints(constraints)
+            .setConstraints(NETWORK_REQUIRED)
             .addTag(WallpaperWorker.TAG)
             .build()
 
@@ -108,7 +108,7 @@ class BauhausApplication : Application(), SingletonImageLoader.Factory {
             if (!settings.isFirstRun()) return@launch
 
             val expedited = OneTimeWorkRequestBuilder<WallpaperWorker>()
-                .setConstraints(Constraints(requiredNetworkType = NetworkType.CONNECTED))
+                .setConstraints(NETWORK_REQUIRED)
                 .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
                 .addTag(WallpaperWorker.TAG)
                 .build()

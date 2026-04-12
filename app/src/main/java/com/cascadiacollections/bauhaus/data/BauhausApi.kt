@@ -11,6 +11,9 @@ import okhttp3.Request
 
 private val json = Json { ignoreUnknownKeys = true }
 
+/** Image format negotiation header shared by [BauhausApi] and [HttpModule]. */
+internal const val IMAGE_ACCEPT_HEADER = "image/avif, image/webp, image/jpeg"
+
 /**
  * Metadata returned by the bauhaus CDN for a given day's artwork.
  *
@@ -54,8 +57,7 @@ data class ArtworkMetadata(
 open class BauhausApi(private val client: OkHttpClient) {
 
     companion object {
-        private const val BASE_URL = "https://bauhaus.cascadiacollections.workers.dev"
-        private const val ACCEPT_HEADER = "image/avif, image/webp, image/jpeg"
+        internal const val BASE_URL = "https://bauhaus.cascadiacollections.workers.dev"
     }
 
     /**
@@ -77,7 +79,7 @@ open class BauhausApi(private val client: OkHttpClient) {
     ): Bitmap = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("$BASE_URL/api/today")
-            .header("Accept", ACCEPT_HEADER)
+            .header("Accept", IMAGE_ACCEPT_HEADER)
             .build()
 
         val bytes = client.newCall(request).execute().use { response ->
@@ -96,7 +98,7 @@ open class BauhausApi(private val client: OkHttpClient) {
     open suspend fun fetchTodayImageRaw(): Pair<ByteArray, String> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("$BASE_URL/api/today")
-            .header("Accept", ACCEPT_HEADER)
+            .header("Accept", IMAGE_ACCEPT_HEADER)
             .build()
 
         client.newCall(request).execute().use { response ->
@@ -131,8 +133,9 @@ open class BauhausApi(private val client: OkHttpClient) {
  */
 private fun decodeSampled(bytes: ByteArray, maxWidth: Int, maxHeight: Int): Bitmap {
     if (maxWidth <= 0 || maxHeight <= 0) {
-        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            ?: throw IllegalStateException("Failed to decode image")
+        return checkNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size)) {
+            "Failed to decode image from ${bytes.size} bytes"
+        }
     }
 
     val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -141,8 +144,9 @@ private fun decodeSampled(bytes: ByteArray, maxWidth: Int, maxHeight: Int): Bitm
     options.inSampleSize = calculateInSampleSize(options.outWidth, options.outHeight, maxWidth, maxHeight)
     options.inJustDecodeBounds = false
 
-    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
-        ?: throw IllegalStateException("Failed to decode image")
+    return checkNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)) {
+        "Failed to decode image from ${bytes.size} bytes with sample size ${options.inSampleSize}"
+    }
 }
 
 /**
