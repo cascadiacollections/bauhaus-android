@@ -27,7 +27,7 @@ firebaseBom = "34.11.0"
 googleServices = "4.4.4"
 firebaseCrashlyticsPlugin = "3.0.6"
 mockk = "1.14.2"
-turbine = "1.2.0"
+turbine = "1.2.1"
 material3Expressive = "1.5.0-alpha16"
 
 [libraries]
