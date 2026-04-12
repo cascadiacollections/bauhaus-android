@@ -13,6 +13,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cascadiacollections.bauhaus.BauhausApplication
+import com.cascadiacollections.bauhaus.CrashReporter
+import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
 import com.cascadiacollections.bauhaus.data.HttpModule
 import com.cascadiacollections.bauhaus.data.SettingsRepository
@@ -42,7 +44,7 @@ data class UiState(
     val wallpaperTarget: WallpaperTarget = WallpaperTarget.BOTH,
     val schedulingEnabled: Boolean = true,
     val lastUpdated: String? = null,
-    val metadata: com.cascadiacollections.bauhaus.data.ArtworkMetadata? = null,
+    val metadata: ArtworkMetadata? = null,
     val isSettingWallpaper: Boolean = false,
     val isRefreshing: Boolean = false,
     val isSavingImage: Boolean = false,
@@ -160,6 +162,7 @@ class BauhausViewModel(
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSettingWallpaper = false) }
+                CrashReporter.recordException(e)
                 _snackbarEvent.tryEmit(SnackbarEvent(e.message ?: "Failed to set wallpaper"))
             }
         }
@@ -209,6 +212,7 @@ class BauhausViewModel(
                 _snackbarEvent.tryEmit(SnackbarEvent("Image saved", uri))
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSavingImage = false) }
+                CrashReporter.recordException(e)
                 _snackbarEvent.tryEmit(SnackbarEvent(e.message ?: "Failed to save image"))
             }
         }
@@ -237,6 +241,7 @@ class BauhausViewModel(
                 _uiState.update { it.copy(metadata = metadata, isRefreshing = false, imageRevision = it.imageRevision + 1) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isRefreshing = false) }
+                CrashReporter.recordException(e)
                 _snackbarEvent.tryEmit(SnackbarEvent(e.message ?: "Failed to refresh"))
             }
         }

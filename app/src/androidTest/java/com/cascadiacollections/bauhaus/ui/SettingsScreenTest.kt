@@ -50,6 +50,8 @@ class SettingsScreenTest {
     private fun getString(resId: Int): String =
         InstrumentationRegistry.getInstrumentation().targetContext.getString(resId)
 
+    private fun targetLabel(target: WallpaperTarget): String = getString(target.labelRes)
+
     // ── Test 1: Preview ───────────────────────────────────────────────────────
 
     @Test
@@ -85,9 +87,9 @@ class SettingsScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Home").assertIsSelected()
-        composeTestRule.onNodeWithText("Lock").assertIsNotSelected()
-        composeTestRule.onNodeWithText("Both").assertIsNotSelected()
+        composeTestRule.onNodeWithText(targetLabel(WallpaperTarget.HOME)).assertIsSelected()
+        composeTestRule.onNodeWithText(targetLabel(WallpaperTarget.LOCK)).assertIsNotSelected()
+        composeTestRule.onNodeWithText(targetLabel(WallpaperTarget.BOTH)).assertIsNotSelected()
     }
 
     @Test
@@ -105,7 +107,7 @@ class SettingsScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Lock").performClick()
+        composeTestRule.onNodeWithText(targetLabel(WallpaperTarget.LOCK)).performClick()
 
         assertEquals(WallpaperTarget.LOCK, capturedTarget)
     }

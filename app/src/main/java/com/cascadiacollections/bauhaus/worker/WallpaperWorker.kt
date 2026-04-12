@@ -5,6 +5,7 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.cascadiacollections.bauhaus.CrashReporter
 import com.cascadiacollections.bauhaus.data.BauhausApi
 import com.cascadiacollections.bauhaus.data.HttpModule
 import com.cascadiacollections.bauhaus.data.SettingsRepository
@@ -90,6 +91,7 @@ class WallpaperWorker(
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to set wallpaper (attempt ${runAttemptCount + 1}/$MAX_RETRIES)", e)
+            CrashReporter.recordException(e)
             Result.retry()
         }
     }

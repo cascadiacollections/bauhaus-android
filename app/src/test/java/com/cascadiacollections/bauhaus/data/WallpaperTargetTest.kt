@@ -25,9 +25,9 @@ class WallpaperTargetTest {
     }
 
     @Test
-    fun `all entries have non-empty labels`() {
+    fun `all entries have valid label resources`() {
         WallpaperTarget.entries.forEach { target ->
-            assert(target.label.isNotEmpty()) { "${target.name} has an empty label" }
+            assert(target.labelRes != 0) { "${target.name} has an invalid label resource" }
         }
     }
 }

@@ -8,4 +8,7 @@
     <string name="last_updated">Last updated: %1$s</string>
     <string name="set_now">Set Wallpaper Now</string>
     <string name="save_image">Save image</string>
+    <string name="wallpaper_target_home">Home</string>
+    <string name="wallpaper_target_lock">Lock</string>
+    <string name="wallpaper_target_both">Both</string>
 </resources>

@@ -46,6 +46,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import java.time.LocalDate
 import com.cascadiacollections.bauhaus.R
+import com.cascadiacollections.bauhaus.data.BauhausApi
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 
 /**
@@ -123,7 +124,7 @@ fun SettingsScreen(
                 val cacheKey = "${LocalDate.now()}-${uiState.imageRevision}"
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
-                        .data("https://bauhaus.cascadiacollections.workers.dev/api/today")
+                        .data("${BauhausApi.BASE_URL}/api/today")
                         .memoryCacheKey(cacheKey)
                         .diskCacheKey(cacheKey)
                         .build(),
@@ -170,7 +171,7 @@ fun SettingsScreen(
                             count = WallpaperTarget.entries.size,
                         ),
                     ) {
-                        Text(target.label)
+                        Text(stringResource(target.labelRes))
                     }
                 }
             }

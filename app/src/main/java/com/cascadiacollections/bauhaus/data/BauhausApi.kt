@@ -57,7 +57,7 @@ data class ArtworkMetadata(
 open class BauhausApi(private val client: OkHttpClient) {
 
     companion object {
-        internal const val BASE_URL = "https://bauhaus.cascadiacollections.workers.dev"
+        const val BASE_URL = "https://bauhaus.cascadiacollections.workers.dev"
     }
 
     /**
@@ -83,6 +83,7 @@ open class BauhausApi(private val client: OkHttpClient) {
             .build()
 
         val bytes = client.newCall(request).execute().use { response ->
+            check(response.isSuccessful) { "CDN returned HTTP ${response.code}" }
             response.body.bytes()
         }
 
@@ -102,6 +103,7 @@ open class BauhausApi(private val client: OkHttpClient) {
             .build()
 
         client.newCall(request).execute().use { response ->
+            check(response.isSuccessful) { "CDN returned HTTP ${response.code}" }
             val mimeType = response.header("Content-Type")?.substringBefore(";")?.trim() ?: "image/jpeg"
             val bytes = response.body.bytes()
             bytes to mimeType
@@ -120,6 +122,7 @@ open class BauhausApi(private val client: OkHttpClient) {
             .build()
 
         client.newCall(request).execute().use { response ->
+            check(response.isSuccessful) { "CDN returned HTTP ${response.code}" }
             json.decodeFromString<ArtworkMetadata>(response.body.string())
         }
     }
