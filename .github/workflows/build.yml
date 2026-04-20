@@ -170,7 +170,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: nightly-build
-          token: ${{ secrets.GH_RELEASE_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           name: "Nightly Build (${{ steps.date.outputs.date }})"
           body: |
             ## 🌙 Nightly Build
