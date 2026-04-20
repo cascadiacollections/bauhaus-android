@@ -194,9 +194,8 @@ jobs:
             ---
             _This release is automatically replaced on each commit to main._
           files: |
-            apks/app/build/outputs/apk/foss/release/app-foss-release*.apk
-            apks/app/build/outputs/apk/foss/debug/app-foss-debug.apk
-            aab/app/build/outputs/bundle/fossRelease/app-foss-release.aab
+            apks/release/app-foss-release*.apk
+            apks/debug/app-foss-debug.apk
           prerelease: true
           make_latest: false
         continue-on-error: true
