@@ -47,7 +47,7 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
       - name: Build, Lint, and Test
-        run: ./gradlew assembleFossRelease assembleFossDebug lintFossDebug testFossDebugUnitTest jacocoTestReport --no-daemon --parallel --build-cache
+        run: ./gradlew assembleFossRelease assembleFossDebug bundleFossRelease lintFossDebug testFossDebugUnitTest jacocoTestReport --no-daemon --parallel --build-cache
         env:
           KEYSTORE_PATH: ${{ env.KEYSTORE_PATH }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -153,7 +153,6 @@ jobs:
         with:
           name: aab-${{ github.sha }}
           path: aab
-        continue-on-error: true
 
       - name: List downloaded artifacts
         run: find apks -type f; find aab -type f 2>/dev/null || true
@@ -183,7 +182,6 @@ jobs:
             | Variant | Description |
             |---------|-------------|
             | `app-foss-release.apk` | FOSS release (no Google dependencies) |
-            | `app-full-release.apk` | Full release with Firebase Crashlytics |
             | `app-foss-debug.apk` | Debug build with LeakCanary |
 
             ### Installation
@@ -218,15 +216,16 @@ jobs:
         with:
           name: aab-${{ github.sha }}
           path: aab
-        continue-on-error: true
 
       - name: Upload to Play Store internal track
+        if: ${{ env.PLAY_SERVICE_ACCOUNT_JSON != '' }}
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.cascadiacollections.bauhaus
-          releaseFiles: aab/app-release.aab
+          releaseFiles: aab/app-foss-release.aab
           track: internal
           status: completed
-        continue-on-error: true
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
 
