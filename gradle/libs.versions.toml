@@ -13,7 +13,7 @@ espressoCore = "3.7.0"
 lifecycleRuntimeKtx = "2.10.0"
 activityCompose = "1.13.0"
 kotlin = "2.3.20"
-composeBom = "2026.03.01"
+composeBom = "2026.04.01"
 okhttp = "5.3.2"
 datastorePreferences = "1.2.1"
 workManager = "2.11.2"
@@ -28,7 +28,7 @@ googleServices = "4.4.4"
 firebaseCrashlyticsPlugin = "3.0.7"
 mockk = "1.14.9"
 turbine = "1.2.1"
-material3Expressive = "1.5.0-alpha17"
+material3Expressive = "1.5.0-alpha18"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
