@@ -23,7 +23,7 @@ A daily artwork wallpaper app for Android. Each day, Bauhaus fetches a new artwo
 
 - Android 15+ (API 35)
 - compileSdk / targetSdk 36
-- AGP 9.1.0, Kotlin 2.3.20
+- AGP 9.2.1, Kotlin 2.3.21
 
 ## Build
 

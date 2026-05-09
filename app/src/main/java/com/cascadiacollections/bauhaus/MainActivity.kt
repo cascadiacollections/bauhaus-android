@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Download
@@ -20,7 +21,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
                         CenterAlignedTopAppBar(
                             title = { Text(stringResource(R.string.app_name)) },
                             actions = {
-                                val uiState by viewModel.uiState.collectAsState()
+                                val uiState by viewModel.uiState.collectAsStateWithLifecycle()
                                 IconButton(
                                     onClick = viewModel::saveImageToGallery,
                                     enabled = !uiState.isSavingImage,
