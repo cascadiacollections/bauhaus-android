@@ -5,11 +5,20 @@ import android.graphics.BitmapFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import okhttp3.Response
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.IOException
 
 private val json = Json { ignoreUnknownKeys = true }
+
+interface BauhausApiClient {
+    suspend fun fetchTodayImage(maxWidth: Int = 0, maxHeight: Int = 0): Bitmap
+    suspend fun fetchTodayImageRaw(): Pair<ByteArray, String>
+    suspend fun fetchTodayMetadata(): ArtworkMetadata
+}
 
 /**
  * Metadata returned by the bauhaus CDN for a given day's artwork.
@@ -51,7 +60,7 @@ data class ArtworkMetadata(
  *
  * @param client Shared [OkHttpClient] with disk cache — obtain via [HttpModule.client].
  */
-open class BauhausApi(private val client: OkHttpClient) {
+open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
 
     companion object {
         private const val BASE_URL = "https://bauhaus.cascadiacollections.workers.dev"
@@ -71,20 +80,25 @@ open class BauhausApi(private val client: OkHttpClient) {
      * @return Decoded bitmap, sized to fit within the requested bounds.
      * @throws IllegalStateException if the CDN response cannot be decoded.
      */
-    open suspend fun fetchTodayImage(
-        maxWidth: Int = 0,
-        maxHeight: Int = 0,
+    override open suspend fun fetchTodayImage(
+        maxWidth: Int,
+        maxHeight: Int,
     ): Bitmap = withContext(Dispatchers.IO) {
+        val endpoint = "/api/today"
         val request = Request.Builder()
             .url("$BASE_URL/api/today")
             .header("Accept", ACCEPT_HEADER)
             .build()
 
-        val bytes = client.newCall(request).execute().use { response ->
-            response.body.bytes()
+        val bytes = executeRequest(endpoint, request) { response ->
+            response.requireBodyBytes(endpoint)
         }
 
-        decodeSampled(bytes, maxWidth, maxHeight)
+        try {
+            decodeSampled(bytes, maxWidth, maxHeight)
+        } catch (e: IllegalStateException) {
+            throw BauhausDecodeException(endpoint, e)
+        }
     }
 
     /**
@@ -93,15 +107,16 @@ open class BauhausApi(private val client: OkHttpClient) {
      *
      * @return The image bytes paired with the MIME type from the `Content-Type` header.
      */
-    open suspend fun fetchTodayImageRaw(): Pair<ByteArray, String> = withContext(Dispatchers.IO) {
+    override open suspend fun fetchTodayImageRaw(): Pair<ByteArray, String> = withContext(Dispatchers.IO) {
+        val endpoint = "/api/today"
         val request = Request.Builder()
             .url("$BASE_URL/api/today")
             .header("Accept", ACCEPT_HEADER)
             .build()
 
-        client.newCall(request).execute().use { response ->
+        executeRequest(endpoint, request) { response ->
             val mimeType = response.header("Content-Type")?.substringBefore(";")?.trim() ?: "image/jpeg"
-            val bytes = response.body.bytes()
+            val bytes = response.requireBodyBytes(endpoint)
             bytes to mimeType
         }
     }
@@ -112,15 +127,49 @@ open class BauhausApi(private val client: OkHttpClient) {
      * This is a lightweight JSON call (~200 bytes) and is safe to call on
      * every app open. The CDN caches the response for 5 minutes.
      */
-    open suspend fun fetchTodayMetadata(): ArtworkMetadata = withContext(Dispatchers.IO) {
+    override open suspend fun fetchTodayMetadata(): ArtworkMetadata = withContext(Dispatchers.IO) {
+        val endpoint = "/api/today.json"
         val request = Request.Builder()
             .url("$BASE_URL/api/today.json")
             .build()
 
-        client.newCall(request).execute().use { response ->
-            json.decodeFromString<ArtworkMetadata>(response.body.string())
+        executeRequest(endpoint, request) { response ->
+            val body = response.body.string()
+            if (body.isBlank()) {
+                throw BauhausEmptyBodyException(endpoint)
+            }
+            try {
+                json.decodeFromString<ArtworkMetadata>(body)
+            } catch (e: SerializationException) {
+                throw BauhausDecodeException(endpoint, e)
+            }
         }
     }
+
+    private inline fun <T> executeRequest(
+        endpoint: String,
+        request: Request,
+        block: (Response) -> T,
+    ): T {
+        return try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw BauhausHttpException(response.code, endpoint)
+                }
+                block(response)
+            }
+        } catch (e: IOException) {
+            throw BauhausNetworkException(endpoint, e)
+        }
+    }
+}
+
+private fun Response.requireBodyBytes(endpoint: String): ByteArray {
+    val bytes = body.bytes()
+    if (bytes.isEmpty()) {
+        throw BauhausEmptyBodyException(endpoint)
+    }
+    return bytes
 }
 
 /**

@@ -87,9 +87,9 @@ class SettingsScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Home").assertIsSelected()
-        composeTestRule.onNodeWithText("Lock").assertIsNotSelected()
-        composeTestRule.onNodeWithText("Both").assertIsNotSelected()
+        composeTestRule.onNodeWithText(getString(R.string.wallpaper_target_home)).assertIsSelected()
+        composeTestRule.onNodeWithText(getString(R.string.wallpaper_target_lock)).assertIsNotSelected()
+        composeTestRule.onNodeWithText(getString(R.string.wallpaper_target_both)).assertIsNotSelected()
     }
 
     @Test
@@ -107,7 +107,7 @@ class SettingsScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithText("Lock").performClick()
+        composeTestRule.onNodeWithText(getString(R.string.wallpaper_target_lock)).performClick()
 
         assertEquals(WallpaperTarget.LOCK, capturedTarget)
     }

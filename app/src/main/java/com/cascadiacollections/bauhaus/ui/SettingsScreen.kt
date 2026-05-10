@@ -13,10 +13,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ListItem
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -25,7 +24,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +45,7 @@ import coil3.request.ImageRequest
 import java.time.LocalDate
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 /**
  * Semantic test tags for nodes in [SettingsScreen].
@@ -83,7 +82,7 @@ object SettingsScreenTestTags {
  * Pull-to-refresh triggers [onRefresh]. Repeated calls within the cooldown window
  * defined in [BauhausViewModel] are silently dropped to guard the upstream service.
  */
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SettingsScreen(
     uiState: UiState,
@@ -170,7 +169,7 @@ fun SettingsScreen(
                             count = WallpaperTarget.entries.size,
                         ),
                     ) {
-                        Text(target.label)
+                        Text(text = targetLabel(target))
                     }
                 }
             }
@@ -212,7 +211,7 @@ fun SettingsScreen(
                 enabled = !uiState.isSettingWallpaper,
             ) {
                 if (uiState.isSettingWallpaper) {
-                    LoadingIndicator(modifier = Modifier.size(24.dp))
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                     Spacer(modifier = Modifier.width(8.dp))
                 }
                 Text(stringResource(R.string.set_now))
@@ -231,7 +230,7 @@ fun SettingsScreen(
     viewModel: BauhausViewModel,
     modifier: Modifier = Modifier,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     SettingsScreen(
         uiState = uiState,
         onWallpaperTargetChange = viewModel::setWallpaperTarget,
@@ -242,3 +241,13 @@ fun SettingsScreen(
         modifier = modifier,
     )
 }
+
+@Composable
+private fun targetLabel(target: WallpaperTarget): String =
+    stringResource(
+        when (target) {
+            WallpaperTarget.HOME -> R.string.wallpaper_target_home
+            WallpaperTarget.LOCK -> R.string.wallpaper_target_lock
+            WallpaperTarget.BOTH -> R.string.wallpaper_target_both
+        },
+    )

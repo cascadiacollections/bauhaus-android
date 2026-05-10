@@ -3,6 +3,8 @@ package com.cascadiacollections.bauhaus.ui
 import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
+import com.cascadiacollections.bauhaus.WallpaperScheduler
+import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
 import com.cascadiacollections.bauhaus.data.SettingsRepository
@@ -33,12 +35,13 @@ import java.time.Duration
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(application = Application::class)
+@Config(application = Application::class, sdk = [36])
 class BauhausViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var fakeApi: FakeBauhausApi
     private lateinit var fakeSettings: FakeSettingsRepository
+    private lateinit var fakeScheduler: FakeWallpaperScheduler
     private lateinit var viewModel: BauhausViewModel
 
     @Before
@@ -46,13 +49,15 @@ class BauhausViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeApi = FakeBauhausApi()
         fakeSettings = FakeSettingsRepository(RuntimeEnvironment.getApplication())
+        fakeScheduler = FakeWallpaperScheduler()
         // SystemClock starts at 0 in Robolectric; advance past the 30 s refresh
         // cooldown so the first call to refresh() in tests is not blocked.
         ShadowSystemClock.advanceBy(Duration.ofSeconds(31))
         viewModel = BauhausViewModel(
-            RuntimeEnvironment.getApplication(),
+            RuntimeEnvironment.getApplication().applicationContext,
             fakeSettings,
             fakeApi,
+            fakeScheduler,
         )
     }
 
@@ -87,9 +92,10 @@ class BauhausViewModelTest {
     fun `init gracefully handles metadata fetch failure`() {
         val failingApi = FakeBauhausApi().apply { shouldThrow = true }
         val vm = BauhausViewModel(
-            RuntimeEnvironment.getApplication(),
+            RuntimeEnvironment.getApplication().applicationContext,
             FakeSettingsRepository(RuntimeEnvironment.getApplication()),
             failingApi,
+            fakeScheduler,
         )
         assertNull(vm.uiState.value.metadata)
     }
@@ -128,6 +134,18 @@ class BauhausViewModelTest {
         assertEquals(WallpaperTarget.HOME, viewModel.uiState.value.wallpaperTarget)
     }
 
+    @Test
+    fun `setSchedulingEnabled true schedules worker`() {
+        viewModel.setSchedulingEnabled(true)
+        assertTrue(fakeScheduler.scheduleCalled)
+    }
+
+    @Test
+    fun `setSchedulingEnabled false cancels worker`() {
+        viewModel.setSchedulingEnabled(false)
+        assertTrue(fakeScheduler.cancelCalled)
+    }
+
     // ── refresh ──────────────────────────────────────────────────────────────
 
     @Test
@@ -153,7 +171,8 @@ class BauhausViewModelTest {
         viewModel.refresh()
 
         assertEquals(1, events.size)
-        assertEquals("Network error", events[0].message)
+        val expected = RuntimeEnvironment.getApplication().getString(R.string.error_generic)
+        assertEquals(expected, events[0].message)
         assertFalse(viewModel.uiState.value.isRefreshing)
     }
 
@@ -239,6 +258,19 @@ class BauhausViewModelTest {
 
         override suspend fun setLastUpdated(date: String) {
             _lastUpdated.value = date
+        }
+    }
+
+    private class FakeWallpaperScheduler : WallpaperScheduler {
+        var scheduleCalled = false
+        var cancelCalled = false
+
+        override fun scheduleDaily() {
+            scheduleCalled = true
+        }
+
+        override fun cancelDaily() {
+            cancelCalled = true
         }
     }
 }

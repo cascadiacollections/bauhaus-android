@@ -10,15 +10,14 @@ import android.app.WallpaperManager
  * as the `which` parameter.
  *
  * @property flag Bitmask for [WallpaperManager.setBitmap]'s `which` parameter.
- * @property label User-facing display text for the segmented button UI.
  */
-enum class WallpaperTarget(val flag: Int, val label: String) {
+enum class WallpaperTarget(val flag: Int) {
     /** Home screen only. */
-    HOME(WallpaperManager.FLAG_SYSTEM, "Home"),
+    HOME(WallpaperManager.FLAG_SYSTEM),
 
     /** Lock screen only. */
-    LOCK(WallpaperManager.FLAG_LOCK, "Lock"),
+    LOCK(WallpaperManager.FLAG_LOCK),
 
     /** Both home and lock screens. */
-    BOTH(WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK, "Both");
+    BOTH(WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK);
 }

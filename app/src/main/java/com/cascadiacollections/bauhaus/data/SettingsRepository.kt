@@ -13,6 +13,17 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
+interface SettingsStore {
+    val wallpaperTarget: Flow<WallpaperTarget>
+    val schedulingEnabled: Flow<Boolean>
+    val lastUpdated: Flow<String?>
+    suspend fun isFirstRun(): Boolean
+    suspend fun setWallpaperTarget(target: WallpaperTarget)
+    suspend fun setSchedulingEnabled(enabled: Boolean)
+    suspend fun setLastUpdated(date: String)
+    suspend fun markFirstRunComplete()
+}
+
 /**
  * Persists user preferences via Jetpack DataStore (Preferences).
  *
@@ -33,7 +44,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
  *                private data directory and is excluded from cloud backup via
  *                `backup_rules.xml`.
  */
-open class SettingsRepository(private val context: Context) {
+open class SettingsRepository(private val context: Context) : SettingsStore {
 
     private object Keys {
         val WALLPAPER_TARGET = stringPreferencesKey("wallpaper_target")
@@ -43,38 +54,38 @@ open class SettingsRepository(private val context: Context) {
     }
 
     /** Which screen(s) the wallpaper should be applied to. */
-    open val wallpaperTarget: Flow<WallpaperTarget> = context.dataStore.data.map { prefs ->
+    override val wallpaperTarget: Flow<WallpaperTarget> = context.dataStore.data.map { prefs ->
         prefs[Keys.WALLPAPER_TARGET]?.let { WallpaperTarget.valueOf(it) } ?: WallpaperTarget.BOTH
     }
 
     /** Whether the daily periodic WorkManager job is enabled. */
-    open val schedulingEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+    override val schedulingEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
         prefs[Keys.SCHEDULING_ENABLED] ?: true
     }
 
     /** ISO-8601 date string of the last successful wallpaper update, or `null`. */
-    open val lastUpdated: Flow<String?> = context.dataStore.data.map { prefs ->
+    override val lastUpdated: Flow<String?> = context.dataStore.data.map { prefs ->
         prefs[Keys.LAST_UPDATED]
     }
 
     /** `true` on the very first app launch; `false` after the expedited worker runs. */
-    suspend fun isFirstRun(): Boolean =
+    override suspend fun isFirstRun(): Boolean =
         context.dataStore.data.first()[Keys.FIRST_RUN] ?: true
 
-    open suspend fun setWallpaperTarget(target: WallpaperTarget) {
+    override suspend fun setWallpaperTarget(target: WallpaperTarget) {
         context.dataStore.edit { it[Keys.WALLPAPER_TARGET] = target.name }
     }
 
-    open suspend fun setSchedulingEnabled(enabled: Boolean) {
+    override suspend fun setSchedulingEnabled(enabled: Boolean) {
         context.dataStore.edit { it[Keys.SCHEDULING_ENABLED] = enabled }
     }
 
-    open suspend fun setLastUpdated(date: String) {
+    override suspend fun setLastUpdated(date: String) {
         context.dataStore.edit { it[Keys.LAST_UPDATED] = date }
     }
 
     /** Marks first-run as complete so the expedited worker is not re-enqueued. */
-    suspend fun markFirstRunComplete() {
+    override suspend fun markFirstRunComplete() {
         context.dataStore.edit { it[Keys.FIRST_RUN] = false }
     }
 }

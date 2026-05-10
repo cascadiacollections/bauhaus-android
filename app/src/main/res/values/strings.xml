@@ -4,8 +4,19 @@
     <string name="todays_artwork">Today\'s artwork</string>
     <string name="daily_bauhaus">Daily Bauhaus</string>
     <string name="wallpaper_target">Apply to</string>
+    <string name="wallpaper_target_home">Home</string>
+    <string name="wallpaper_target_lock">Lock</string>
+    <string name="wallpaper_target_both">Both</string>
     <string name="daily_updates">Daily updates</string>
     <string name="last_updated">Last updated: %1$s</string>
     <string name="set_now">Set Wallpaper Now</string>
     <string name="save_image">Save image</string>
+    <string name="open">Open</string>
+    <string name="image_saved">Image saved</string>
+    <string name="error_network_unavailable">Network unavailable. Check your connection and try again.</string>
+    <string name="error_service_unavailable">Service is temporarily unavailable. Try again shortly.</string>
+    <string name="error_request_failed_with_code">Request failed (%1$d). Please try again.</string>
+    <string name="error_invalid_response">Received an invalid response from the service. Try again.</string>
+    <string name="error_request_generic">Could not complete the request. Please try again.</string>
+    <string name="error_generic">Something went wrong. Please try again.</string>
 </resources>

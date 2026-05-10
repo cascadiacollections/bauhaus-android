@@ -1,26 +1,22 @@
 package com.cascadiacollections.bauhaus
 
 import android.app.Application
+import androidx.work.Configuration
 import androidx.work.Constraints
-import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.CachePolicy
 import com.cascadiacollections.bauhaus.data.HttpModule
-import com.cascadiacollections.bauhaus.data.SettingsRepository
 import com.cascadiacollections.bauhaus.worker.WallpaperWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.hours
-import kotlin.time.toJavaDuration
 
 /**
  * Application entry point. Responsible for:
@@ -35,15 +31,24 @@ import kotlin.time.toJavaDuration
  *    so the preview image in [SettingsScreen][com.cascadiacollections.bauhaus.ui.SettingsScreen]
  *    and the worker share cached responses. This directly reduces CDN COGs.
  */
-class BauhausApplication : Application(), SingletonImageLoader.Factory {
+class BauhausApplication : Application(), SingletonImageLoader.Factory, Configuration.Provider {
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    lateinit var container: AppContainer
+        private set
 
     override fun onCreate() {
         super.onCreate()
+        container = AppContainer(this)
         CrashReporter.init(this)
         scheduleWallpaperWorker()
         enqueueFirstRunIfNeeded()
+    }
+
+    override val workManagerConfiguration: Configuration by lazy {
+        Configuration.Builder()
+            .setWorkerFactory(container.workerFactory)
+            .build()
     }
 
     // -- Coil SingletonImageLoader.Factory --
@@ -73,26 +78,12 @@ class BauhausApplication : Application(), SingletonImageLoader.Factory {
 
     /** Enqueues (or keeps) the daily periodic wallpaper worker. */
     fun scheduleWallpaperWorker() {
-        val constraints = Constraints(requiredNetworkType = NetworkType.CONNECTED)
-
-        val workRequest = PeriodicWorkRequestBuilder<WallpaperWorker>(
-            repeatInterval = 24.hours.toJavaDuration(),
-            flexTimeInterval = 1.hours.toJavaDuration(),
-        )
-            .setConstraints(constraints)
-            .addTag(WallpaperWorker.TAG)
-            .build()
-
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            WallpaperWorker.WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
-            workRequest,
-        )
+        container.wallpaperScheduler.scheduleDaily()
     }
 
     /** Cancels the daily periodic worker (called when the user disables scheduling). */
     fun cancelWallpaperWorker() {
-        WorkManager.getInstance(this).cancelUniqueWork(WallpaperWorker.WORK_NAME)
+        container.wallpaperScheduler.cancelDaily()
     }
 
     /**
@@ -103,7 +94,7 @@ class BauhausApplication : Application(), SingletonImageLoader.Factory {
      * if the system's expedited quota is exhausted.
      */
     private fun enqueueFirstRunIfNeeded() {
-        val settings = SettingsRepository(this)
+        val settings = container.settingsRepository
         appScope.launch {
             if (!settings.isFirstRun()) return@launch
 

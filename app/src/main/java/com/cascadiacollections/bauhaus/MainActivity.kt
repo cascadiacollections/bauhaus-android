@@ -20,13 +20,13 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cascadiacollections.bauhaus.ui.BauhausViewModel
 import com.cascadiacollections.bauhaus.ui.SettingsScreen
 import com.cascadiacollections.bauhaus.ui.SettingsScreenTestTags
@@ -52,12 +52,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             BauhausTheme {
                 val snackbarHostState = remember { SnackbarHostState() }
+                val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
                 LaunchedEffect(Unit) {
                     viewModel.snackbarEvent.collect { event ->
                         val result = snackbarHostState.showSnackbar(
                             message = event.message,
-                            actionLabel = if (event.uri != null) "Open" else null,
+                            actionLabel = event.actionLabel,
                             duration = if (event.uri != null) SnackbarDuration.Short else SnackbarDuration.Short,
                         )
                         if (result == SnackbarResult.ActionPerformed && event.uri != null) {
@@ -71,7 +72,6 @@ class MainActivity : ComponentActivity() {
                         CenterAlignedTopAppBar(
                             title = { Text(stringResource(R.string.app_name)) },
                             actions = {
-                                val uiState by viewModel.uiState.collectAsState()
                                 IconButton(
                                     onClick = viewModel::saveImageToGallery,
                                     enabled = !uiState.isSavingImage,
@@ -90,7 +90,12 @@ class MainActivity : ComponentActivity() {
                     snackbarHost = { SnackbarHost(snackbarHostState) },
                 ) { innerPadding ->
                     SettingsScreen(
-                        viewModel = viewModel,
+                        uiState = uiState,
+                        onWallpaperTargetChange = viewModel::setWallpaperTarget,
+                        onSchedulingToggle = viewModel::setSchedulingEnabled,
+                        onSetWallpaperNow = viewModel::setWallpaperNow,
+                        onSaveImage = viewModel::saveImageToGallery,
+                        onRefresh = viewModel::refresh,
                         modifier = Modifier.padding(innerPadding),
                     )
                 }

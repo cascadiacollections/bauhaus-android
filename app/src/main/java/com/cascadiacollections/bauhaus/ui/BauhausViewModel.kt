@@ -1,21 +1,28 @@
 package com.cascadiacollections.bauhaus.ui
 
-import android.app.Application
 import android.app.WallpaperManager
 import android.content.ContentValues
+import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.os.SystemClock
 import android.provider.MediaStore
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.cascadiacollections.bauhaus.AppLogger
 import com.cascadiacollections.bauhaus.BauhausApplication
-import com.cascadiacollections.bauhaus.data.BauhausApi
-import com.cascadiacollections.bauhaus.data.HttpModule
-import com.cascadiacollections.bauhaus.data.SettingsRepository
+import com.cascadiacollections.bauhaus.R
+import com.cascadiacollections.bauhaus.WallpaperScheduler
+import com.cascadiacollections.bauhaus.data.BauhausApiClient
+import com.cascadiacollections.bauhaus.data.BauhausDataException
+import com.cascadiacollections.bauhaus.data.BauhausDecodeException
+import com.cascadiacollections.bauhaus.data.BauhausEmptyBodyException
+import com.cascadiacollections.bauhaus.data.BauhausHttpException
+import com.cascadiacollections.bauhaus.data.BauhausNetworkException
+import com.cascadiacollections.bauhaus.data.SettingsStore
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -30,7 +37,11 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDate
 
 /** One-shot event for [SnackbarHost][androidx.compose.material3.SnackbarHost] display. */
-data class SnackbarEvent(val message: String, val uri: Uri? = null)
+data class SnackbarEvent(
+    val message: String,
+    val uri: Uri? = null,
+    val actionLabel: String? = null,
+)
 
 /**
  * Immutable snapshot of the settings screen.
@@ -57,7 +68,8 @@ data class UiState(
  *
  * [settings] and [api] are constructor parameters so the ViewModel can be
  * tested with fakes. Production construction goes through [Factory], which
- * reads the [Application] from [CreationExtras][androidx.lifecycle.viewmodel.CreationExtras].
+ * reads the application instance from
+ * [CreationExtras][androidx.lifecycle.viewmodel.CreationExtras].
  *
  * ## COGs Note
  *
@@ -70,10 +82,11 @@ data class UiState(
  * the image it may already be in the HTTP cache.
  */
 class BauhausViewModel(
-    application: Application,
-    private val settings: SettingsRepository,
-    private val api: BauhausApi,
-) : AndroidViewModel(application) {
+    private val appContext: Context,
+    private val settings: SettingsStore,
+    private val api: BauhausApiClient,
+    private val wallpaperScheduler: WallpaperScheduler,
+) : ViewModel() {
 
     /** Minimum milliseconds between user-initiated refreshes (DOS guard). */
     private val refreshCooldownMs: Long = 30_000L
@@ -105,8 +118,13 @@ class BauhausViewModel(
             try {
                 val metadata = api.fetchTodayMetadata()
                 _uiState.update { it.copy(metadata = metadata) }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 // Metadata is optional — don't block UI if the CDN is unreachable
+                AppLogger.warn(
+                    "BauhausViewModel",
+                    AppLogger.Event("metadata_initial_failure"),
+                    "Initial metadata fetch failed: ${e.toUserMessage(appContext)}",
+                )
             }
         }
     }
@@ -125,10 +143,9 @@ class BauhausViewModel(
      * job is cancelled. Re-enabling re-enqueues it with [ExistingPeriodicWorkPolicy.KEEP][androidx.work.ExistingPeriodicWorkPolicy.KEEP].
      */
     fun setSchedulingEnabled(enabled: Boolean) {
-        val app = getApplication<BauhausApplication>()
         viewModelScope.launch {
             settings.setSchedulingEnabled(enabled)
-            if (enabled) app.scheduleWallpaperWorker() else app.cancelWallpaperWorker()
+            if (enabled) wallpaperScheduler.scheduleDaily() else wallpaperScheduler.cancelDaily()
         }
     }
 
@@ -142,7 +159,7 @@ class BauhausViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isSettingWallpaper = true) }
             try {
-                val metrics = getApplication<Application>().resources.displayMetrics
+                val metrics = appContext.resources.displayMetrics
                 val bitmap = api.fetchTodayImage(
                     maxWidth = metrics.widthPixels,
                     maxHeight = metrics.heightPixels,
@@ -150,7 +167,7 @@ class BauhausViewModel(
                 try {
                     val target = _uiState.value.wallpaperTarget
                     withContext(Dispatchers.IO) {
-                        val wallpaperManager = WallpaperManager.getInstance(getApplication())
+                        val wallpaperManager = WallpaperManager.getInstance(appContext)
                         wallpaperManager.setBitmap(bitmap, null, true, target.flag)
                     }
                     settings.setLastUpdated(LocalDate.now().toString())
@@ -160,7 +177,13 @@ class BauhausViewModel(
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSettingWallpaper = false) }
-                _snackbarEvent.tryEmit(SnackbarEvent(e.message ?: "Failed to set wallpaper"))
+                AppLogger.error(
+                    "BauhausViewModel",
+                    AppLogger.Event("set_wallpaper_failure", mapOf("target" to _uiState.value.wallpaperTarget.name)),
+                    "Set wallpaper failed",
+                    e,
+                )
+                _snackbarEvent.tryEmit(SnackbarEvent(e.toUserMessage(appContext)))
             }
         }
     }
@@ -177,36 +200,58 @@ class BauhausViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isSavingImage = true) }
             try {
-                val (bytes, mimeType) = api.fetchTodayImageRaw()
-                val extension = when (mimeType) {
-                    "image/avif" -> "avif"
-                    "image/webp" -> "webp"
-                    else -> "jpg"
+                val uri = withContext(Dispatchers.IO) {
+                    var pendingUri: Uri? = null
+                    val (bytes, mimeType) = api.fetchTodayImageRaw()
+                    val extension = when (mimeType) {
+                        "image/avif" -> "avif"
+                        "image/webp" -> "webp"
+                        else -> "jpg"
+                    }
+                    val displayName = "bauhaus_${LocalDate.now()}.$extension"
+
+                    val contentValues = ContentValues().apply {
+                        put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
+                        put(MediaStore.Images.Media.MIME_TYPE, mimeType)
+                        put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/Bauhaus")
+                        put(MediaStore.Images.Media.IS_PENDING, 1)
+                    }
+
+                    val resolver = appContext.contentResolver
+                    pendingUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+                    val uri = pendingUri
+                        ?: throw IllegalStateException("MediaStore insert returned null")
+                    try {
+                        resolver.openOutputStream(uri)?.use { it.write(bytes) }
+                            ?: throw IllegalStateException("Failed to open output stream")
+
+                        contentValues.clear()
+                        contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
+                        resolver.update(uri, contentValues, null, null)
+                        uri
+                    } catch (writeError: Exception) {
+                        resolver.delete(uri, null, null)
+                        throw writeError
+                    }
                 }
-                val displayName = "bauhaus_${LocalDate.now()}.$extension"
-
-                val contentValues = ContentValues().apply {
-                    put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
-                    put(MediaStore.Images.Media.MIME_TYPE, mimeType)
-                    put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/Bauhaus")
-                    put(MediaStore.Images.Media.IS_PENDING, 1)
-                }
-
-                val resolver = getApplication<Application>().contentResolver
-                val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-                    ?: throw IllegalStateException("MediaStore insert returned null")
-
-                resolver.openOutputStream(uri)!!.use { it.write(bytes) }
-
-                contentValues.clear()
-                contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
-                resolver.update(uri, contentValues, null, null)
 
                 _uiState.update { it.copy(isSavingImage = false) }
-                _snackbarEvent.tryEmit(SnackbarEvent("Image saved", uri))
+                _snackbarEvent.tryEmit(
+                    SnackbarEvent(
+                        message = appContext.getString(R.string.image_saved),
+                        uri = uri,
+                        actionLabel = appContext.getString(R.string.open),
+                    ),
+                )
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSavingImage = false) }
-                _snackbarEvent.tryEmit(SnackbarEvent(e.message ?: "Failed to save image"))
+                AppLogger.error(
+                    "BauhausViewModel",
+                    AppLogger.Event("save_image_failure"),
+                    "Save image failed",
+                    e,
+                )
+                _snackbarEvent.tryEmit(SnackbarEvent(e.toUserMessage(appContext)))
             }
         }
     }
@@ -234,7 +279,13 @@ class BauhausViewModel(
                 _uiState.update { it.copy(metadata = metadata, isRefreshing = false, imageRevision = it.imageRevision + 1) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isRefreshing = false) }
-                _snackbarEvent.tryEmit(SnackbarEvent(e.message ?: "Failed to refresh"))
+                AppLogger.error(
+                    "BauhausViewModel",
+                    AppLogger.Event("metadata_refresh_failure"),
+                    "Refresh failed",
+                    e,
+                )
+                _snackbarEvent.tryEmit(SnackbarEvent(e.toUserMessage(appContext)))
             }
         }
     }
@@ -243,12 +294,31 @@ class BauhausViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]!!
+                val bauhausApp = app as BauhausApplication
                 BauhausViewModel(
-                    app,
-                    SettingsRepository(app),
-                    BauhausApi(HttpModule.client(app)),
+                    app.applicationContext,
+                    bauhausApp.container.settingsRepository,
+                    bauhausApp.container.bauhausApi,
+                    bauhausApp.container.wallpaperScheduler,
                 )
             }
         }
+    }
+}
+
+private fun Throwable.toUserMessage(context: Context): String {
+    return when (this) {
+        is BauhausNetworkException -> context.getString(R.string.error_network_unavailable)
+        is BauhausHttpException -> {
+            if (code in 500..599) {
+                context.getString(R.string.error_service_unavailable)
+            } else {
+                context.getString(R.string.error_request_failed_with_code, code)
+            }
+        }
+
+        is BauhausDecodeException, is BauhausEmptyBodyException -> context.getString(R.string.error_invalid_response)
+        is BauhausDataException -> context.getString(R.string.error_request_generic)
+        else -> context.getString(R.string.error_generic)
     }
 }

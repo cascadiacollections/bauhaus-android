@@ -2,12 +2,11 @@ package com.cascadiacollections.bauhaus.worker
 
 import android.app.WallpaperManager
 import android.content.Context
-import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.cascadiacollections.bauhaus.data.BauhausApi
-import com.cascadiacollections.bauhaus.data.HttpModule
-import com.cascadiacollections.bauhaus.data.SettingsRepository
+import com.cascadiacollections.bauhaus.AppLogger
+import com.cascadiacollections.bauhaus.data.BauhausApiClient
+import com.cascadiacollections.bauhaus.data.SettingsStore
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 
@@ -44,6 +43,7 @@ import java.time.LocalDate
 class WallpaperWorker(
     context: Context,
     params: WorkerParameters,
+    private val dependencies: Dependencies,
 ) : CoroutineWorker(context, params) {
 
     companion object {
@@ -52,24 +52,37 @@ class WallpaperWorker(
         private const val MAX_RETRIES = 3
     }
 
+    data class Dependencies(
+        val settings: SettingsStore,
+        val api: BauhausApiClient,
+    )
+
     override suspend fun doWork(): Result {
         if (runAttemptCount >= MAX_RETRIES) {
-            Log.w(TAG, "Giving up after $MAX_RETRIES attempts to avoid excessive CDN requests")
+            AppLogger.warn(
+                TAG,
+                AppLogger.Event("worker_give_up", mapOf("attempt" to "$runAttemptCount")),
+                "Giving up after $MAX_RETRIES attempts to avoid excessive CDN requests",
+            )
             return Result.failure()
         }
 
-        val settings = SettingsRepository(applicationContext)
+        val settings = dependencies.settings
 
         // Skip if we already set today's wallpaper (e.g. user tapped "Set Now",
         // or the worker ran twice within the flex window). Saves a CDN request.
         val today = LocalDate.now().toString()
         val lastUpdated = settings.lastUpdated.first()
         if (lastUpdated == today) {
-            Log.i(TAG, "Wallpaper already set for $today, skipping CDN fetch")
+            AppLogger.info(
+                TAG,
+                AppLogger.Event("worker_skip_today", mapOf("date" to today)),
+                "Wallpaper already set for $today, skipping CDN fetch",
+            )
             return Result.success()
         }
 
-        val api = BauhausApi(HttpModule.client(applicationContext))
+        val api = dependencies.api
 
         return try {
             val metrics = applicationContext.resources.displayMetrics
@@ -83,13 +96,22 @@ class WallpaperWorker(
                 val wallpaperManager = WallpaperManager.getInstance(applicationContext)
                 wallpaperManager.setBitmap(bitmap, null, true, target.flag)
                 settings.setLastUpdated(LocalDate.now().toString())
-                Log.i(TAG, "Wallpaper set for target: ${target.name}")
+                AppLogger.info(
+                    TAG,
+                    AppLogger.Event("worker_set_success", mapOf("target" to target.name)),
+                    "Wallpaper set for target: ${target.name}",
+                )
                 Result.success()
             } finally {
                 bitmap.recycle()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to set wallpaper (attempt ${runAttemptCount + 1}/$MAX_RETRIES)", e)
+            AppLogger.error(
+                TAG,
+                AppLogger.Event("worker_set_failure", mapOf("attempt" to "${runAttemptCount + 1}", "maxRetries" to "$MAX_RETRIES")),
+                "Failed to set wallpaper (attempt ${runAttemptCount + 1}/$MAX_RETRIES)",
+                e,
+            )
             Result.retry()
         }
     }

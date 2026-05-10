@@ -25,9 +25,7 @@ class WallpaperTargetTest {
     }
 
     @Test
-    fun `all entries have non-empty labels`() {
-        WallpaperTarget.entries.forEach { target ->
-            assert(target.label.isNotEmpty()) { "${target.name} has an empty label" }
-        }
+    fun `enum still has exactly three targets`() {
+        assertEquals(3, WallpaperTarget.entries.size)
     }
 }
