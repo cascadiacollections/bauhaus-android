@@ -224,20 +224,41 @@ fun SettingsScreen(
                 )
             }
 
-            // -- Metadata (title + artist) --
+            // -- Metadata (title + artist + date + source) --
             uiState.metadata?.let { metadata ->
-                Column {
-                    Text(
-                        text = metadata.title.ifEmpty { stringResource(R.string.daily_bauhaus) },
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.semantics { heading() },
-                    )
-                    if (metadata.artist.isNotEmpty()) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
                         Text(
-                            text = metadata.artist,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = metadata.title.ifEmpty { stringResource(R.string.daily_bauhaus) },
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.semantics { heading() },
                         )
+                        if (metadata.artist.isNotEmpty()) {
+                            Text(
+                                text = metadata.artist,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (metadata.date.isNotBlank()) {
+                            Text(
+                                text = metadata.date,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (metadata.source.isNotBlank()) {
+                            Text(
+                                text = metadata.source,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
             }
