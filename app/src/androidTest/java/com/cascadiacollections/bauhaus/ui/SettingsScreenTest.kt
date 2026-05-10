@@ -30,6 +30,8 @@ import org.junit.runner.RunWith
 private val TEST_METADATA = ArtworkMetadata(
     title = "Composition VIII",
     artist = "Wassily Kandinsky",
+    source = "Guggenheim Museum",
+    date = "1923-07-01",
 )
 
 @RunWith(AndroidJUnit4::class)
@@ -38,7 +40,7 @@ class SettingsScreenTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    private val defaultState = UiState(isMetadataLoading = false)
+    private val defaultState = UiState()
 
     private fun getString(resId: Int): String =
         InstrumentationRegistry.getInstrumentation().targetContext.getString(resId)
@@ -191,6 +193,45 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun settingsScreen_saveButton_invokesOnSaveImageCallback() {
+        var callbackInvoked = false
+
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState,
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = { callbackInvoked = true },
+                onArchivePageSelected = {},
+                onRefresh = {},
+            )
+        }
+
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.SAVE_IMAGE_BUTTON).performClick()
+
+        assertTrue("onSaveImage callback should be invoked on button click", callbackInvoked)
+    }
+
+    @Test
+    fun settingsScreen_saveButton_showsLoadingStateWhenSavingImage() {
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState.copy(isSavingImage = true),
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = {},
+                onArchivePageSelected = {},
+                onRefresh = {},
+            )
+        }
+
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.SAVE_IMAGE_BUTTON).assertIsNotEnabled()
+        composeTestRule.onNodeWithText(getString(R.string.save_image)).assertIsDisplayed()
+    }
+
+    @Test
     fun settingsScreen_displaysMetadata_whenMetadataIsAvailable() {
         composeTestRule.setContent {
             SettingsScreen(
@@ -206,13 +247,15 @@ class SettingsScreenTest {
 
         composeTestRule.onNodeWithText(TEST_METADATA.title).assertIsDisplayed()
         composeTestRule.onNodeWithText(TEST_METADATA.artist).assertIsDisplayed()
+        composeTestRule.onNodeWithText(TEST_METADATA.date).assertIsDisplayed()
+        composeTestRule.onNodeWithText(TEST_METADATA.source).assertIsDisplayed()
     }
 
     @Test
     fun settingsScreen_doesNotDisplayMetadata_whenMetadataIsNull() {
         composeTestRule.setContent {
             SettingsScreen(
-                uiState = defaultState.copy(metadata = null, isMetadataLoading = false, metadataLoadFailed = false),
+                uiState = defaultState.copy(metadata = null),
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
@@ -224,49 +267,8 @@ class SettingsScreenTest {
 
         composeTestRule.onAllNodesWithText(TEST_METADATA.title).assertCountEquals(0)
         composeTestRule.onAllNodesWithText(TEST_METADATA.artist).assertCountEquals(0)
-        composeTestRule.onNodeWithText(getString(R.string.metadata_unavailable)).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(SettingsScreenTestTags.METADATA_RETRY_BUTTON).assertIsDisplayed()
-    }
-
-    @Test
-    fun settingsScreen_displaysMetadataLoadingState_whenMetadataIsLoading() {
-        composeTestRule.setContent {
-            SettingsScreen(
-                uiState = defaultState.copy(metadata = null, isMetadataLoading = true),
-                onWallpaperTargetChange = {},
-                onSchedulingToggle = {},
-                onSetWallpaperNow = {},
-                onSaveImage = {},
-                onArchivePageSelected = {},
-                onRefresh = {},
-            )
-        }
-
-        composeTestRule.onNodeWithText(getString(R.string.metadata_loading)).assertIsDisplayed()
-    }
-
-    @Test
-    fun settingsScreen_displaysMetadataErrorRetry_andInvokesRefresh() {
-        var refreshInvoked = false
-        composeTestRule.setContent {
-            SettingsScreen(
-                uiState = defaultState.copy(
-                    metadata = null,
-                    isMetadataLoading = false,
-                    metadataLoadFailed = true,
-                ),
-                onWallpaperTargetChange = {},
-                onSchedulingToggle = {},
-                onSetWallpaperNow = {},
-                onSaveImage = {},
-                onArchivePageSelected = {},
-                onRefresh = { refreshInvoked = true },
-            )
-        }
-
-        composeTestRule.onNodeWithText(getString(R.string.metadata_error)).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(SettingsScreenTestTags.METADATA_RETRY_BUTTON).performClick()
-        assertTrue("Retry should trigger refresh callback", refreshInvoked)
+        composeTestRule.onAllNodesWithText(TEST_METADATA.date).assertCountEquals(0)
+        composeTestRule.onAllNodesWithText(TEST_METADATA.source).assertCountEquals(0)
     }
 
     @Test
@@ -289,26 +291,6 @@ class SettingsScreenTest {
         composeTestRule
             .onNodeWithTag(SettingsScreenTestTags.SET_NOW_BUTTON)
             .assertIsDisplayed()
-    }
-
-    @Test
-    fun settingsScreen_artworkEmptyState_showsRetryAndInvokesRefresh() {
-        var refreshInvoked = false
-        composeTestRule.setContent {
-            SettingsScreen(
-                uiState = defaultState.copy(availableDates = emptyList()),
-                onWallpaperTargetChange = {},
-                onSchedulingToggle = {},
-                onSetWallpaperNow = {},
-                onSaveImage = {},
-                onArchivePageSelected = {},
-                onRefresh = { refreshInvoked = true },
-            )
-        }
-
-        composeTestRule.onNodeWithText(getString(R.string.artwork_unavailable)).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(SettingsScreenTestTags.ARTWORK_RETRY_BUTTON).performClick()
-        assertTrue("Retry should trigger refresh callback", refreshInvoked)
     }
 
     @Test
@@ -351,5 +333,24 @@ class SettingsScreenTest {
             .performTouchInput { longClick() }
 
         assertTrue("onSaveImage callback should be invoked on long press", callbackInvoked)
+    }
+
+    @Test
+    fun settingsScreen_jumpToDateButton_opensDatePickerDialog() {
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState,
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = {},
+                onArchivePageSelected = {},
+                onRefresh = {},
+            )
+        }
+
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.JUMP_TO_DATE_BUTTON).performClick()
+        composeTestRule.onNodeWithText(getString(android.R.string.ok)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(getString(android.R.string.cancel)).assertIsDisplayed()
     }
 }
