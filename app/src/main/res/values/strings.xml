@@ -14,6 +14,7 @@
     <string name="error_network">No internet connection</string>
     <string name="error_set_wallpaper">Failed to set wallpaper</string>
     <string name="error_save_image">Failed to save image</string>
+    <string name="error_share_unavailable">No app available to share</string>
     <string name="error_refresh">Failed to refresh</string>
     <string name="wallpaper_target_home">Home</string>
     <string name="wallpaper_target_lock">Lock</string>

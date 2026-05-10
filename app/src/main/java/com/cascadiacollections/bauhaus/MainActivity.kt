@@ -73,7 +73,16 @@ class MainActivity : ComponentActivity() {
                             type = "text/plain"
                             putExtra(Intent.EXTRA_TEXT, event.text)
                         }
-                        startActivity(Intent.createChooser(intent, getString(R.string.share_artwork)))
+                        val chooser = Intent.createChooser(intent, getString(R.string.share_artwork))
+                        val canResolve = chooser.resolveActivity(packageManager) != null
+                        if (canResolve) {
+                            startActivity(chooser)
+                        } else {
+                            snackbarHostState.showSnackbar(
+                                message = getString(R.string.error_share_unavailable),
+                                duration = SnackbarDuration.Short,
+                            )
+                        }
                     }
                 }
 
