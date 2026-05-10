@@ -333,7 +333,7 @@ class BauhausViewModel(
                     it.copy(
                         isRefreshing = false,
                         isMetadataLoading = false,
-                        metadataLoadFailed = it.metadata == null,
+                        metadataLoadFailed = true,
                     )
                 }
                 _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
@@ -342,7 +342,7 @@ class BauhausViewModel(
                     it.copy(
                         isRefreshing = false,
                         isMetadataLoading = false,
-                        metadataLoadFailed = it.metadata == null,
+                        metadataLoadFailed = true,
                     )
                 }
                 CrashReporter.recordException(e)

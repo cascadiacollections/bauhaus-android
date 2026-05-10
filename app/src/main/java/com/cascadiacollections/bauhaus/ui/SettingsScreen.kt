@@ -227,6 +227,7 @@ fun SettingsScreen(
 
             // -- Metadata (title + artist) --
             val metadata = uiState.metadata
+            val metadataIsEmpty = metadata == null || (metadata.title.isBlank() && metadata.artist.isBlank())
             when {
                 uiState.isMetadataLoading -> {
                     StateMessage(
@@ -240,7 +241,7 @@ fun SettingsScreen(
                     }
                 }
 
-                uiState.metadataLoadFailed -> {
+                uiState.metadataLoadFailed && metadata == null -> {
                     RetryStateMessage(
                         text = stringResource(R.string.metadata_error),
                         buttonText = stringResource(R.string.retry),
@@ -253,20 +254,7 @@ fun SettingsScreen(
                     )
                 }
 
-                metadata == null -> {
-                    RetryStateMessage(
-                        text = stringResource(R.string.metadata_unavailable),
-                        buttonText = stringResource(R.string.retry),
-                        onRetry = onRefresh,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .defaultMinSize(minHeight = 72.dp)
-                            .semantics { testTag = SettingsScreenTestTags.METADATA_STATE },
-                        buttonModifier = Modifier.semantics { testTag = SettingsScreenTestTags.METADATA_RETRY_BUTTON },
-                    )
-                }
-
-                metadata.title.isBlank() && metadata.artist.isBlank() -> {
+                metadataIsEmpty -> {
                     RetryStateMessage(
                         text = stringResource(R.string.metadata_unavailable),
                         buttonText = stringResource(R.string.retry),
