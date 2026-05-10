@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
@@ -67,6 +68,7 @@ object SettingsScreenTestTags {
     const val ARTWORK_PAGER = "artwork_pager"
     const val DAILY_UPDATES_SWITCH = "daily_updates_switch"
     const val SET_NOW_BUTTON = "set_now_button"
+    const val SAVE_IMAGE_BUTTON = "save_image_button"
     const val DOWNLOAD_ICON = "download_icon"
 }
 
@@ -180,9 +182,21 @@ fun SettingsScreen(
                         ) {
                             OutlinedButton(
                                 onClick = onSaveImage,
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .semantics { testTag = SettingsScreenTestTags.SAVE_IMAGE_BUTTON },
                                 enabled = !uiState.isSavingImage,
                             ) {
+                                if (uiState.isSavingImage) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .semantics {
+                                                contentDescription = stringResource(R.string.saving_image)
+                                            },
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
                                 Text(stringResource(R.string.save_image))
                             }
                             Button(
@@ -193,7 +207,13 @@ fun SettingsScreen(
                                 enabled = !uiState.isSettingWallpaper,
                             ) {
                                 if (uiState.isSettingWallpaper) {
-                                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                    CircularProgressIndicator(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .semantics {
+                                                contentDescription = stringResource(R.string.setting_wallpaper)
+                                            },
+                                    )
                                     Spacer(modifier = Modifier.width(8.dp))
                                 }
                                 Text(stringResource(R.string.set_now))

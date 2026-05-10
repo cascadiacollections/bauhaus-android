@@ -206,9 +206,27 @@ class SettingsScreenTest {
             )
         }
 
-        composeTestRule.onNodeWithText(getString(R.string.save_image)).performClick()
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.SAVE_IMAGE_BUTTON).performClick()
 
         assertTrue("onSaveImage callback should be invoked on button click", callbackInvoked)
+    }
+
+    @Test
+    fun settingsScreen_saveButton_showsLoadingStateWhenSavingImage() {
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState.copy(isSavingImage = true),
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = {},
+                onArchivePageSelected = {},
+                onRefresh = {},
+            )
+        }
+
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.SAVE_IMAGE_BUTTON).assertIsNotEnabled()
+        composeTestRule.onNodeWithText(getString(R.string.save_image)).assertIsDisplayed()
     }
 
     @Test
