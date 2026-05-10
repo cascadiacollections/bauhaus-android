@@ -9,6 +9,7 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -66,12 +67,42 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+                LaunchedEffect(Unit) {
+                    viewModel.shareArtworkEvent.collect { event ->
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, event.text)
+                        }
+                        val chooser = Intent.createChooser(intent, getString(R.string.share_artwork))
+                        val canResolve = chooser.resolveActivity(packageManager) != null
+                        if (canResolve) {
+                            startActivity(chooser)
+                        } else {
+                            snackbarHostState.showSnackbar(
+                                message = getString(R.string.error_share_unavailable),
+                                duration = SnackbarDuration.Short,
+                            )
+                        }
+                    }
+                }
 
                 Scaffold(
                     topBar = {
                         CenterAlignedTopAppBar(
                             title = { Text(stringResource(R.string.app_name)) },
                             actions = {
+                                IconButton(
+                                    onClick = viewModel::shareCurrentArtwork,
+                                    enabled = !uiState.isSavingImage,
+                                    modifier = Modifier.semantics {
+                                        testTag = SettingsScreenTestTags.SHARE_ICON
+                                    },
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Share,
+                                        contentDescription = stringResource(R.string.share_artwork),
+                                    )
+                                }
                                 IconButton(
                                     onClick = viewModel::saveImageToGallery,
                                     enabled = !uiState.isSavingImage,

@@ -67,6 +67,7 @@ object SettingsScreenTestTags {
     const val ARTWORK_PAGER = "artwork_pager"
     const val DAILY_UPDATES_SWITCH = "daily_updates_switch"
     const val SET_NOW_BUTTON = "set_now_button"
+    const val SHARE_ICON = "share_icon"
     const val DOWNLOAD_ICON = "download_icon"
 }
 

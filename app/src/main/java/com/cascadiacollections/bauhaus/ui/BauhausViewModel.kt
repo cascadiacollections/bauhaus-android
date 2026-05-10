@@ -36,6 +36,7 @@ import java.time.LocalDate
 
 /** One-shot event for [SnackbarHost][androidx.compose.material3.SnackbarHost] display. */
 data class SnackbarEvent(val message: String, val uri: Uri? = null)
+data class ShareArtworkEvent(val uri: Uri, val text: String)
 
 /**
  * Immutable snapshot of the settings screen.
@@ -103,6 +104,8 @@ class BauhausViewModel(
 
     private val _snackbarEvent = MutableSharedFlow<SnackbarEvent>(extraBufferCapacity = 1)
     val snackbarEvent: SharedFlow<SnackbarEvent> = _snackbarEvent.asSharedFlow()
+    private val _shareArtworkEvent = MutableSharedFlow<ShareArtworkEvent>(extraBufferCapacity = 1)
+    val shareArtworkEvent: SharedFlow<ShareArtworkEvent> = _shareArtworkEvent.asSharedFlow()
 
     init {
         viewModelScope.launch {
@@ -213,6 +216,23 @@ class BauhausViewModel(
                 _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_set_wallpaper)))
             }
         }
+    }
+
+    fun shareCurrentArtwork() {
+        val snapshot = _uiState.value
+        val path = if (snapshot.visibleDate == today) "/api/today" else "/api/${snapshot.visibleDate}"
+        val artworkUri = Uri.parse("${BauhausApi.BASE_URL}$path")
+
+        val title = snapshot.metadata?.title?.trim().orEmpty()
+        val artist = snapshot.metadata?.artist?.trim().orEmpty()
+        val metadataText = when {
+            title.isNotEmpty() && artist.isNotEmpty() -> "$title — $artist"
+            title.isNotEmpty() -> title
+            artist.isNotEmpty() -> artist
+            else -> null
+        }
+        val shareText = listOfNotNull(metadataText, artworkUri.toString()).joinToString("\n")
+        _shareArtworkEvent.tryEmit(ShareArtworkEvent(uri = artworkUri, text = shareText))
     }
 
     /**

@@ -7,12 +7,14 @@
     <string name="daily_updates">Daily updates</string>
     <string name="last_updated">Last updated: %1$s</string>
     <string name="set_now">Set Wallpaper Now</string>
+    <string name="share_artwork">Share artwork</string>
     <string name="save_image">Save image</string>
     <string name="viewing_date">Viewing: %1$s</string>
     <string name="artwork_for_date">Artwork for %1$s</string>
     <string name="error_network">No internet connection</string>
     <string name="error_set_wallpaper">Failed to set wallpaper</string>
     <string name="error_save_image">Failed to save image</string>
+    <string name="error_share_unavailable">No app available to share</string>
     <string name="error_refresh">Failed to refresh</string>
     <string name="wallpaper_target_home">Home</string>
     <string name="wallpaper_target_lock">Lock</string>
