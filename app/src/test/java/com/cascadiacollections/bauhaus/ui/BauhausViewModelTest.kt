@@ -3,7 +3,6 @@ package com.cascadiacollections.bauhaus.ui
 import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
-import com.cascadiacollections.bauhaus.WallpaperScheduler
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
@@ -32,16 +31,16 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowSystemClock
 import java.time.Duration
+import java.time.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(application = Application::class, sdk = [36])
+@Config(application = Application::class)
 class BauhausViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var fakeApi: FakeBauhausApi
     private lateinit var fakeSettings: FakeSettingsRepository
-    private lateinit var fakeScheduler: FakeWallpaperScheduler
     private lateinit var viewModel: BauhausViewModel
 
     @Before
@@ -49,15 +48,13 @@ class BauhausViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeApi = FakeBauhausApi()
         fakeSettings = FakeSettingsRepository(RuntimeEnvironment.getApplication())
-        fakeScheduler = FakeWallpaperScheduler()
         // SystemClock starts at 0 in Robolectric; advance past the 30 s refresh
         // cooldown so the first call to refresh() in tests is not blocked.
         ShadowSystemClock.advanceBy(Duration.ofSeconds(31))
         viewModel = BauhausViewModel(
-            RuntimeEnvironment.getApplication().applicationContext,
+            RuntimeEnvironment.getApplication(),
             fakeSettings,
             fakeApi,
-            fakeScheduler,
         )
     }
 
@@ -92,10 +89,9 @@ class BauhausViewModelTest {
     fun `init gracefully handles metadata fetch failure`() {
         val failingApi = FakeBauhausApi().apply { shouldThrow = true }
         val vm = BauhausViewModel(
-            RuntimeEnvironment.getApplication().applicationContext,
+            RuntimeEnvironment.getApplication(),
             FakeSettingsRepository(RuntimeEnvironment.getApplication()),
             failingApi,
-            fakeScheduler,
         )
         assertNull(vm.uiState.value.metadata)
     }
@@ -134,18 +130,6 @@ class BauhausViewModelTest {
         assertEquals(WallpaperTarget.HOME, viewModel.uiState.value.wallpaperTarget)
     }
 
-    @Test
-    fun `setSchedulingEnabled true schedules worker`() {
-        viewModel.setSchedulingEnabled(true)
-        assertTrue(fakeScheduler.scheduleCalled)
-    }
-
-    @Test
-    fun `setSchedulingEnabled false cancels worker`() {
-        viewModel.setSchedulingEnabled(false)
-        assertTrue(fakeScheduler.cancelCalled)
-    }
-
     // ── refresh ──────────────────────────────────────────────────────────────
 
     @Test
@@ -161,7 +145,7 @@ class BauhausViewModelTest {
     }
 
     @Test
-    fun `refresh failure emits snackbar event`() = runTest {
+    fun `refresh unexpected failure emits snackbar event`() = runTest {
         val events = mutableListOf<SnackbarEvent>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             viewModel.snackbarEvent.collect { events.add(it) }
@@ -171,7 +155,23 @@ class BauhausViewModelTest {
         viewModel.refresh()
 
         assertEquals(1, events.size)
-        val expected = RuntimeEnvironment.getApplication().getString(R.string.error_generic)
+        val expected = RuntimeEnvironment.getApplication().getString(R.string.error_refresh)
+        assertEquals(expected, events[0].message)
+        assertFalse(viewModel.uiState.value.isRefreshing)
+    }
+
+    @Test
+    fun `refresh network failure shows friendly message`() = runTest {
+        val events = mutableListOf<SnackbarEvent>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.snackbarEvent.collect { events.add(it) }
+        }
+
+        fakeApi.throwIOException = true
+        viewModel.refresh()
+
+        assertEquals(1, events.size)
+        val expected = RuntimeEnvironment.getApplication().getString(R.string.error_network)
         assertEquals(expected, events[0].message)
         assertFalse(viewModel.uiState.value.isRefreshing)
     }
@@ -203,6 +203,42 @@ class BauhausViewModelTest {
         assertEquals(newMetadata, viewModel.uiState.value.metadata)
     }
 
+    @Test
+    fun `selecting oldest page appends older date when archive has data`() {
+        val today = viewModel.uiState.value.visibleDate
+        val expectedOlder = today.minusDays(1)
+        fakeApi.dateMetadata[expectedOlder] = ArtworkMetadata(title = "Older", artist = "Archive")
+
+        viewModel.onArchivePageSelected(0)
+
+        assertEquals(listOf(today, expectedOlder), viewModel.uiState.value.availableDates)
+    }
+
+    @Test
+    fun `selecting older page updates visible date and metadata`() {
+        val today = viewModel.uiState.value.visibleDate
+        val older = today.minusDays(1)
+        val olderMetadata = ArtworkMetadata(title = "Older", artist = "Archive")
+        fakeApi.dateMetadata[older] = olderMetadata
+
+        viewModel.onArchivePageSelected(0)
+        viewModel.onArchivePageSelected(1)
+
+        assertEquals(older, viewModel.uiState.value.visibleDate)
+        assertEquals(olderMetadata, viewModel.uiState.value.metadata)
+    }
+
+    @Test
+    fun `archive is marked complete when older date returns 404`() {
+        val today = viewModel.uiState.value.visibleDate
+        fakeApi.missingDates += today.minusDays(1)
+
+        viewModel.onArchivePageSelected(0)
+
+        assertTrue(viewModel.uiState.value.reachedArchiveStart)
+        assertEquals(listOf(today), viewModel.uiState.value.availableDates)
+    }
+
     // ── Fakes ────────────────────────────────────────────────────────────────
 
     private class FakeBauhausApi : BauhausApi(OkHttpClient()) {
@@ -212,19 +248,46 @@ class BauhausViewModelTest {
 
         var metadataToReturn: ArtworkMetadata = DEFAULT_METADATA
         var shouldThrow = false
+        var throwIOException = false
+        val dateMetadata: MutableMap<LocalDate, ArtworkMetadata> = mutableMapOf()
+        val missingDates: MutableSet<LocalDate> = mutableSetOf()
 
         override suspend fun fetchTodayMetadata(): ArtworkMetadata {
-            if (shouldThrow) throw RuntimeException("Network error")
+            if (throwIOException) throw java.io.IOException("Unable to resolve host")
+            if (shouldThrow) throw RuntimeException("Unexpected error")
             return metadataToReturn
         }
 
+        override suspend fun fetchMetadataForDate(date: LocalDate): ArtworkMetadata {
+            if (throwIOException) throw java.io.IOException("Unable to resolve host")
+            if (shouldThrow) throw RuntimeException("Unexpected error")
+            if (missingDates.contains(date)) throw BauhausApi.ApiHttpException(404)
+            return dateMetadata[date] ?: ArtworkMetadata(title = "Date $date", artist = "Archive")
+        }
+
         override suspend fun fetchTodayImage(maxWidth: Int, maxHeight: Int): Bitmap {
-            if (shouldThrow) throw RuntimeException("Network error")
+            if (throwIOException) throw java.io.IOException("Unable to resolve host")
+            if (shouldThrow) throw RuntimeException("Unexpected error")
+            return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        }
+
+        override suspend fun fetchImageForDate(date: LocalDate, maxWidth: Int, maxHeight: Int): Bitmap {
+            if (throwIOException) throw java.io.IOException("Unable to resolve host")
+            if (shouldThrow) throw RuntimeException("Unexpected error")
+            if (missingDates.contains(date)) throw BauhausApi.ApiHttpException(404)
             return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
         }
 
         override suspend fun fetchTodayImageRaw(): Pair<ByteArray, String> {
-            if (shouldThrow) throw RuntimeException("Network error")
+            if (throwIOException) throw java.io.IOException("Unable to resolve host")
+            if (shouldThrow) throw RuntimeException("Unexpected error")
+            return byteArrayOf(0) to "image/jpeg"
+        }
+
+        override suspend fun fetchImageRawForDate(date: LocalDate): Pair<ByteArray, String> {
+            if (throwIOException) throw java.io.IOException("Unable to resolve host")
+            if (shouldThrow) throw RuntimeException("Unexpected error")
+            if (missingDates.contains(date)) throw BauhausApi.ApiHttpException(404)
             return byteArrayOf(0) to "image/jpeg"
         }
     }
@@ -258,19 +321,6 @@ class BauhausViewModelTest {
 
         override suspend fun setLastUpdated(date: String) {
             _lastUpdated.value = date
-        }
-    }
-
-    private class FakeWallpaperScheduler : WallpaperScheduler {
-        var scheduleCalled = false
-        var cancelCalled = false
-
-        override fun scheduleDaily() {
-            scheduleCalled = true
-        }
-
-        override fun cancelDaily() {
-            cancelCalled = true
         }
     }
 }

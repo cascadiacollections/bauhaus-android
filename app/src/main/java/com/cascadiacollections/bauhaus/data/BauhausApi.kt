@@ -5,20 +5,17 @@ import android.graphics.BitmapFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
-import okhttp3.Response
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 private val json = Json { ignoreUnknownKeys = true }
 
-interface BauhausApiClient {
-    suspend fun fetchTodayImage(maxWidth: Int = 0, maxHeight: Int = 0): Bitmap
-    suspend fun fetchTodayImageRaw(): Pair<ByteArray, String>
-    suspend fun fetchTodayMetadata(): ArtworkMetadata
-}
+/** Image format negotiation header shared by [BauhausApi] and [HttpModule]. */
+internal const val IMAGE_ACCEPT_HEADER = "image/avif, image/webp, image/jpeg"
 
 /**
  * Metadata returned by the bauhaus CDN for a given day's artwork.
@@ -60,12 +57,14 @@ data class ArtworkMetadata(
  *
  * @param client Shared [OkHttpClient] with disk cache — obtain via [HttpModule.client].
  */
-open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
+open class BauhausApi(private val client: OkHttpClient) {
 
     companion object {
-        private const val BASE_URL = "https://bauhaus.cascadiacollections.workers.dev"
-        private const val ACCEPT_HEADER = "image/avif, image/webp, image/jpeg"
+        const val BASE_URL = "https://bauhaus.cascadiacollections.workers.dev"
+        private val ISO_DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
     }
+
+    class ApiHttpException(val statusCode: Int) : IOException("CDN returned HTTP $statusCode")
 
     /**
      * Fetches today's artwork as a [Bitmap], optionally downsampled to fit
@@ -80,25 +79,41 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
      * @return Decoded bitmap, sized to fit within the requested bounds.
      * @throws IllegalStateException if the CDN response cannot be decoded.
      */
-    override open suspend fun fetchTodayImage(
+    open suspend fun fetchTodayImage(
+        maxWidth: Int = 0,
+        maxHeight: Int = 0,
+    ): Bitmap = fetchImageForPath(
+        imagePath = "/api/today",
+        maxWidth = maxWidth,
+        maxHeight = maxHeight,
+    )
+
+    open suspend fun fetchImageForDate(
+        date: LocalDate,
+        maxWidth: Int = 0,
+        maxHeight: Int = 0,
+    ): Bitmap = fetchImageForPath(
+        imagePath = "/api/${date.format(ISO_DATE_FORMAT)}",
+        maxWidth = maxWidth,
+        maxHeight = maxHeight,
+    )
+
+    private suspend fun fetchImageForPath(
+        imagePath: String,
         maxWidth: Int,
         maxHeight: Int,
     ): Bitmap = withContext(Dispatchers.IO) {
-        val endpoint = "/api/today"
         val request = Request.Builder()
-            .url("$BASE_URL/api/today")
-            .header("Accept", ACCEPT_HEADER)
+            .url("$BASE_URL$imagePath")
+            .header("Accept", IMAGE_ACCEPT_HEADER)
             .build()
 
-        val bytes = executeRequest(endpoint, request) { response ->
-            response.requireBodyBytes(endpoint)
+        val bytes = client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw ApiHttpException(response.code)
+            response.body.bytes()
         }
 
-        try {
-            decodeSampled(bytes, maxWidth, maxHeight)
-        } catch (e: IllegalStateException) {
-            throw BauhausDecodeException(endpoint, e)
-        }
+        decodeSampled(bytes, maxWidth, maxHeight)
     }
 
     /**
@@ -107,16 +122,24 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
      *
      * @return The image bytes paired with the MIME type from the `Content-Type` header.
      */
-    override open suspend fun fetchTodayImageRaw(): Pair<ByteArray, String> = withContext(Dispatchers.IO) {
-        val endpoint = "/api/today"
+    open suspend fun fetchTodayImageRaw(): Pair<ByteArray, String> = withContext(Dispatchers.IO) {
+        fetchImageRawForPath("/api/today")
+    }
+
+    open suspend fun fetchImageRawForDate(date: LocalDate): Pair<ByteArray, String> = withContext(Dispatchers.IO) {
+        fetchImageRawForPath("/api/${date.format(ISO_DATE_FORMAT)}")
+    }
+
+    private fun fetchImageRawForPath(path: String): Pair<ByteArray, String> {
         val request = Request.Builder()
-            .url("$BASE_URL/api/today")
-            .header("Accept", ACCEPT_HEADER)
+            .url("$BASE_URL$path")
+            .header("Accept", IMAGE_ACCEPT_HEADER)
             .build()
 
-        executeRequest(endpoint, request) { response ->
+        return client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw ApiHttpException(response.code)
             val mimeType = response.header("Content-Type")?.substringBefore(";")?.trim() ?: "image/jpeg"
-            val bytes = response.requireBodyBytes(endpoint)
+            val bytes = response.body.bytes()
             bytes to mimeType
         }
     }
@@ -127,49 +150,21 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
      * This is a lightweight JSON call (~200 bytes) and is safe to call on
      * every app open. The CDN caches the response for 5 minutes.
      */
-    override open suspend fun fetchTodayMetadata(): ArtworkMetadata = withContext(Dispatchers.IO) {
-        val endpoint = "/api/today.json"
+    open suspend fun fetchTodayMetadata(): ArtworkMetadata = fetchMetadataForPath("/api/today.json")
+
+    open suspend fun fetchMetadataForDate(date: LocalDate): ArtworkMetadata =
+        fetchMetadataForPath("/api/${date.format(ISO_DATE_FORMAT)}.json")
+
+    private suspend fun fetchMetadataForPath(path: String): ArtworkMetadata = withContext(Dispatchers.IO) {
         val request = Request.Builder()
-            .url("$BASE_URL/api/today.json")
+            .url("$BASE_URL$path")
             .build()
 
-        executeRequest(endpoint, request) { response ->
-            val body = response.body.string()
-            if (body.isBlank()) {
-                throw BauhausEmptyBodyException(endpoint)
-            }
-            try {
-                json.decodeFromString<ArtworkMetadata>(body)
-            } catch (e: SerializationException) {
-                throw BauhausDecodeException(endpoint, e)
-            }
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw ApiHttpException(response.code)
+            json.decodeFromString<ArtworkMetadata>(response.body.string())
         }
     }
-
-    private inline fun <T> executeRequest(
-        endpoint: String,
-        request: Request,
-        block: (Response) -> T,
-    ): T {
-        return try {
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    throw BauhausHttpException(response.code, endpoint)
-                }
-                block(response)
-            }
-        } catch (e: IOException) {
-            throw BauhausNetworkException(endpoint, e)
-        }
-    }
-}
-
-private fun Response.requireBodyBytes(endpoint: String): ByteArray {
-    val bytes = body.bytes()
-    if (bytes.isEmpty()) {
-        throw BauhausEmptyBodyException(endpoint)
-    }
-    return bytes
 }
 
 /**
@@ -180,8 +175,9 @@ private fun Response.requireBodyBytes(endpoint: String): ByteArray {
  */
 private fun decodeSampled(bytes: ByteArray, maxWidth: Int, maxHeight: Int): Bitmap {
     if (maxWidth <= 0 || maxHeight <= 0) {
-        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            ?: throw IllegalStateException("Failed to decode image")
+        return checkNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size)) {
+            "Failed to decode image from ${bytes.size} bytes"
+        }
     }
 
     val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -190,8 +186,9 @@ private fun decodeSampled(bytes: ByteArray, maxWidth: Int, maxHeight: Int): Bitm
     options.inSampleSize = calculateInSampleSize(options.outWidth, options.outHeight, maxWidth, maxHeight)
     options.inJustDecodeBounds = false
 
-    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
-        ?: throw IllegalStateException("Failed to decode image")
+    return checkNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)) {
+        "Failed to decode image from ${bytes.size} bytes with sample size ${options.inSampleSize}"
+    }
 }
 
 /**

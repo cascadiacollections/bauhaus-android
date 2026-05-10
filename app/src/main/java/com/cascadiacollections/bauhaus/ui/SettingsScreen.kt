@@ -1,5 +1,8 @@
 package com.cascadiacollections.bauhaus.ui
 
+import android.view.HapticFeedbackConstants
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -10,12 +13,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -24,28 +31,28 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.semantics.Role
-import android.view.HapticFeedbackConstants
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
-import java.time.LocalDate
 import com.cascadiacollections.bauhaus.R
+import com.cascadiacollections.bauhaus.data.BauhausApi
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
  * Semantic test tags for nodes in [SettingsScreen].
@@ -56,6 +63,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
  */
 object SettingsScreenTestTags {
     const val ARTWORK_PREVIEW = "artwork_preview"
+    const val ARTWORK_PAGER = "artwork_pager"
     const val DAILY_UPDATES_SWITCH = "daily_updates_switch"
     const val SET_NOW_BUTTON = "set_now_button"
     const val DOWNLOAD_ICON = "download_icon"
@@ -67,22 +75,8 @@ object SettingsScreenTestTags {
  * Keeping state out of this composable makes it straightforward to test: callers
  * (and tests) supply a fixed [UiState] snapshot and capture callbacks to verify
  * interactions without standing up a real [BauhausViewModel].
- *
- * ## Layout
- *
- * 1. **Preview card** — today's artwork loaded via Coil from the CDN. Uses the
- *    app-wide [ImageLoader][coil3.ImageLoader] (configured in [BauhausApplication][com.cascadiacollections.bauhaus.BauhausApplication])
- *    which negotiates AVIF > WebP > JPEG and caches via the shared OkHttp client.
- * 2. **Metadata** — title and artist from `/api/today.json` (optional; gracefully
- *    hidden if the CDN is unreachable).
- * 3. **Wallpaper target** — Material 3 segmented button row (Home / Lock / Both).
- * 4. **Daily updates toggle** — enables or disables the [WorkManager][androidx.work.WorkManager] periodic job.
- * 5. **"Set Now" button** — immediate wallpaper apply with loading state.
- *
- * Pull-to-refresh triggers [onRefresh]. Repeated calls within the cooldown window
- * defined in [BauhausViewModel] are silently dropped to guard the upstream service.
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsScreen(
     uiState: UiState,
@@ -90,6 +84,7 @@ fun SettingsScreen(
     onSchedulingToggle: (Boolean) -> Unit,
     onSetWallpaperNow: () -> Unit,
     onSaveImage: () -> Unit,
+    onArchivePageSelected: (Int) -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -119,19 +114,53 @@ fun SettingsScreen(
                         onLongClickLabel = stringResource(R.string.save_image),
                     ),
             ) {
-                val cacheKey = "${LocalDate.now()}-${uiState.imageRevision}"
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data("https://bauhaus.cascadiacollections.workers.dev/api/today")
-                        .memoryCacheKey(cacheKey)
-                        .diskCacheKey(cacheKey)
-                        .build(),
-                    contentDescription = stringResource(R.string.todays_artwork),
-                    contentScale = ContentScale.Crop,
+                val pagerState = rememberPagerState(pageCount = { uiState.availableDates.size })
+                val today = LocalDate.now()
+                LaunchedEffect(pagerState) {
+                    snapshotFlow { pagerState.currentPage }
+                        .distinctUntilChanged()
+                        .collect { onArchivePageSelected(it) }
+                }
+
+                HorizontalPager(
+                    state = pagerState,
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(4f / 3f)
-                        .semantics { testTag = SettingsScreenTestTags.ARTWORK_PREVIEW },
+                        .semantics { testTag = SettingsScreenTestTags.ARTWORK_PAGER },
+                ) { page ->
+                    val date = uiState.availableDates[page]
+                    val cacheKey = "${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}-${uiState.imageRevision}"
+                    val imagePath = if (date == today) "/api/today" else "/api/${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}"
+                    val contentDescription = if (date == today) {
+                        stringResource(R.string.todays_artwork)
+                    } else {
+                        stringResource(R.string.artwork_for_date, date.toString())
+                    }
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data("${BauhausApi.BASE_URL}$imagePath")
+                            .memoryCacheKey(cacheKey)
+                            .diskCacheKey(cacheKey)
+                            .build(),
+                        contentDescription = contentDescription,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(4f / 3f)
+                            .semantics {
+                                if (date == uiState.visibleDate) {
+                                    testTag = SettingsScreenTestTags.ARTWORK_PREVIEW
+                                }
+                            },
+                    )
+                }
+
+                Text(
+                    text = stringResource(R.string.viewing_date, uiState.visibleDate.toString()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 )
             }
 
@@ -169,7 +198,7 @@ fun SettingsScreen(
                             count = WallpaperTarget.entries.size,
                         ),
                     ) {
-                        Text(text = targetLabel(target))
+                        Text(stringResource(target.labelRes))
                     }
                 }
             }
@@ -211,13 +240,12 @@ fun SettingsScreen(
                 enabled = !uiState.isSettingWallpaper,
             ) {
                 if (uiState.isSettingWallpaper) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    LoadingIndicator(modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                 }
                 Text(stringResource(R.string.set_now))
             }
-
-}
+        }
     }
 }
 
@@ -237,17 +265,8 @@ fun SettingsScreen(
         onSchedulingToggle = viewModel::setSchedulingEnabled,
         onSetWallpaperNow = viewModel::setWallpaperNow,
         onSaveImage = viewModel::saveImageToGallery,
+        onArchivePageSelected = viewModel::onArchivePageSelected,
         onRefresh = viewModel::refresh,
         modifier = modifier,
     )
 }
-
-@Composable
-private fun targetLabel(target: WallpaperTarget): String =
-    stringResource(
-        when (target) {
-            WallpaperTarget.HOME -> R.string.wallpaper_target_home
-            WallpaperTarget.LOCK -> R.string.wallpaper_target_lock
-            WallpaperTarget.BOTH -> R.string.wallpaper_target_both
-        },
-    )

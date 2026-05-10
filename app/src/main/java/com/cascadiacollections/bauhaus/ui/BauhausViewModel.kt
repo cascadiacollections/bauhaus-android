@@ -1,28 +1,25 @@
 package com.cascadiacollections.bauhaus.ui
 
+import android.app.Application
 import android.app.WallpaperManager
 import android.content.ContentValues
-import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.os.SystemClock
 import android.provider.MediaStore
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.cascadiacollections.bauhaus.AppLogger
 import com.cascadiacollections.bauhaus.BauhausApplication
+import com.cascadiacollections.bauhaus.CrashReporter
 import com.cascadiacollections.bauhaus.R
-import com.cascadiacollections.bauhaus.WallpaperScheduler
-import com.cascadiacollections.bauhaus.data.BauhausApiClient
-import com.cascadiacollections.bauhaus.data.BauhausDataException
-import com.cascadiacollections.bauhaus.data.BauhausDecodeException
-import com.cascadiacollections.bauhaus.data.BauhausEmptyBodyException
-import com.cascadiacollections.bauhaus.data.BauhausHttpException
-import com.cascadiacollections.bauhaus.data.BauhausNetworkException
-import com.cascadiacollections.bauhaus.data.SettingsStore
+import com.cascadiacollections.bauhaus.data.ArtworkMetadata
+import com.cascadiacollections.bauhaus.data.BauhausApi.ApiHttpException
+import com.cascadiacollections.bauhaus.data.BauhausApi
+import com.cascadiacollections.bauhaus.data.HttpModule
+import com.cascadiacollections.bauhaus.data.SettingsRepository
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -34,14 +31,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.time.LocalDate
 
 /** One-shot event for [SnackbarHost][androidx.compose.material3.SnackbarHost] display. */
-data class SnackbarEvent(
-    val message: String,
-    val uri: Uri? = null,
-    val actionLabel: String? = null,
-)
+data class SnackbarEvent(val message: String, val uri: Uri? = null)
 
 /**
  * Immutable snapshot of the settings screen.
@@ -53,7 +47,10 @@ data class UiState(
     val wallpaperTarget: WallpaperTarget = WallpaperTarget.BOTH,
     val schedulingEnabled: Boolean = true,
     val lastUpdated: String? = null,
-    val metadata: com.cascadiacollections.bauhaus.data.ArtworkMetadata? = null,
+    val visibleDate: LocalDate = LocalDate.now(),
+    val availableDates: List<LocalDate> = listOf(LocalDate.now()),
+    val reachedArchiveStart: Boolean = false,
+    val metadata: ArtworkMetadata? = null,
     val isSettingWallpaper: Boolean = false,
     val isRefreshing: Boolean = false,
     val isSavingImage: Boolean = false,
@@ -68,8 +65,7 @@ data class UiState(
  *
  * [settings] and [api] are constructor parameters so the ViewModel can be
  * tested with fakes. Production construction goes through [Factory], which
- * reads the application instance from
- * [CreationExtras][androidx.lifecycle.viewmodel.CreationExtras].
+ * reads the [Application] from [CreationExtras][androidx.lifecycle.viewmodel.CreationExtras].
  *
  * ## COGs Note
  *
@@ -82,17 +78,27 @@ data class UiState(
  * the image it may already be in the HTTP cache.
  */
 class BauhausViewModel(
-    private val appContext: Context,
-    private val settings: SettingsStore,
-    private val api: BauhausApiClient,
-    private val wallpaperScheduler: WallpaperScheduler,
-) : ViewModel() {
+    application: Application,
+    private val settings: SettingsRepository,
+    private val api: BauhausApi,
+) : AndroidViewModel(application) {
+    private val today: LocalDate = LocalDate.now()
+    private val metadataByDate = mutableMapOf<LocalDate, ArtworkMetadata>()
+    private var isAppendingOlderDate: Boolean = false
 
     /** Minimum milliseconds between user-initiated refreshes (DOS guard). */
     private val refreshCooldownMs: Long = 30_000L
     private var lastRefreshAt: Long = 0L
 
-    private val _uiState = MutableStateFlow(UiState())
+    private fun getString(@androidx.annotation.StringRes resId: Int): String =
+        getApplication<Application>().getString(resId)
+
+    private val _uiState = MutableStateFlow(
+        UiState(
+            visibleDate = today,
+            availableDates = listOf(today),
+        ),
+    )
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     private val _snackbarEvent = MutableSharedFlow<SnackbarEvent>(extraBufferCapacity = 1)
@@ -117,15 +123,28 @@ class BauhausViewModel(
         viewModelScope.launch {
             try {
                 val metadata = api.fetchTodayMetadata()
+                metadataByDate[today] = metadata
                 _uiState.update { it.copy(metadata = metadata) }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Metadata is optional — don't block UI if the CDN is unreachable
-                AppLogger.warn(
-                    "BauhausViewModel",
-                    AppLogger.Event("metadata_initial_failure"),
-                    "Initial metadata fetch failed: ${e.toUserMessage(appContext)}",
-                )
             }
+        }
+    }
+
+    fun onArchivePageSelected(pageIndex: Int) {
+        val snapshot = _uiState.value
+        val selectedDate = snapshot.availableDates.getOrNull(pageIndex) ?: return
+
+        if (snapshot.visibleDate != selectedDate) {
+            val cached = metadataByDate[selectedDate]
+            _uiState.update { it.copy(visibleDate = selectedDate, metadata = cached) }
+            if (cached == null) {
+                loadMetadataForDate(selectedDate, force = false)
+            }
+        }
+
+        if (!snapshot.reachedArchiveStart && pageIndex == snapshot.availableDates.lastIndex) {
+            appendNextOlderDate()
         }
     }
 
@@ -143,9 +162,10 @@ class BauhausViewModel(
      * job is cancelled. Re-enabling re-enqueues it with [ExistingPeriodicWorkPolicy.KEEP][androidx.work.ExistingPeriodicWorkPolicy.KEEP].
      */
     fun setSchedulingEnabled(enabled: Boolean) {
+        val app = getApplication<BauhausApplication>()
         viewModelScope.launch {
             settings.setSchedulingEnabled(enabled)
-            if (enabled) wallpaperScheduler.scheduleDaily() else wallpaperScheduler.cancelDaily()
+            if (enabled) app.scheduleWallpaperWorker() else app.cancelWallpaperWorker()
         }
     }
 
@@ -159,15 +179,24 @@ class BauhausViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isSettingWallpaper = true) }
             try {
-                val metrics = appContext.resources.displayMetrics
-                val bitmap = api.fetchTodayImage(
-                    maxWidth = metrics.widthPixels,
-                    maxHeight = metrics.heightPixels,
-                )
+                val visibleDate = _uiState.value.visibleDate
+                val metrics = getApplication<Application>().resources.displayMetrics
+                val bitmap = if (visibleDate == today) {
+                    api.fetchTodayImage(
+                        maxWidth = metrics.widthPixels,
+                        maxHeight = metrics.heightPixels,
+                    )
+                } else {
+                    api.fetchImageForDate(
+                        date = visibleDate,
+                        maxWidth = metrics.widthPixels,
+                        maxHeight = metrics.heightPixels,
+                    )
+                }
                 try {
                     val target = _uiState.value.wallpaperTarget
                     withContext(Dispatchers.IO) {
-                        val wallpaperManager = WallpaperManager.getInstance(appContext)
+                        val wallpaperManager = WallpaperManager.getInstance(getApplication())
                         wallpaperManager.setBitmap(bitmap, null, true, target.flag)
                     }
                     settings.setLastUpdated(LocalDate.now().toString())
@@ -175,15 +204,13 @@ class BauhausViewModel(
                 } finally {
                     bitmap.recycle()
                 }
+            } catch (e: IOException) {
+                _uiState.update { it.copy(isSettingWallpaper = false) }
+                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSettingWallpaper = false) }
-                AppLogger.error(
-                    "BauhausViewModel",
-                    AppLogger.Event("set_wallpaper_failure", mapOf("target" to _uiState.value.wallpaperTarget.name)),
-                    "Set wallpaper failed",
-                    e,
-                )
-                _snackbarEvent.tryEmit(SnackbarEvent(e.toUserMessage(appContext)))
+                CrashReporter.recordException(e)
+                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_set_wallpaper)))
             }
         }
     }
@@ -200,58 +227,48 @@ class BauhausViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isSavingImage = true) }
             try {
-                val uri = withContext(Dispatchers.IO) {
-                    var pendingUri: Uri? = null
-                    val (bytes, mimeType) = api.fetchTodayImageRaw()
-                    val extension = when (mimeType) {
-                        "image/avif" -> "avif"
-                        "image/webp" -> "webp"
-                        else -> "jpg"
-                    }
-                    val displayName = "bauhaus_${LocalDate.now()}.$extension"
+                val visibleDate = _uiState.value.visibleDate
+                val (bytes, mimeType) = if (visibleDate == today) {
+                    api.fetchTodayImageRaw()
+                } else {
+                    api.fetchImageRawForDate(visibleDate)
+                }
+                val extension = when (mimeType) {
+                    "image/avif" -> "avif"
+                    "image/webp" -> "webp"
+                    else -> "jpg"
+                }
+                val displayName = "bauhaus_${visibleDate}.$extension"
 
-                    val contentValues = ContentValues().apply {
-                        put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
-                        put(MediaStore.Images.Media.MIME_TYPE, mimeType)
-                        put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/Bauhaus")
-                        put(MediaStore.Images.Media.IS_PENDING, 1)
-                    }
-
-                    val resolver = appContext.contentResolver
-                    pendingUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-                    val uri = pendingUri
-                        ?: throw IllegalStateException("MediaStore insert returned null")
-                    try {
-                        resolver.openOutputStream(uri)?.use { it.write(bytes) }
-                            ?: throw IllegalStateException("Failed to open output stream")
-
-                        contentValues.clear()
-                        contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
-                        resolver.update(uri, contentValues, null, null)
-                        uri
-                    } catch (writeError: Exception) {
-                        resolver.delete(uri, null, null)
-                        throw writeError
-                    }
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
+                    put(MediaStore.Images.Media.MIME_TYPE, mimeType)
+                    put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/Bauhaus")
+                    put(MediaStore.Images.Media.IS_PENDING, 1)
                 }
 
+                val resolver = getApplication<Application>().contentResolver
+                val uri = checkNotNull(resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)) {
+                    "MediaStore insert returned null"
+                }
+
+                checkNotNull(resolver.openOutputStream(uri)) {
+                    "Failed to open output stream for URI: $uri"
+                }.use { it.write(bytes) }
+
+                contentValues.clear()
+                contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
+                resolver.update(uri, contentValues, null, null)
+
                 _uiState.update { it.copy(isSavingImage = false) }
-                _snackbarEvent.tryEmit(
-                    SnackbarEvent(
-                        message = appContext.getString(R.string.image_saved),
-                        uri = uri,
-                        actionLabel = appContext.getString(R.string.open),
-                    ),
-                )
+                _snackbarEvent.tryEmit(SnackbarEvent("Image saved", uri))
+            } catch (e: IOException) {
+                _uiState.update { it.copy(isSavingImage = false) }
+                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
             } catch (e: Exception) {
                 _uiState.update { it.copy(isSavingImage = false) }
-                AppLogger.error(
-                    "BauhausViewModel",
-                    AppLogger.Event("save_image_failure"),
-                    "Save image failed",
-                    e,
-                )
-                _snackbarEvent.tryEmit(SnackbarEvent(e.toUserMessage(appContext)))
+                CrashReporter.recordException(e)
+                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_save_image)))
             }
         }
     }
@@ -275,17 +292,78 @@ class BauhausViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
             try {
-                val metadata = api.fetchTodayMetadata()
-                _uiState.update { it.copy(metadata = metadata, isRefreshing = false, imageRevision = it.imageRevision + 1) }
+                val visibleDate = _uiState.value.visibleDate
+                val metadata = if (visibleDate == today) {
+                    api.fetchTodayMetadata()
+                } else {
+                    api.fetchMetadataForDate(visibleDate)
+                }
+                metadataByDate[visibleDate] = metadata
+                _uiState.update {
+                    it.copy(
+                        metadata = metadata,
+                        isRefreshing = false,
+                        imageRevision = it.imageRevision + 1,
+                    )
+                }
+            } catch (e: IOException) {
+                _uiState.update { it.copy(isRefreshing = false) }
+                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
             } catch (e: Exception) {
                 _uiState.update { it.copy(isRefreshing = false) }
-                AppLogger.error(
-                    "BauhausViewModel",
-                    AppLogger.Event("metadata_refresh_failure"),
-                    "Refresh failed",
-                    e,
-                )
-                _snackbarEvent.tryEmit(SnackbarEvent(e.toUserMessage(appContext)))
+                CrashReporter.recordException(e)
+                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
+            }
+        }
+    }
+
+    private fun loadMetadataForDate(date: LocalDate, force: Boolean) {
+        if (!force) {
+            metadataByDate[date]?.let { cached ->
+                _uiState.update {
+                    if (it.visibleDate == date) it.copy(metadata = cached) else it
+                }
+                return
+            }
+        }
+
+        viewModelScope.launch {
+            try {
+                val metadata = if (date == today) api.fetchTodayMetadata() else api.fetchMetadataForDate(date)
+                metadataByDate[date] = metadata
+                _uiState.update {
+                    if (it.visibleDate == date) it.copy(metadata = metadata) else it
+                }
+            } catch (_: Exception) {
+                // Metadata is optional — don't block browsing if one date fails
+            }
+        }
+    }
+
+    private fun appendNextOlderDate() {
+        if (isAppendingOlderDate || _uiState.value.reachedArchiveStart) return
+        val oldest = _uiState.value.availableDates.lastOrNull() ?: today
+        val nextOlderDate = oldest.minusDays(1)
+        isAppendingOlderDate = true
+
+        viewModelScope.launch {
+            try {
+                val metadata = api.fetchMetadataForDate(nextOlderDate)
+                metadataByDate[nextOlderDate] = metadata
+                _uiState.update { it.copy(availableDates = it.availableDates + nextOlderDate) }
+            } catch (e: ApiHttpException) {
+                if (e.statusCode == 404) {
+                    _uiState.update { it.copy(reachedArchiveStart = true) }
+                } else {
+                    _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
+                }
+            } catch (e: IOException) {
+                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
+            } catch (e: Exception) {
+                CrashReporter.recordException(e)
+                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
+            } finally {
+                isAppendingOlderDate = false
             }
         }
     }
@@ -293,32 +371,15 @@ class BauhausViewModel(
     companion object {
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]!!
-                val bauhausApp = app as BauhausApplication
+                val app = checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]) {
+                    "APPLICATION_KEY not found in CreationExtras"
+                }
                 BauhausViewModel(
-                    app.applicationContext,
-                    bauhausApp.container.settingsRepository,
-                    bauhausApp.container.bauhausApi,
-                    bauhausApp.container.wallpaperScheduler,
+                    app,
+                    SettingsRepository(app),
+                    BauhausApi(HttpModule.client(app)),
                 )
             }
         }
-    }
-}
-
-private fun Throwable.toUserMessage(context: Context): String {
-    return when (this) {
-        is BauhausNetworkException -> context.getString(R.string.error_network_unavailable)
-        is BauhausHttpException -> {
-            if (code in 500..599) {
-                context.getString(R.string.error_service_unavailable)
-            } else {
-                context.getString(R.string.error_request_failed_with_code, code)
-            }
-        }
-
-        is BauhausDecodeException, is BauhausEmptyBodyException -> context.getString(R.string.error_invalid_response)
-        is BauhausDataException -> context.getString(R.string.error_request_generic)
-        else -> context.getString(R.string.error_generic)
     }
 }

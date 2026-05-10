@@ -1,13 +1,14 @@
 package com.cascadiacollections.bauhaus.ui
 
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -26,12 +27,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/**
- * Instrumented Compose UI tests for [SettingsScreen].
- *
- * Uses the stateless [SettingsScreen] overload so tests run entirely in-process
- * without a real [BauhausViewModel], DataStore, or network calls.
- */
+private val TEST_METADATA = ArtworkMetadata(
+    title = "Composition VIII",
+    artist = "Wassily Kandinsky",
+)
+
 @RunWith(AndroidJUnit4::class)
 class SettingsScreenTest {
 
@@ -40,19 +40,10 @@ class SettingsScreenTest {
 
     private val defaultState = UiState()
 
-    /** Resolves a string resource from the app under test at runtime, ensuring
-     *  tests are not coupled to any particular English copy. */
     private fun getString(resId: Int): String =
         InstrumentationRegistry.getInstrumentation().targetContext.getString(resId)
 
-    companion object {
-        private val TEST_METADATA = ArtworkMetadata(
-            title = "Composition VIII",
-            artist = "Wassily Kandinsky",
-        )
-    }
-
-    // ── Test 1: Preview ───────────────────────────────────────────────────────
+    private fun targetLabel(target: WallpaperTarget): String = getString(target.labelRes)
 
     @Test
     fun settingsScreen_artworkPreview_isDisplayed() {
@@ -63,6 +54,7 @@ class SettingsScreenTest {
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
                 onSaveImage = {},
+                onArchivePageSelected = {},
                 onRefresh = {},
             )
         }
@@ -71,8 +63,6 @@ class SettingsScreenTest {
             .onNodeWithTag(SettingsScreenTestTags.ARTWORK_PREVIEW)
             .assertIsDisplayed()
     }
-
-    // ── Test 2: Segmented button ──────────────────────────────────────────────
 
     @Test
     fun settingsScreen_segmentedButton_reflectsWallpaperTarget() {
@@ -83,13 +73,14 @@ class SettingsScreenTest {
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
                 onSaveImage = {},
+                onArchivePageSelected = {},
                 onRefresh = {},
             )
         }
 
-        composeTestRule.onNodeWithText(getString(R.string.wallpaper_target_home)).assertIsSelected()
-        composeTestRule.onNodeWithText(getString(R.string.wallpaper_target_lock)).assertIsNotSelected()
-        composeTestRule.onNodeWithText(getString(R.string.wallpaper_target_both)).assertIsNotSelected()
+        composeTestRule.onNodeWithText(targetLabel(WallpaperTarget.HOME)).assertIsSelected()
+        composeTestRule.onNodeWithText(targetLabel(WallpaperTarget.LOCK)).assertIsNotSelected()
+        composeTestRule.onNodeWithText(targetLabel(WallpaperTarget.BOTH)).assertIsNotSelected()
     }
 
     @Test
@@ -103,16 +94,15 @@ class SettingsScreenTest {
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
                 onSaveImage = {},
+                onArchivePageSelected = {},
                 onRefresh = {},
             )
         }
 
-        composeTestRule.onNodeWithText(getString(R.string.wallpaper_target_lock)).performClick()
+        composeTestRule.onNodeWithText(targetLabel(WallpaperTarget.LOCK)).performClick()
 
         assertEquals(WallpaperTarget.LOCK, capturedTarget)
     }
-
-    // ── Test 3: Daily updates toggle ──────────────────────────────────────────
 
     @Test
     fun settingsScreen_dailyUpdatesSwitch_reflectsSchedulingState() {
@@ -123,6 +113,7 @@ class SettingsScreenTest {
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
                 onSaveImage = {},
+                onArchivePageSelected = {},
                 onRefresh = {},
             )
         }
@@ -141,6 +132,7 @@ class SettingsScreenTest {
                 onSchedulingToggle = { capturedEnabled = it },
                 onSetWallpaperNow = {},
                 onSaveImage = {},
+                onArchivePageSelected = {},
                 onRefresh = {},
             )
         }
@@ -152,8 +144,6 @@ class SettingsScreenTest {
         assertFalse("Callback should be called with false when toggling off", capturedEnabled!!)
     }
 
-    // ── Test 4: Set Now button ────────────────────────────────────────────────
-
     @Test
     fun settingsScreen_setNowButton_showsLoadingStateWhenSettingWallpaper() {
         composeTestRule.setContent {
@@ -163,6 +153,7 @@ class SettingsScreenTest {
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
                 onSaveImage = {},
+                onArchivePageSelected = {},
                 onRefresh = {},
             )
         }
@@ -182,6 +173,7 @@ class SettingsScreenTest {
                 onSchedulingToggle = {},
                 onSetWallpaperNow = { callbackInvoked = true },
                 onSaveImage = {},
+                onArchivePageSelected = {},
                 onRefresh = {},
             )
         }
@@ -192,8 +184,6 @@ class SettingsScreenTest {
         assertTrue("onSetWallpaperNow callback should be invoked on button click", callbackInvoked)
     }
 
-    // ── Test 5: Metadata display ──────────────────────────────────────────────
-
     @Test
     fun settingsScreen_displaysMetadata_whenMetadataIsAvailable() {
         composeTestRule.setContent {
@@ -203,6 +193,7 @@ class SettingsScreenTest {
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
                 onSaveImage = {},
+                onArchivePageSelected = {},
                 onRefresh = {},
             )
         }
@@ -220,15 +211,14 @@ class SettingsScreenTest {
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
                 onSaveImage = {},
+                onArchivePageSelected = {},
                 onRefresh = {},
             )
         }
 
-        composeTestRule.onNodeWithText(TEST_METADATA.title).assertDoesNotExist()
-        composeTestRule.onNodeWithText(TEST_METADATA.artist).assertDoesNotExist()
+        composeTestRule.onAllNodesWithText(TEST_METADATA.title).assertCountEquals(0)
+        composeTestRule.onAllNodesWithText(TEST_METADATA.artist).assertCountEquals(0)
     }
-
-    // ── Test 6: Pull-to-refresh ───────────────────────────────────────────────
 
     @Test
     fun settingsScreen_rendersContentDuringRefresh() {
@@ -239,6 +229,7 @@ class SettingsScreenTest {
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
                 onSaveImage = {},
+                onArchivePageSelected = {},
                 onRefresh = {},
             )
         }
@@ -251,8 +242,6 @@ class SettingsScreenTest {
             .assertIsDisplayed()
     }
 
-    // ── Test 7: Image cache invalidation ─────────────────────────────────────
-
     @Test
     fun settingsScreen_artworkPreview_rendersAfterImageRevisionChange() {
         composeTestRule.setContent {
@@ -262,6 +251,7 @@ class SettingsScreenTest {
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
                 onSaveImage = {},
+                onArchivePageSelected = {},
                 onRefresh = {},
             )
         }
@@ -270,8 +260,6 @@ class SettingsScreenTest {
             .onNodeWithTag(SettingsScreenTestTags.ARTWORK_PREVIEW)
             .assertIsDisplayed()
     }
-
-    // ── Test 8: Long-press save image ────────────────────────────────────────
 
     @Test
     fun settingsScreen_longPressCard_invokesOnSaveImageCallback() {
@@ -284,6 +272,7 @@ class SettingsScreenTest {
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
                 onSaveImage = { callbackInvoked = true },
+                onArchivePageSelected = {},
                 onRefresh = {},
             )
         }
