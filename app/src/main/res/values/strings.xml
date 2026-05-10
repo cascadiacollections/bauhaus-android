@@ -10,6 +10,13 @@
     <string name="save_image">Save image</string>
     <string name="viewing_date">Viewing: %1$s</string>
     <string name="artwork_for_date">Artwork for %1$s</string>
+    <string name="artwork_loading">Loading artwork…</string>
+    <string name="artwork_error">Couldn\'t load artwork</string>
+    <string name="artwork_unavailable">Artwork unavailable</string>
+    <string name="metadata_loading">Loading artwork details…</string>
+    <string name="metadata_error">Couldn\'t load artwork details</string>
+    <string name="metadata_unavailable">No artwork details available</string>
+    <string name="retry">Retry</string>
     <string name="error_network">No internet connection</string>
     <string name="error_set_wallpaper">Failed to set wallpaper</string>
     <string name="error_save_image">Failed to save image</string>

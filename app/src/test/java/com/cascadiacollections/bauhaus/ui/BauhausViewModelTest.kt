@@ -69,6 +69,8 @@ class BauhausViewModelTest {
     @Test
     fun `init loads metadata from api`() {
         assertEquals(FakeBauhausApi.DEFAULT_METADATA, viewModel.uiState.value.metadata)
+        assertFalse(viewModel.uiState.value.isMetadataLoading)
+        assertFalse(viewModel.uiState.value.metadataLoadFailed)
     }
 
     @Test
@@ -95,6 +97,8 @@ class BauhausViewModelTest {
             failingApi,
         )
         assertNull(vm.uiState.value.metadata)
+        assertFalse(vm.uiState.value.isMetadataLoading)
+        assertTrue(vm.uiState.value.metadataLoadFailed)
     }
 
     // ── settings flow reactivity ─────────────────────────────────────────────

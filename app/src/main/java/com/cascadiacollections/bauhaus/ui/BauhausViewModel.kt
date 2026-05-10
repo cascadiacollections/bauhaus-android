@@ -51,6 +51,8 @@ data class UiState(
     val availableDates: List<LocalDate> = listOf(LocalDate.now()),
     val reachedArchiveStart: Boolean = false,
     val metadata: ArtworkMetadata? = null,
+    val isMetadataLoading: Boolean = true,
+    val metadataLoadFailed: Boolean = false,
     val isSettingWallpaper: Boolean = false,
     val isRefreshing: Boolean = false,
     val isSavingImage: Boolean = false,
@@ -124,9 +126,12 @@ class BauhausViewModel(
             try {
                 val metadata = api.fetchTodayMetadata()
                 metadataByDate[today] = metadata
-                _uiState.update { it.copy(metadata = metadata) }
-            } catch (_: Exception) {
-                // Metadata is optional — don't block UI if the CDN is unreachable
+                _uiState.update { it.copy(metadata = metadata, isMetadataLoading = false, metadataLoadFailed = false) }
+            } catch (e: Exception) {
+                if (e is IOException) {
+                    _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
+                }
+                _uiState.update { it.copy(metadata = null, isMetadataLoading = false, metadataLoadFailed = true) }
             }
         }
     }
@@ -137,7 +142,14 @@ class BauhausViewModel(
 
         if (snapshot.visibleDate != selectedDate) {
             val cached = metadataByDate[selectedDate]
-            _uiState.update { it.copy(visibleDate = selectedDate, metadata = cached) }
+            _uiState.update {
+                it.copy(
+                    visibleDate = selectedDate,
+                    metadata = cached,
+                    isMetadataLoading = cached == null,
+                    metadataLoadFailed = false,
+                )
+            }
             if (cached == null) {
                 loadMetadataForDate(selectedDate, force = false)
             }
@@ -290,7 +302,13 @@ class BauhausViewModel(
         if (now - lastRefreshAt < refreshCooldownMs) return
         lastRefreshAt = now
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshing = true) }
+            _uiState.update {
+                it.copy(
+                    isRefreshing = true,
+                    isMetadataLoading = it.metadata == null,
+                    metadataLoadFailed = false,
+                )
+            }
             try {
                 val visibleDate = _uiState.value.visibleDate
                 val metadata = if (visibleDate == today) {
@@ -303,14 +321,28 @@ class BauhausViewModel(
                     it.copy(
                         metadata = metadata,
                         isRefreshing = false,
+                        isMetadataLoading = false,
+                        metadataLoadFailed = false,
                         imageRevision = it.imageRevision + 1,
                     )
                 }
             } catch (e: IOException) {
-                _uiState.update { it.copy(isRefreshing = false) }
+                _uiState.update {
+                    it.copy(
+                        isRefreshing = false,
+                        isMetadataLoading = false,
+                        metadataLoadFailed = it.metadata == null,
+                    )
+                }
                 _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
             } catch (e: Exception) {
-                _uiState.update { it.copy(isRefreshing = false) }
+                _uiState.update {
+                    it.copy(
+                        isRefreshing = false,
+                        isMetadataLoading = false,
+                        metadataLoadFailed = it.metadata == null,
+                    )
+                }
                 CrashReporter.recordException(e)
                 _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
             }
@@ -328,14 +360,31 @@ class BauhausViewModel(
         }
 
         viewModelScope.launch {
+            _uiState.update {
+                if (it.visibleDate == date) {
+                    it.copy(isMetadataLoading = true, metadataLoadFailed = false)
+                } else {
+                    it
+                }
+            }
             try {
                 val metadata = if (date == today) api.fetchTodayMetadata() else api.fetchMetadataForDate(date)
                 metadataByDate[date] = metadata
                 _uiState.update {
-                    if (it.visibleDate == date) it.copy(metadata = metadata) else it
+                    if (it.visibleDate == date) {
+                        it.copy(metadata = metadata, isMetadataLoading = false, metadataLoadFailed = false)
+                    } else {
+                        it
+                    }
                 }
             } catch (_: Exception) {
-                // Metadata is optional — don't block browsing if one date fails
+                _uiState.update {
+                    if (it.visibleDate == date) {
+                        it.copy(metadata = null, isMetadataLoading = false, metadataLoadFailed = true)
+                    } else {
+                        it
+                    }
+                }
             }
         }
     }

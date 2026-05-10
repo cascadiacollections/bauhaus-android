@@ -38,7 +38,7 @@ class SettingsScreenTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
-    private val defaultState = UiState()
+    private val defaultState = UiState(isMetadataLoading = false)
 
     private fun getString(resId: Int): String =
         InstrumentationRegistry.getInstrumentation().targetContext.getString(resId)
@@ -212,7 +212,7 @@ class SettingsScreenTest {
     fun settingsScreen_doesNotDisplayMetadata_whenMetadataIsNull() {
         composeTestRule.setContent {
             SettingsScreen(
-                uiState = defaultState.copy(metadata = null),
+                uiState = defaultState.copy(metadata = null, isMetadataLoading = false, metadataLoadFailed = false),
                 onWallpaperTargetChange = {},
                 onSchedulingToggle = {},
                 onSetWallpaperNow = {},
@@ -224,6 +224,49 @@ class SettingsScreenTest {
 
         composeTestRule.onAllNodesWithText(TEST_METADATA.title).assertCountEquals(0)
         composeTestRule.onAllNodesWithText(TEST_METADATA.artist).assertCountEquals(0)
+        composeTestRule.onNodeWithText(getString(R.string.metadata_unavailable)).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.METADATA_RETRY_BUTTON).assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsScreen_displaysMetadataLoadingState_whenMetadataIsLoading() {
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState.copy(metadata = null, isMetadataLoading = true),
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = {},
+                onArchivePageSelected = {},
+                onRefresh = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText(getString(R.string.metadata_loading)).assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsScreen_displaysMetadataErrorRetry_andInvokesRefresh() {
+        var refreshInvoked = false
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState.copy(
+                    metadata = null,
+                    isMetadataLoading = false,
+                    metadataLoadFailed = true,
+                ),
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = {},
+                onArchivePageSelected = {},
+                onRefresh = { refreshInvoked = true },
+            )
+        }
+
+        composeTestRule.onNodeWithText(getString(R.string.metadata_error)).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.METADATA_RETRY_BUTTON).performClick()
+        assertTrue("Retry should trigger refresh callback", refreshInvoked)
     }
 
     @Test
@@ -246,6 +289,26 @@ class SettingsScreenTest {
         composeTestRule
             .onNodeWithTag(SettingsScreenTestTags.SET_NOW_BUTTON)
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsScreen_artworkEmptyState_showsRetryAndInvokesRefresh() {
+        var refreshInvoked = false
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState.copy(availableDates = emptyList()),
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = {},
+                onArchivePageSelected = {},
+                onRefresh = { refreshInvoked = true },
+            )
+        }
+
+        composeTestRule.onNodeWithText(getString(R.string.artwork_unavailable)).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.ARTWORK_RETRY_BUTTON).performClick()
+        assertTrue("Retry should trigger refresh callback", refreshInvoked)
     }
 
     @Test
