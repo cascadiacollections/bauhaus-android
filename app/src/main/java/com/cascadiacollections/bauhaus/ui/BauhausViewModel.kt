@@ -130,6 +130,9 @@ class BauhausViewModel(
             } catch (e: Exception) {
                 if (e is IOException) {
                     _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
+                } else {
+                    CrashReporter.recordException(e)
+                    _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
                 }
                 _uiState.update { it.copy(metadata = null, isMetadataLoading = false, metadataLoadFailed = true) }
             }

@@ -155,7 +155,7 @@ fun SettingsScreen(
                             .semantics { testTag = SettingsScreenTestTags.ARTWORK_PAGER },
                     ) { page ->
                         val date = uiState.availableDates[page]
-                        var artworkRetryNonce by rememberSaveable(date, uiState.imageRevision) { mutableIntStateOf(0) }
+                        var artworkRetryAttempt by rememberSaveable(date, uiState.imageRevision) { mutableIntStateOf(0) }
                         val cacheKey = "${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}-${uiState.imageRevision}"
                         val imagePath = if (date == today) "/api/today" else "/api/${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}"
                         val contentDescription = if (date == today) {
@@ -176,8 +176,8 @@ fun SettingsScreen(
                             SubcomposeAsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data("${BauhausApi.BASE_URL}$imagePath")
-                                    .memoryCacheKey("$cacheKey-$artworkRetryNonce")
-                                    .diskCacheKey("$cacheKey-$artworkRetryNonce")
+                                    .memoryCacheKey("$cacheKey-$artworkRetryAttempt")
+                                    .diskCacheKey("$cacheKey-$artworkRetryAttempt")
                                     .build(),
                                 contentDescription = contentDescription,
                                 contentScale = ContentScale.Crop,
@@ -202,7 +202,7 @@ fun SettingsScreen(
                                             text = stringResource(R.string.artwork_error),
                                             buttonText = stringResource(R.string.retry),
                                             onRetry = {
-                                                artworkRetryNonce += 1
+                                                artworkRetryAttempt += 1
                                                 onRefresh()
                                             },
                                             modifier = Modifier
