@@ -32,6 +32,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -44,6 +45,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.cascadiacollections.bauhaus.R
@@ -66,6 +68,44 @@ object SettingsScreenTestTags {
     const val DAILY_UPDATES_SWITCH = "daily_updates_switch"
     const val SET_NOW_BUTTON = "set_now_button"
     const val DOWNLOAD_ICON = "download_icon"
+}
+
+internal data class ArchiveImageRequest(
+    val imagePath: String,
+    val cacheKey: String,
+)
+
+internal fun imagePathForDate(
+    date: LocalDate,
+    today: LocalDate,
+): String = if (date == today) {
+    "/api/today"
+} else {
+    "/api/${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}"
+}
+
+internal fun imageCacheKeyForDate(
+    date: LocalDate,
+    imageRevision: Int,
+): String = "${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}-$imageRevision"
+
+internal fun neighborPrefetchRequests(
+    dates: List<LocalDate>,
+    settledPage: Int,
+    today: LocalDate,
+    imageRevision: Int,
+): List<ArchiveImageRequest> {
+    if (dates.isEmpty()) return emptyList()
+    val neighbors = listOf(settledPage - 1, settledPage + 1)
+        .filter { it in dates.indices }
+        .map { dates[it] }
+        .distinct()
+    return neighbors.map { date ->
+        ArchiveImageRequest(
+            imagePath = imagePathForDate(date, today),
+            cacheKey = imageCacheKeyForDate(date, imageRevision),
+        )
+    }
 }
 
 /**
@@ -115,10 +155,31 @@ fun SettingsScreen(
             ) {
                 val pagerState = rememberPagerState(pageCount = { uiState.availableDates.size })
                 val today = LocalDate.now()
-                LaunchedEffect(pagerState) {
-                    snapshotFlow { pagerState.currentPage }
+                val context = LocalContext.current
+                val imageLoader = remember(context) { SingletonImageLoader.get(context) }
+                val prefetchedNeighborKeys = remember(uiState.imageRevision) { mutableSetOf<String>() }
+                LaunchedEffect(pagerState, uiState.availableDates, uiState.imageRevision) {
+                    snapshotFlow { pagerState.settledPage }
                         .distinctUntilChanged()
-                        .collect { onArchivePageSelected(it) }
+                        .collect { pageIndex ->
+                            onArchivePageSelected(pageIndex)
+                            neighborPrefetchRequests(
+                                dates = uiState.availableDates,
+                                settledPage = pageIndex,
+                                today = today,
+                                imageRevision = uiState.imageRevision,
+                            ).forEach { request ->
+                                if (prefetchedNeighborKeys.add(request.cacheKey)) {
+                                    imageLoader.enqueue(
+                                        ImageRequest.Builder(context)
+                                            .data("${BauhausApi.BASE_URL}${request.imagePath}")
+                                            .memoryCacheKey(request.cacheKey)
+                                            .diskCacheKey(request.cacheKey)
+                                            .build(),
+                                    )
+                                }
+                            }
+                        }
                 }
 
                 HorizontalPager(
@@ -129,8 +190,8 @@ fun SettingsScreen(
                         .semantics { testTag = SettingsScreenTestTags.ARTWORK_PAGER },
                 ) { page ->
                     val date = uiState.availableDates[page]
-                    val cacheKey = "${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}-${uiState.imageRevision}"
-                    val imagePath = if (date == today) "/api/today" else "/api/${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}"
+                    val cacheKey = imageCacheKeyForDate(date, uiState.imageRevision)
+                    val imagePath = imagePathForDate(date, today)
                     val contentDescription = if (date == today) {
                         stringResource(R.string.todays_artwork)
                     } else {
