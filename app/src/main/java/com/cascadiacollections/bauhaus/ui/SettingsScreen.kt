@@ -85,6 +85,7 @@ object SettingsScreenTestTags {
     const val ARTWORK_PAGER = "artwork_pager"
     const val DAILY_UPDATES_SWITCH = "daily_updates_switch"
     const val SET_NOW_BUTTON = "set_now_button"
+    const val SAVE_IMAGE_BUTTON = "save_image_button"
     const val SHARE_ICON = "share_icon"
     const val DOWNLOAD_ICON = "download_icon"
     const val JUMP_TO_DATE_BUTTON = "jump_to_date_button"
@@ -452,6 +453,20 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                 }
                 Text(stringResource(R.string.set_now))
+            }
+
+            Button(
+                onClick = onSaveImage,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { testTag = SettingsScreenTestTags.SAVE_IMAGE_BUTTON },
+                enabled = !uiState.isSavingImage,
+            ) {
+                if (uiState.isSavingImage) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(stringResource(R.string.save_image))
             }
         }
     }
