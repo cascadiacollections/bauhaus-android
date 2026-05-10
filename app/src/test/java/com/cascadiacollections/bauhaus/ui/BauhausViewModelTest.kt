@@ -22,6 +22,7 @@ import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -263,6 +264,59 @@ class BauhausViewModelTest {
 
         assertEquals(initialState.visibleDate, viewModel.uiState.value.visibleDate)
         assertEquals(initialState.availableDates, viewModel.uiState.value.availableDates)
+    }
+
+    fun `shareCurrentArtwork emits current artwork uri with metadata`() = runTest {
+        val events = mutableListOf<ShareArtworkEvent>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.shareArtworkEvent.collect { events.add(it) }
+        }
+
+        viewModel.shareCurrentArtwork()
+
+        assertEquals(1, events.size)
+        assertEquals("${BauhausApi.BASE_URL}/api/today", events[0].uri.toString())
+        assertEquals("Test — Test Artist\n${BauhausApi.BASE_URL}/api/today", events[0].text)
+    }
+
+    @Test
+    fun `shareCurrentArtwork uses selected archive date uri`() = runTest {
+        val events = mutableListOf<ShareArtworkEvent>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.shareArtworkEvent.collect { events.add(it) }
+        }
+
+        val today = viewModel.uiState.value.visibleDate
+        val older = today.minusDays(1)
+        fakeApi.dateMetadata[older] = ArtworkMetadata(title = "Older", artist = "Archive")
+        viewModel.onArchivePageSelected(0)
+        viewModel.onArchivePageSelected(1)
+
+        viewModel.shareCurrentArtwork()
+
+        assertEquals(1, events.size)
+        assertEquals("${BauhausApi.BASE_URL}/api/$older", events[0].uri.toString())
+        assertEquals("Older — Archive\n${BauhausApi.BASE_URL}/api/$older", events[0].text)
+    }
+
+    @Test
+    fun `shareCurrentArtwork falls back to uri when metadata unavailable`() = runTest {
+        val failingApi = FakeBauhausApi().apply { shouldThrow = true }
+        val vm = BauhausViewModel(
+            RuntimeEnvironment.getApplication(),
+            FakeSettingsRepository(RuntimeEnvironment.getApplication()),
+            failingApi,
+        )
+        val events = mutableListOf<ShareArtworkEvent>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            vm.shareArtworkEvent.collect { events.add(it) }
+        }
+
+        vm.shareCurrentArtwork()
+        assertEquals(1, events.size)
+        assertNotNull(events[0].uri)
+        assertEquals("${BauhausApi.BASE_URL}/api/today", events[0].text)
+        assertEquals("${BauhausApi.BASE_URL}/api/today", events[0].text)
     }
 
     // ── Fakes ────────────────────────────────────────────────────────────────

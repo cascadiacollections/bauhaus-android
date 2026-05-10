@@ -33,9 +33,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 /** One-shot event for [SnackbarHost][androidx.compose.material3.SnackbarHost] display. */
 data class SnackbarEvent(val message: String, val uri: Uri? = null)
+data class ShareArtworkEvent(val uri: Uri, val text: String)
 
 /**
  * Immutable snapshot of the settings screen.
@@ -82,6 +84,7 @@ class BauhausViewModel(
     private val settings: SettingsRepository,
     private val api: BauhausApi,
 ) : AndroidViewModel(application) {
+    private val maxJumpExpansionDays: Long = 730
     private val today: LocalDate = LocalDate.now()
     private val metadataByDate = mutableMapOf<LocalDate, ArtworkMetadata>()
     private var isAppendingOlderDate: Boolean = false
@@ -103,6 +106,8 @@ class BauhausViewModel(
 
     private val _snackbarEvent = MutableSharedFlow<SnackbarEvent>(extraBufferCapacity = 1)
     val snackbarEvent: SharedFlow<SnackbarEvent> = _snackbarEvent.asSharedFlow()
+    private val _shareArtworkEvent = MutableSharedFlow<ShareArtworkEvent>(extraBufferCapacity = 1)
+    val shareArtworkEvent: SharedFlow<ShareArtworkEvent> = _shareArtworkEvent.asSharedFlow()
 
     init {
         viewModelScope.launch {
@@ -151,29 +156,91 @@ class BauhausViewModel(
     fun jumpToDate(date: LocalDate) {
         if (date.isAfter(today)) return
         val snapshot = _uiState.value
+        if (date == snapshot.visibleDate) return
+
+        val existingIndex = snapshot.availableDates.indexOf(date)
+        if (existingIndex >= 0) {
+            val cached = metadataByDate[date]
+            _uiState.update { it.copy(visibleDate = date, metadata = cached) }
+            if (cached == null) {
+                loadMetadataForDate(date, force = false)
+            }
+            return
+        }
+
         val oldestLoadedDate = snapshot.availableDates.lastOrNull() ?: today
-        val resolvedDates = if (date.isBefore(oldestLoadedDate)) {
-            val datesToAppend = buildList {
-                var nextDate = oldestLoadedDate.minusDays(1)
-                while (nextDate >= date) {
-                    add(nextDate)
-                    nextDate = nextDate.minusDays(1)
+        if (!date.isBefore(oldestLoadedDate)) {
+            val cached = metadataByDate[date]
+            _uiState.update { it.copy(visibleDate = date, metadata = cached) }
+            if (cached == null) {
+                loadMetadataForDate(date, force = false)
+            }
+            return
+        }
+
+        val missingSpanDays = ChronoUnit.DAYS.between(date, oldestLoadedDate)
+        if (missingSpanDays > maxJumpExpansionDays) {
+            _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
+            return
+        }
+
+        viewModelScope.launch {
+            val appendedDates = mutableListOf<LocalDate>()
+            var reachedArchiveStart = false
+            var cursor = oldestLoadedDate.minusDays(1)
+            while (cursor >= date && appendedDates.size < maxJumpExpansionDays) {
+                try {
+                    val metadata = api.fetchMetadataForDate(cursor)
+                    metadataByDate[cursor] = metadata
+                    appendedDates += cursor
+                    if (cursor == date) break
+                } catch (e: BauhausHttpException) {
+                    if (e.code == 404) {
+                        reachedArchiveStart = true
+                        break
+                    }
+                    _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
+                    return@launch
+                } catch (e: IOException) {
+                    _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
+                    return@launch
+                } catch (e: Exception) {
+                    CrashReporter.recordException(e)
+                    _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
+                    return@launch
+                }
+                cursor = cursor.minusDays(1)
+            }
+
+            val targetReached = appendedDates.contains(date)
+            _uiState.update {
+                val mergedDates = if (appendedDates.isNotEmpty()) {
+                    it.availableDates + appendedDates
+                } else {
+                    it.availableDates
+                }
+                if (targetReached) {
+                    it.copy(
+                        availableDates = mergedDates,
+                        visibleDate = date,
+                        metadata = metadataByDate[date],
+                        reachedArchiveStart = it.reachedArchiveStart || reachedArchiveStart,
+                    )
+                } else {
+                    it.copy(
+                        availableDates = mergedDates,
+                        reachedArchiveStart = it.reachedArchiveStart || reachedArchiveStart,
+                    )
                 }
             }
-            snapshot.availableDates + datesToAppend
-        } else {
-            snapshot.availableDates
-        }
-        val cached = metadataByDate[date]
-        _uiState.update {
-            it.copy(
-                visibleDate = date,
-                availableDates = resolvedDates,
-                metadata = cached,
-            )
-        }
-        if (cached == null) {
-            loadMetadataForDate(date, force = false)
+
+            if (targetReached) {
+                if (metadataByDate[date] == null) {
+                    loadMetadataForDate(date, force = false)
+                }
+            } else {
+                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
+            }
         }
     }
 
@@ -242,6 +309,23 @@ class BauhausViewModel(
                 _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_set_wallpaper)))
             }
         }
+    }
+
+    fun shareCurrentArtwork() {
+        val snapshot = _uiState.value
+        val path = if (snapshot.visibleDate == today) "/api/today" else "/api/${snapshot.visibleDate}"
+        val artworkUri = Uri.parse("${BauhausApi.BASE_URL}$path")
+
+        val title = snapshot.metadata?.title?.trim().orEmpty()
+        val artist = snapshot.metadata?.artist?.trim().orEmpty()
+        val metadataText = when {
+            title.isNotEmpty() && artist.isNotEmpty() -> "$title — $artist"
+            title.isNotEmpty() -> title
+            artist.isNotEmpty() -> artist
+            else -> null
+        }
+        val shareText = listOfNotNull(metadataText, artworkUri.toString()).joinToString("\n")
+        _shareArtworkEvent.tryEmit(ShareArtworkEvent(uri = artworkUri, text = shareText))
     }
 
     /**
