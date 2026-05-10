@@ -240,6 +240,88 @@ class BauhausViewModelTest {
         assertEquals(listOf(today), viewModel.uiState.value.availableDates)
     }
 
+    // ── favorites ────────────────────────────────────────────────────────────
+
+    @Test
+    fun `toggleFavorite adds date to favorites`() {
+        val today = viewModel.uiState.value.visibleDate
+        viewModel.toggleFavorite()
+        assertTrue(viewModel.uiState.value.isFavorite)
+        assertTrue(today in viewModel.uiState.value.favoriteDates)
+    }
+
+    @Test
+    fun `toggleFavorite removes date from favorites when already favorited`() {
+        val today = viewModel.uiState.value.visibleDate
+        fakeSettings.emitFavorites(setOf(today.toString()))
+        assertTrue(viewModel.uiState.value.isFavorite)
+
+        viewModel.toggleFavorite()
+
+        assertFalse(viewModel.uiState.value.isFavorite)
+        assertFalse(today in viewModel.uiState.value.favoriteDates)
+    }
+
+    @Test
+    fun `favorites flow updates isFavorite in uiState`() {
+        val today = viewModel.uiState.value.visibleDate
+        assertFalse(viewModel.uiState.value.isFavorite)
+
+        fakeSettings.emitFavorites(setOf(today.toString()))
+
+        assertTrue(viewModel.uiState.value.isFavorite)
+    }
+
+    @Test
+    fun `toggleFavoritesFilter switches to favorites-only mode`() {
+        val today = viewModel.uiState.value.visibleDate
+        fakeSettings.emitFavorites(setOf(today.toString()))
+
+        viewModel.toggleFavoritesFilter()
+
+        assertTrue(viewModel.uiState.value.showFavoritesOnly)
+        assertEquals(listOf(today), viewModel.uiState.value.availableDates)
+    }
+
+    @Test
+    fun `toggleFavoritesFilter restores full date list when exiting favorites-only mode`() {
+        val today = viewModel.uiState.value.visibleDate
+        fakeSettings.emitFavorites(setOf(today.toString()))
+
+        viewModel.toggleFavoritesFilter()
+        viewModel.toggleFavoritesFilter()
+
+        assertFalse(viewModel.uiState.value.showFavoritesOnly)
+        assertEquals(listOf(today), viewModel.uiState.value.availableDates)
+    }
+
+    @Test
+    fun `favorites-only mode shows only favorited dates`() {
+        val today = viewModel.uiState.value.visibleDate
+        val older = today.minusDays(1)
+        fakeApi.dateMetadata[older] = ArtworkMetadata(title = "Older", artist = "Archive")
+        viewModel.onArchivePageSelected(0)
+
+        // Favorite only 'older', not today
+        fakeSettings.emitFavorites(setOf(older.toString()))
+
+        viewModel.toggleFavoritesFilter()
+
+        assertEquals(listOf(older), viewModel.uiState.value.availableDates)
+    }
+
+    @Test
+    fun `selecting page in favorites-only mode does not append older date`() {
+        val today = viewModel.uiState.value.visibleDate
+        fakeSettings.emitFavorites(setOf(today.toString()))
+        viewModel.toggleFavoritesFilter()
+
+        val sizeBeforeSelect = viewModel.uiState.value.availableDates.size
+        viewModel.onArchivePageSelected(0)
+
+        assertEquals(sizeBeforeSelect, viewModel.uiState.value.availableDates.size)
+    }
+
     // ── Fakes ────────────────────────────────────────────────────────────────
 
     private class FakeBauhausApi : BauhausApi(OkHttpClient()) {
@@ -305,11 +387,15 @@ class BauhausViewModelTest {
         private val _lastUpdated = MutableStateFlow<String?>(null)
         override val lastUpdated: Flow<String?> = _lastUpdated
 
+        private val _favorites = MutableStateFlow<Set<String>>(emptySet())
+        override val favorites: Flow<Set<String>> = _favorites
+
         var lastSetTarget: WallpaperTarget? = null
 
         fun emitWallpaperTarget(target: WallpaperTarget) { _wallpaperTarget.value = target }
         fun emitSchedulingEnabled(enabled: Boolean) { _schedulingEnabled.value = enabled }
         fun emitLastUpdated(date: String?) { _lastUpdated.value = date }
+        fun emitFavorites(dates: Set<String>) { _favorites.value = dates }
 
         override suspend fun setWallpaperTarget(target: WallpaperTarget) {
             lastSetTarget = target
@@ -322,6 +408,11 @@ class BauhausViewModelTest {
 
         override suspend fun setLastUpdated(date: String) {
             _lastUpdated.value = date
+        }
+
+        override suspend fun toggleFavorite(date: String) {
+            val current = _favorites.value
+            _favorites.value = if (date in current) current - date else current + date
         }
     }
 }

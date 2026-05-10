@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -17,6 +18,7 @@ interface SettingsStore {
     val wallpaperTarget: Flow<WallpaperTarget>
     val schedulingEnabled: Flow<Boolean>
     val lastUpdated: Flow<String?>
+    val favorites: Flow<Set<String>>
     suspend fun isFirstRun(): Boolean
     suspend fun setWallpaperTarget(target: WallpaperTarget)
     suspend fun setSchedulingEnabled(enabled: Boolean)
@@ -24,6 +26,7 @@ interface SettingsStore {
     suspend fun getLastPrefetchedDate(): String?
     suspend fun setLastPrefetchedDate(date: String)
     suspend fun markFirstRunComplete()
+    suspend fun toggleFavorite(date: String)
 }
 
 /**
@@ -42,6 +45,7 @@ interface SettingsStore {
  * | `last_updated` | String (ISO date) | `null` | Date of the most recent wallpaper set |
  * | `last_prefetched_date` | String (ISO date) | `null` | Date when startup prefetch last warmed `/api/today` |
  * | `first_run` | Boolean | `true` | Guards the expedited first-launch fetch |
+ * | `favorites` | Set&lt;String&gt; (ISO dates) | `emptySet()` | Dates the user has favorited |
  *
  * @param context Application context — the DataStore file lives in the app's
  *                private data directory and is excluded from cloud backup via
@@ -55,6 +59,7 @@ open class SettingsRepository(private val context: Context) : SettingsStore {
         val LAST_UPDATED = stringPreferencesKey("last_updated")
         val LAST_PREFETCHED_DATE = stringPreferencesKey("last_prefetched_date")
         val FIRST_RUN = booleanPreferencesKey("first_run")
+        val FAVORITES = stringSetPreferencesKey("favorites")
     }
 
     /** Which screen(s) the wallpaper should be applied to. */
@@ -70,6 +75,11 @@ open class SettingsRepository(private val context: Context) : SettingsStore {
     /** ISO-8601 date string of the last successful wallpaper update, or `null`. */
     override val lastUpdated: Flow<String?> = context.dataStore.data.map { prefs ->
         prefs[Keys.LAST_UPDATED]
+    }
+
+    /** Set of ISO-8601 date strings that the user has favorited. */
+    override val favorites: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[Keys.FAVORITES] ?: emptySet()
     }
 
     /** `true` on the very first app launch; `false` after the expedited worker runs. */
@@ -98,5 +108,13 @@ open class SettingsRepository(private val context: Context) : SettingsStore {
     /** Marks first-run as complete so the expedited worker is not re-enqueued. */
     override suspend fun markFirstRunComplete() {
         context.dataStore.edit { it[Keys.FIRST_RUN] = false }
+    }
+
+    /** Adds the date to favorites if absent; removes it if present. */
+    override suspend fun toggleFavorite(date: String) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.FAVORITES] ?: emptySet()
+            prefs[Keys.FAVORITES] = if (date in current) current - date else current + date
+        }
     }
 }

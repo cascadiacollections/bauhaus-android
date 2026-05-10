@@ -10,6 +10,9 @@
     <string name="save_image">Save image</string>
     <string name="viewing_date">Viewing: %1$s</string>
     <string name="artwork_for_date">Artwork for %1$s</string>
+    <string name="favorite_artwork">Add to favorites</string>
+    <string name="unfavorite_artwork">Remove from favorites</string>
+    <string name="favorites_only">Favorites</string>
     <string name="error_network">No internet connection</string>
     <string name="error_set_wallpaper">Failed to set wallpaper</string>
     <string name="error_save_image">Failed to save image</string>

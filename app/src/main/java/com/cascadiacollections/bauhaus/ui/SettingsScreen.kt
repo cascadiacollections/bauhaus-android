@@ -5,6 +5,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,9 +19,15 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
@@ -33,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -66,6 +74,8 @@ object SettingsScreenTestTags {
     const val DAILY_UPDATES_SWITCH = "daily_updates_switch"
     const val SET_NOW_BUTTON = "set_now_button"
     const val DOWNLOAD_ICON = "download_icon"
+    const val FAVORITE_BUTTON = "favorite_button"
+    const val FAVORITES_FILTER_CHIP = "favorites_filter_chip"
 }
 
 /**
@@ -85,6 +95,8 @@ fun SettingsScreen(
     onSaveImage: () -> Unit,
     onArchivePageSelected: (Int) -> Unit,
     onRefresh: () -> Unit,
+    onFavoriteToggle: () -> Unit,
+    onFavoritesFilterToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     PullToRefreshBox(
@@ -161,6 +173,47 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 )
+            }
+
+            // -- Favorites filter chip --
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                FilterChip(
+                    selected = uiState.showFavoritesOnly,
+                    onClick = onFavoritesFilterToggle,
+                    enabled = uiState.showFavoritesOnly || uiState.favoriteDates.isNotEmpty(),
+                    label = { Text(stringResource(R.string.favorites_only)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Favorite,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                    modifier = Modifier.semantics { testTag = SettingsScreenTestTags.FAVORITES_FILTER_CHIP },
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                IconButton(
+                    onClick = onFavoriteToggle,
+                    modifier = Modifier.semantics { testTag = SettingsScreenTestTags.FAVORITE_BUTTON },
+                ) {
+                    Icon(
+                        imageVector = if (uiState.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                        contentDescription = stringResource(
+                            if (uiState.isFavorite) R.string.unfavorite_artwork else R.string.favorite_artwork,
+                        ),
+                        tint = if (uiState.isFavorite) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
             }
 
             // -- Metadata (title + artist) --
@@ -271,6 +324,8 @@ fun SettingsScreen(
         onSaveImage = viewModel::saveImageToGallery,
         onArchivePageSelected = viewModel::onArchivePageSelected,
         onRefresh = viewModel::refresh,
+        onFavoriteToggle = viewModel::toggleFavorite,
+        onFavoritesFilterToggle = viewModel::toggleFavoritesFilter,
         modifier = modifier,
     )
 }

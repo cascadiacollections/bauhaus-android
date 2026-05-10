@@ -62,6 +62,8 @@ class SettingsScreenTest {
                 onSaveImage = {},
                 onArchivePageSelected = {},
                 onRefresh = {},
+                onFavoriteToggle = {},
+                onFavoritesFilterToggle = {},
             )
         }
 
@@ -81,6 +83,8 @@ class SettingsScreenTest {
                 onSaveImage = {},
                 onArchivePageSelected = {},
                 onRefresh = {},
+                onFavoriteToggle = {},
+                onFavoritesFilterToggle = {},
             )
         }
 
@@ -102,6 +106,8 @@ class SettingsScreenTest {
                 onSaveImage = {},
                 onArchivePageSelected = {},
                 onRefresh = {},
+                onFavoriteToggle = {},
+                onFavoritesFilterToggle = {},
             )
         }
 
@@ -121,6 +127,8 @@ class SettingsScreenTest {
                 onSaveImage = {},
                 onArchivePageSelected = {},
                 onRefresh = {},
+                onFavoriteToggle = {},
+                onFavoritesFilterToggle = {},
             )
         }
 
@@ -140,6 +148,8 @@ class SettingsScreenTest {
                 onSaveImage = {},
                 onArchivePageSelected = {},
                 onRefresh = {},
+                onFavoriteToggle = {},
+                onFavoritesFilterToggle = {},
             )
         }
 
@@ -161,6 +171,8 @@ class SettingsScreenTest {
                 onSaveImage = {},
                 onArchivePageSelected = {},
                 onRefresh = {},
+                onFavoriteToggle = {},
+                onFavoritesFilterToggle = {},
             )
         }
 
@@ -181,6 +193,8 @@ class SettingsScreenTest {
                 onSaveImage = {},
                 onArchivePageSelected = {},
                 onRefresh = {},
+                onFavoriteToggle = {},
+                onFavoritesFilterToggle = {},
             )
         }
 
@@ -201,6 +215,8 @@ class SettingsScreenTest {
                 onSaveImage = {},
                 onArchivePageSelected = {},
                 onRefresh = {},
+                onFavoriteToggle = {},
+                onFavoritesFilterToggle = {},
             )
         }
 
@@ -219,6 +235,8 @@ class SettingsScreenTest {
                 onSaveImage = {},
                 onArchivePageSelected = {},
                 onRefresh = {},
+                onFavoriteToggle = {},
+                onFavoritesFilterToggle = {},
             )
         }
 
@@ -237,6 +255,8 @@ class SettingsScreenTest {
                 onSaveImage = {},
                 onArchivePageSelected = {},
                 onRefresh = {},
+                onFavoriteToggle = {},
+                onFavoritesFilterToggle = {},
             )
         }
 
@@ -259,6 +279,8 @@ class SettingsScreenTest {
                 onSaveImage = {},
                 onArchivePageSelected = {},
                 onRefresh = {},
+                onFavoriteToggle = {},
+                onFavoritesFilterToggle = {},
             )
         }
 
@@ -280,6 +302,8 @@ class SettingsScreenTest {
                 onSaveImage = { callbackInvoked = true },
                 onArchivePageSelected = {},
                 onRefresh = {},
+                onFavoriteToggle = {},
+                onFavoritesFilterToggle = {},
             )
         }
 
@@ -288,5 +312,119 @@ class SettingsScreenTest {
             .performTouchInput { longClick() }
 
         assertTrue("onSaveImage callback should be invoked on long press", callbackInvoked)
+    }
+
+    @Test
+    fun settingsScreen_favoriteButton_isDisplayed() {
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState,
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = {},
+                onArchivePageSelected = {},
+                onRefresh = {},
+                onFavoriteToggle = {},
+                onFavoritesFilterToggle = {},
+            )
+        }
+
+        composeTestRule
+            .onNodeWithTag(SettingsScreenTestTags.FAVORITE_BUTTON)
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsScreen_favoriteButton_invokesCallback() {
+        var callbackInvoked = false
+
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState,
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = {},
+                onArchivePageSelected = {},
+                onRefresh = {},
+                onFavoriteToggle = { callbackInvoked = true },
+                onFavoritesFilterToggle = {},
+            )
+        }
+
+        composeTestRule
+            .onNodeWithTag(SettingsScreenTestTags.FAVORITE_BUTTON)
+            .performClick()
+
+        assertTrue("onFavoriteToggle callback should be invoked on button click", callbackInvoked)
+    }
+
+    @Test
+    fun settingsScreen_favoritesFilterChip_isDisplayed() {
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState,
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = {},
+                onArchivePageSelected = {},
+                onRefresh = {},
+                onFavoriteToggle = {},
+                onFavoritesFilterToggle = {},
+            )
+        }
+
+        composeTestRule
+            .onNodeWithTag(SettingsScreenTestTags.FAVORITES_FILTER_CHIP)
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsScreen_favoritesFilterChip_reflectsShowFavoritesOnlyState() {
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState.copy(showFavoritesOnly = true, favoriteDates = setOf(defaultState.visibleDate)),
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = {},
+                onArchivePageSelected = {},
+                onRefresh = {},
+                onFavoriteToggle = {},
+                onFavoritesFilterToggle = {},
+            )
+        }
+
+        composeTestRule
+            .onNodeWithTag(SettingsScreenTestTags.FAVORITES_FILTER_CHIP)
+            .assertIsOn()
+    }
+
+    @Test
+    fun settingsScreen_favoritesFilterChip_invokesCallbackOnClick() {
+        var callbackInvoked = false
+        val visibleDate = defaultState.visibleDate
+
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState.copy(favoriteDates = setOf(visibleDate)),
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = {},
+                onArchivePageSelected = {},
+                onRefresh = {},
+                onFavoriteToggle = {},
+                onFavoritesFilterToggle = { callbackInvoked = true },
+            )
+        }
+
+        composeTestRule
+            .onNodeWithTag(SettingsScreenTestTags.FAVORITES_FILTER_CHIP)
+            .performClick()
+
+        assertTrue("onFavoritesFilterToggle callback should be invoked on chip click", callbackInvoked)
     }
 }
