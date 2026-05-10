@@ -32,6 +32,7 @@ object HttpModule {
 
     private const val CACHE_SIZE_BYTES = 50L * 1024 * 1024 // 50 MB
     private const val CDN_HOST = "bauhaus.cascadiacollections.workers.dev"
+    private const val IMAGE_ACCEPT_HEADER = "image/avif, image/webp, image/jpeg"
 
     private var instance: OkHttpClient? = null
 
