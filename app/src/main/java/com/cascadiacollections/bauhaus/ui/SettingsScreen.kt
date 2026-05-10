@@ -227,7 +227,7 @@ fun SettingsScreen(
 
             // -- Metadata (title + artist) --
             val metadata = uiState.metadata
-            val metadataIsEmpty = metadata == null || (metadata.title.isBlank() && metadata.artist.isBlank())
+            val metadataUnavailable = metadata == null || (metadata.title.isBlank() && metadata.artist.isBlank())
             when {
                 uiState.isMetadataLoading -> {
                     StateMessage(
@@ -254,7 +254,7 @@ fun SettingsScreen(
                     )
                 }
 
-                metadataIsEmpty -> {
+                metadataUnavailable -> {
                     RetryStateMessage(
                         text = stringResource(R.string.metadata_unavailable),
                         buttonText = stringResource(R.string.retry),
