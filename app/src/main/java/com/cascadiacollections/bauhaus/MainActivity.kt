@@ -58,8 +58,8 @@ class MainActivity : ComponentActivity() {
                     viewModel.snackbarEvent.collect { event ->
                         val result = snackbarHostState.showSnackbar(
                             message = event.message,
-                            actionLabel = event.actionLabel,
-                            duration = if (event.uri != null) SnackbarDuration.Short else SnackbarDuration.Short,
+                            actionLabel = event.uri?.let { "Open" },
+                            duration = SnackbarDuration.Short,
                         )
                         if (result == SnackbarResult.ActionPerformed && event.uri != null) {
                             startActivity(Intent(Intent.ACTION_VIEW, event.uri))
@@ -95,6 +95,7 @@ class MainActivity : ComponentActivity() {
                         onSchedulingToggle = viewModel::setSchedulingEnabled,
                         onSetWallpaperNow = viewModel::setWallpaperNow,
                         onSaveImage = viewModel::saveImageToGallery,
+                        onArchivePageSelected = viewModel::onArchivePageSelected,
                         onRefresh = viewModel::refresh,
                         modifier = Modifier.padding(innerPadding),
                     )

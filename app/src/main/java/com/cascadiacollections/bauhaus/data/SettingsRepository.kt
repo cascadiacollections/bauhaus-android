@@ -21,6 +21,8 @@ interface SettingsStore {
     suspend fun setWallpaperTarget(target: WallpaperTarget)
     suspend fun setSchedulingEnabled(enabled: Boolean)
     suspend fun setLastUpdated(date: String)
+    suspend fun getLastPrefetchedDate(): String?
+    suspend fun setLastPrefetchedDate(date: String)
     suspend fun markFirstRunComplete()
 }
 
@@ -38,6 +40,7 @@ interface SettingsStore {
  * | `wallpaper_target` | String (enum name) | `BOTH` | Which screen(s) to wallpaper |
  * | `scheduling_enabled` | Boolean | `true` | Whether the daily WorkManager job is active |
  * | `last_updated` | String (ISO date) | `null` | Date of the most recent wallpaper set |
+ * | `last_prefetched_date` | String (ISO date) | `null` | Date when startup prefetch last warmed `/api/today` |
  * | `first_run` | Boolean | `true` | Guards the expedited first-launch fetch |
  *
  * @param context Application context — the DataStore file lives in the app's
@@ -50,6 +53,7 @@ open class SettingsRepository(private val context: Context) : SettingsStore {
         val WALLPAPER_TARGET = stringPreferencesKey("wallpaper_target")
         val SCHEDULING_ENABLED = booleanPreferencesKey("scheduling_enabled")
         val LAST_UPDATED = stringPreferencesKey("last_updated")
+        val LAST_PREFETCHED_DATE = stringPreferencesKey("last_prefetched_date")
         val FIRST_RUN = booleanPreferencesKey("first_run")
     }
 
@@ -82,6 +86,13 @@ open class SettingsRepository(private val context: Context) : SettingsStore {
 
     override suspend fun setLastUpdated(date: String) {
         context.dataStore.edit { it[Keys.LAST_UPDATED] = date }
+    }
+
+    override suspend fun getLastPrefetchedDate(): String? =
+        context.dataStore.data.first()[Keys.LAST_PREFETCHED_DATE]
+
+    override suspend fun setLastPrefetchedDate(date: String) {
+        context.dataStore.edit { it[Keys.LAST_PREFETCHED_DATE] = date }
     }
 
     /** Marks first-run as complete so the expedited worker is not re-enqueued. */

@@ -96,6 +96,8 @@ class WallpaperWorkerTest {
         override suspend fun setWallpaperTarget(target: WallpaperTarget) = Unit
         override suspend fun setSchedulingEnabled(enabled: Boolean) = Unit
         override suspend fun setLastUpdated(date: String) = Unit
+        override suspend fun getLastPrefetchedDate(): String? = null
+        override suspend fun setLastPrefetchedDate(date: String) = Unit
         override suspend fun markFirstRunComplete() = Unit
     }
 
@@ -118,6 +120,21 @@ class WallpaperWorkerTest {
         override suspend fun fetchTodayMetadata(): ArtworkMetadata {
             if (shouldThrow) throw RuntimeException("boom")
             return ArtworkMetadata()
+        }
+
+        override suspend fun fetchImageForDate(date: LocalDate, maxWidth: Int, maxHeight: Int): Bitmap {
+            if (shouldThrow) throw RuntimeException("boom")
+            return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        }
+
+        override suspend fun fetchImageRawForDate(date: LocalDate): Pair<ByteArray, String> {
+            if (shouldThrow) throw RuntimeException("boom")
+            return byteArrayOf(1) to "image/jpeg"
+        }
+
+        override suspend fun fetchMetadataForDate(date: LocalDate): ArtworkMetadata {
+            if (shouldThrow) throw RuntimeException("boom")
+            return ArtworkMetadata(date = date.toString())
         }
     }
 }

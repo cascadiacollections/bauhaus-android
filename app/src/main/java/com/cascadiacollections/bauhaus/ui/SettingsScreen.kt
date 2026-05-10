@@ -20,9 +20,8 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ListItem
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -76,7 +75,7 @@ object SettingsScreenTestTags {
  * (and tests) supply a fixed [UiState] snapshot and capture callbacks to verify
  * interactions without standing up a real [BauhausViewModel].
  */
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SettingsScreen(
     uiState: UiState,
@@ -198,7 +197,12 @@ fun SettingsScreen(
                             count = WallpaperTarget.entries.size,
                         ),
                     ) {
-                        Text(stringResource(target.labelRes))
+                        val labelRes = when (target) {
+                            WallpaperTarget.HOME -> R.string.wallpaper_target_home
+                            WallpaperTarget.LOCK -> R.string.wallpaper_target_lock
+                            WallpaperTarget.BOTH -> R.string.wallpaper_target_both
+                        }
+                        Text(stringResource(labelRes))
                     }
                 }
             }
@@ -240,7 +244,7 @@ fun SettingsScreen(
                 enabled = !uiState.isSettingWallpaper,
             ) {
                 if (uiState.isSettingWallpaper) {
-                    LoadingIndicator(modifier = Modifier.size(24.dp))
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                 }
                 Text(stringResource(R.string.set_now))

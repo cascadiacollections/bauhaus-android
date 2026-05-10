@@ -16,8 +16,8 @@ import com.cascadiacollections.bauhaus.BauhausApplication
 import com.cascadiacollections.bauhaus.CrashReporter
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
-import com.cascadiacollections.bauhaus.data.BauhausApi.ApiHttpException
 import com.cascadiacollections.bauhaus.data.BauhausApi
+import com.cascadiacollections.bauhaus.data.BauhausHttpException
 import com.cascadiacollections.bauhaus.data.HttpModule
 import com.cascadiacollections.bauhaus.data.SettingsRepository
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
@@ -351,8 +351,8 @@ class BauhausViewModel(
                 val metadata = api.fetchMetadataForDate(nextOlderDate)
                 metadataByDate[nextOlderDate] = metadata
                 _uiState.update { it.copy(availableDates = it.availableDates + nextOlderDate) }
-            } catch (e: ApiHttpException) {
-                if (e.statusCode == 404) {
+            } catch (e: BauhausHttpException) {
+                if (e.code == 404) {
                     _uiState.update { it.copy(reachedArchiveStart = true) }
                 } else {
                     _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))

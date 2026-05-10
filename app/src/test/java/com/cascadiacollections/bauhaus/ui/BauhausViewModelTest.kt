@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
+import com.cascadiacollections.bauhaus.data.BauhausHttpException
 import com.cascadiacollections.bauhaus.data.SettingsRepository
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 import kotlinx.coroutines.Dispatchers
@@ -35,7 +36,7 @@ import java.time.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(application = Application::class)
+@Config(application = Application::class, sdk = [35])
 class BauhausViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -261,7 +262,7 @@ class BauhausViewModelTest {
         override suspend fun fetchMetadataForDate(date: LocalDate): ArtworkMetadata {
             if (throwIOException) throw java.io.IOException("Unable to resolve host")
             if (shouldThrow) throw RuntimeException("Unexpected error")
-            if (missingDates.contains(date)) throw BauhausApi.ApiHttpException(404)
+            if (missingDates.contains(date)) throw BauhausHttpException(404, "/api/$date.json")
             return dateMetadata[date] ?: ArtworkMetadata(title = "Date $date", artist = "Archive")
         }
 
@@ -274,7 +275,7 @@ class BauhausViewModelTest {
         override suspend fun fetchImageForDate(date: LocalDate, maxWidth: Int, maxHeight: Int): Bitmap {
             if (throwIOException) throw java.io.IOException("Unable to resolve host")
             if (shouldThrow) throw RuntimeException("Unexpected error")
-            if (missingDates.contains(date)) throw BauhausApi.ApiHttpException(404)
+            if (missingDates.contains(date)) throw BauhausHttpException(404, "/api/$date")
             return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
         }
 
@@ -287,7 +288,7 @@ class BauhausViewModelTest {
         override suspend fun fetchImageRawForDate(date: LocalDate): Pair<ByteArray, String> {
             if (throwIOException) throw java.io.IOException("Unable to resolve host")
             if (shouldThrow) throw RuntimeException("Unexpected error")
-            if (missingDates.contains(date)) throw BauhausApi.ApiHttpException(404)
+            if (missingDates.contains(date)) throw BauhausHttpException(404, "/api/$date")
             return byteArrayOf(0) to "image/jpeg"
         }
     }

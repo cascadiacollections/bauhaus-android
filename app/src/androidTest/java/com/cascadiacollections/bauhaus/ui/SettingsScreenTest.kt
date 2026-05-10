@@ -43,7 +43,13 @@ class SettingsScreenTest {
     private fun getString(resId: Int): String =
         InstrumentationRegistry.getInstrumentation().targetContext.getString(resId)
 
-    private fun targetLabel(target: WallpaperTarget): String = getString(target.labelRes)
+    private fun targetLabel(target: WallpaperTarget): String = getString(
+        when (target) {
+            WallpaperTarget.HOME -> R.string.wallpaper_target_home
+            WallpaperTarget.LOCK -> R.string.wallpaper_target_lock
+            WallpaperTarget.BOTH -> R.string.wallpaper_target_both
+        },
+    )
 
     @Test
     fun settingsScreen_artworkPreview_isDisplayed() {

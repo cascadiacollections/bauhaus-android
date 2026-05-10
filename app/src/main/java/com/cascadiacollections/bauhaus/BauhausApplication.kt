@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 /**
  * Application entry point. Responsible for:
@@ -30,8 +31,14 @@ import kotlinx.coroutines.launch
  *    [OkHttpClient][okhttp3.OkHttpClient] (with disk cache) used by [BauhausApi][com.cascadiacollections.bauhaus.data.BauhausApi],
  *    so the preview image in [SettingsScreen][com.cascadiacollections.bauhaus.ui.SettingsScreen]
  *    and the worker share cached responses. This directly reduces CDN COGs.
+ * 4. **Startup prefetch** — opportunistically fetches today's image once per day
+ *    to warm HTTP cache before UI render.
  */
 class BauhausApplication : Application(), SingletonImageLoader.Factory, Configuration.Provider {
+
+    companion object {
+        private const val TAG = "BauhausApplication"
+    }
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     lateinit var container: AppContainer
@@ -43,6 +50,7 @@ class BauhausApplication : Application(), SingletonImageLoader.Factory, Configur
         CrashReporter.init(this)
         scheduleWallpaperWorker()
         enqueueFirstRunIfNeeded()
+        prefetchTodayImageIfNeeded()
     }
 
     override val workManagerConfiguration: Configuration by lazy {
@@ -106,6 +114,34 @@ class BauhausApplication : Application(), SingletonImageLoader.Factory, Configur
 
             WorkManager.getInstance(this@BauhausApplication).enqueue(expedited)
             settings.markFirstRunComplete()
+        }
+    }
+
+    /**
+     * Opportunistically warms the `/api/today` cache once per day so the first
+     * foreground render can hit local cache on the happy path.
+     */
+    private fun prefetchTodayImageIfNeeded() {
+        val settings = container.settingsRepository
+        val api = container.bauhausApi
+        appScope.launch {
+            val today = LocalDate.now().toString()
+            if (settings.getLastPrefetchedDate() == today) return@launch
+            try {
+                api.fetchTodayImageRaw()
+                settings.setLastPrefetchedDate(today)
+                AppLogger.info(
+                    TAG,
+                    AppLogger.Event("startup_prefetch_success", mapOf("date" to today)),
+                    "Prefetched today's image into cache",
+                )
+            } catch (e: Exception) {
+                AppLogger.warn(
+                    TAG,
+                    AppLogger.Event("startup_prefetch_failure", mapOf("date" to today)),
+                    "Failed to prefetch today's image",
+                )
+            }
         }
     }
 }
