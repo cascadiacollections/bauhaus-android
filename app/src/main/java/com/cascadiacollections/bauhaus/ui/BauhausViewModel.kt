@@ -57,6 +57,9 @@ data class UiState(
     val isRefreshing: Boolean = false,
     val isSavingImage: Boolean = false,
     val imageRevision: Int = 0,
+    val isFavorite: Boolean = false,
+    val showFavoritesOnly: Boolean = false,
+    val favoriteDates: Set<LocalDate> = emptySet(),
 )
 
 /**
@@ -88,6 +91,13 @@ class BauhausViewModel(
     private val today: LocalDate = LocalDate.now()
     private val metadataByDate = mutableMapOf<LocalDate, ArtworkMetadata>()
     private var isAppendingOlderDate: Boolean = false
+
+    /**
+     * Tracks the full chronological list of dates available for browsing
+     * (independent of the favorites filter). Restored when the user exits
+     * favorites-only mode.
+     */
+    private var allBrowsableDates: List<LocalDate> = listOf(today)
 
     /** Minimum milliseconds between user-initiated refreshes (DOS guard). */
     private val refreshCooldownMs: Long = 30_000L
@@ -126,6 +136,36 @@ class BauhausViewModel(
             }
         }
         viewModelScope.launch {
+            settings.favorites.collect { favStrings ->
+                val favDates = favStrings.mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }.toSet()
+                var metadataDateToLoad: LocalDate? = null
+                _uiState.update { state ->
+                    val newAvailableDates = if (state.showFavoritesOnly) {
+                        favDates.sortedDescending()
+                    } else {
+                        state.availableDates
+                    }
+                    val newVisibleDate = if (state.showFavoritesOnly && state.visibleDate !in newAvailableDates) {
+                        newAvailableDates.firstOrNull() ?: state.visibleDate
+                    } else {
+                        state.visibleDate
+                    }
+                    val cached = metadataByDate[newVisibleDate]
+                    if (cached == null) {
+                        metadataDateToLoad = newVisibleDate
+                    }
+                    state.copy(
+                        visibleDate = newVisibleDate,
+                        metadata = cached,
+                        isFavorite = newVisibleDate in favDates,
+                        favoriteDates = favDates,
+                        availableDates = newAvailableDates,
+                    )
+                }
+                metadataDateToLoad?.let { loadMetadataForDate(it, force = false) }
+            }
+        }
+        viewModelScope.launch {
             try {
                 val metadata = api.fetchTodayMetadata()
                 metadataByDate[today] = metadata
@@ -142,13 +182,19 @@ class BauhausViewModel(
 
         if (snapshot.visibleDate != selectedDate) {
             val cached = metadataByDate[selectedDate]
-            _uiState.update { it.copy(visibleDate = selectedDate, metadata = cached) }
+            _uiState.update {
+                it.copy(
+                    visibleDate = selectedDate,
+                    metadata = cached,
+                    isFavorite = selectedDate in it.favoriteDates,
+                )
+            }
             if (cached == null) {
                 loadMetadataForDate(selectedDate, force = false)
             }
         }
 
-        if (!snapshot.reachedArchiveStart && pageIndex == snapshot.availableDates.lastIndex) {
+        if (!snapshot.showFavoritesOnly && !snapshot.reachedArchiveStart && pageIndex == snapshot.availableDates.lastIndex) {
             appendNextOlderDate()
         }
     }
@@ -249,6 +295,55 @@ class BauhausViewModel(
         viewModelScope.launch {
             settings.setWallpaperTarget(target)
         }
+    }
+
+    /**
+     * Toggles the favorite state of the currently visible artwork date.
+     *
+     * The change is persisted to DataStore and reflected immediately in [uiState]
+     * via the [favorites][SettingsStore.favorites] flow.
+     */
+    fun toggleFavorite() {
+        val date = _uiState.value.visibleDate
+        viewModelScope.launch {
+            settings.toggleFavorite(date.toString())
+        }
+    }
+
+    /**
+     * Switches between the full chronological browsing mode and a
+     * favorites-only view that shows only the dates the user has hearted.
+     *
+     * When entering favorites-only mode the pager is replaced with the
+     * sorted favorites list; exiting restores [allBrowsableDates].
+     */
+    fun toggleFavoritesFilter() {
+        var metadataDateToLoad: LocalDate? = null
+        _uiState.update { state ->
+            val newShowFavoritesOnly = !state.showFavoritesOnly
+            val newAvailableDates = if (newShowFavoritesOnly) {
+                state.favoriteDates.sortedDescending()
+            } else {
+                allBrowsableDates
+            }
+            val newVisibleDate = if (newAvailableDates.contains(state.visibleDate)) {
+                state.visibleDate
+            } else {
+                newAvailableDates.firstOrNull() ?: state.visibleDate
+            }
+            val cached = metadataByDate[newVisibleDate]
+            if (cached == null) {
+                metadataDateToLoad = newVisibleDate
+            }
+            state.copy(
+                showFavoritesOnly = newShowFavoritesOnly,
+                availableDates = newAvailableDates,
+                visibleDate = newVisibleDate,
+                metadata = cached,
+                isFavorite = newVisibleDate in state.favoriteDates,
+            )
+        }
+        metadataDateToLoad?.let { loadMetadataForDate(it, force = false) }
     }
 
     /**
@@ -455,7 +550,7 @@ class BauhausViewModel(
 
     private fun appendNextOlderDate() {
         if (isAppendingOlderDate || _uiState.value.reachedArchiveStart) return
-        val oldest = _uiState.value.availableDates.lastOrNull() ?: today
+        val oldest = allBrowsableDates.lastOrNull() ?: today
         val nextOlderDate = oldest.minusDays(1)
         isAppendingOlderDate = true
 
@@ -463,7 +558,14 @@ class BauhausViewModel(
             try {
                 val metadata = api.fetchMetadataForDate(nextOlderDate)
                 metadataByDate[nextOlderDate] = metadata
-                _uiState.update { it.copy(availableDates = it.availableDates + nextOlderDate) }
+                allBrowsableDates = allBrowsableDates + nextOlderDate
+                _uiState.update { state ->
+                    if (!state.showFavoritesOnly) {
+                        state.copy(availableDates = allBrowsableDates)
+                    } else {
+                        state
+                    }
+                }
             } catch (e: BauhausHttpException) {
                 if (e.code == 404) {
                     _uiState.update { it.copy(reachedArchiveStart = true) }

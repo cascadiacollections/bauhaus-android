@@ -5,6 +5,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +25,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SelectableDates
@@ -43,6 +47,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -53,6 +58,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -80,6 +88,8 @@ object SettingsScreenTestTags {
     const val SHARE_ICON = "share_icon"
     const val DOWNLOAD_ICON = "download_icon"
     const val JUMP_TO_DATE_BUTTON = "jump_to_date_button"
+    const val FAVORITE_BUTTON = "favorite_button"
+    const val FAVORITES_FILTER_CHIP = "favorites_filter_chip"
 }
 
 internal data class ArchiveImageRequest(
@@ -136,6 +146,8 @@ fun SettingsScreen(
     onSetWallpaperNow: () -> Unit,
     onSaveImage: () -> Unit,
     onJumpToDate: (LocalDate) -> Unit = {},
+    onFavoriteToggle: () -> Unit = {},
+    onFavoritesFilterToggle: () -> Unit = {},
     onArchivePageSelected: (Int) -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
@@ -296,6 +308,44 @@ fun SettingsScreen(
                 Text(stringResource(R.string.jump_to_date))
             }
 
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                FilterChip(
+                    selected = uiState.showFavoritesOnly,
+                    onClick = onFavoritesFilterToggle,
+                    enabled = uiState.showFavoritesOnly || uiState.favoriteDates.isNotEmpty(),
+                    label = { Text(stringResource(R.string.favorites_only)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Favorite,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                    modifier = Modifier.semantics { testTag = SettingsScreenTestTags.FAVORITES_FILTER_CHIP },
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                IconButton(
+                    onClick = onFavoriteToggle,
+                    modifier = Modifier.semantics { testTag = SettingsScreenTestTags.FAVORITE_BUTTON },
+                ) {
+                    Icon(
+                        imageVector = if (uiState.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                        contentDescription = stringResource(
+                            if (uiState.isFavorite) R.string.unfavorite_artwork else R.string.favorite_artwork,
+                        ),
+                        tint = if (uiState.isFavorite) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+            }
+
             // -- Metadata (title + artist + date + source) --
             uiState.metadata?.let { metadata ->
                 Card(modifier = Modifier.fillMaxWidth()) {
@@ -424,6 +474,8 @@ fun SettingsScreen(
         onSetWallpaperNow = viewModel::setWallpaperNow,
         onSaveImage = viewModel::saveImageToGallery,
         onJumpToDate = viewModel::jumpToDate,
+        onFavoriteToggle = viewModel::toggleFavorite,
+        onFavoritesFilterToggle = viewModel::toggleFavoritesFilter,
         onArchivePageSelected = viewModel::onArchivePageSelected,
         onRefresh = viewModel::refresh,
         modifier = modifier,
