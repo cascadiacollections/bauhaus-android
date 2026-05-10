@@ -191,6 +191,27 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun settingsScreen_saveButton_invokesOnSaveImageCallback() {
+        var callbackInvoked = false
+
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState,
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = { callbackInvoked = true },
+                onArchivePageSelected = {},
+                onRefresh = {},
+            )
+        }
+
+        composeTestRule.onNodeWithText(getString(R.string.save_image)).performClick()
+
+        assertTrue("onSaveImage callback should be invoked on button click", callbackInvoked)
+    }
+
+    @Test
     fun settingsScreen_displaysMetadata_whenMetadataIsAvailable() {
         composeTestRule.setContent {
             SettingsScreen(
