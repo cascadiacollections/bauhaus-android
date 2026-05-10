@@ -21,17 +21,26 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -49,7 +58,9 @@ import coil3.request.ImageRequest
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.BauhausApi
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.distinctUntilChanged
 
@@ -66,6 +77,7 @@ object SettingsScreenTestTags {
     const val DAILY_UPDATES_SWITCH = "daily_updates_switch"
     const val SET_NOW_BUTTON = "set_now_button"
     const val DOWNLOAD_ICON = "download_icon"
+    const val JUMP_TO_DATE_BUTTON = "jump_to_date_button"
 }
 
 /**
@@ -75,7 +87,7 @@ object SettingsScreenTestTags {
  * (and tests) supply a fixed [UiState] snapshot and capture callbacks to verify
  * interactions without standing up a real [BauhausViewModel].
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     uiState: UiState,
@@ -83,10 +95,51 @@ fun SettingsScreen(
     onSchedulingToggle: (Boolean) -> Unit,
     onSetWallpaperNow: () -> Unit,
     onSaveImage: () -> Unit,
+    onJumpToDate: (LocalDate) -> Unit = {},
     onArchivePageSelected: (Int) -> Unit,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    val today = LocalDate.now()
+    val todayUtcMillis = remember(today) { localDateToUtcMillis(today) }
+    if (showDatePicker) {
+        val datePickerState = androidx.compose.material3.rememberDatePickerState(
+            initialSelectedDateMillis = localDateToUtcMillis(uiState.visibleDate),
+            selectableDates = remember(todayUtcMillis, today.year) {
+                object : SelectableDates {
+                    override fun isSelectableDate(utcTimeMillis: Long): Boolean = utcTimeMillis <= todayUtcMillis
+                    override fun isSelectableYear(year: Int): Boolean = year <= today.year
+                }
+            },
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let {
+                            val selectedDate = utcMillisToLocalDate(it)
+                            if (!selectedDate.isAfter(today)) {
+                                onJumpToDate(selectedDate)
+                            }
+                        }
+                        showDatePicker = false
+                    },
+                ) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
     PullToRefreshBox(
         isRefreshing = uiState.isRefreshing,
         onRefresh = onRefresh,
@@ -113,12 +166,20 @@ fun SettingsScreen(
                         onLongClickLabel = stringResource(R.string.save_image),
                     ),
             ) {
-                val pagerState = rememberPagerState(pageCount = { uiState.availableDates.size })
-                val today = LocalDate.now()
+                val visiblePage = uiState.availableDates.indexOf(uiState.visibleDate).coerceAtLeast(0)
+                val pagerState = rememberPagerState(
+                    initialPage = visiblePage,
+                    pageCount = { uiState.availableDates.size },
+                )
                 LaunchedEffect(pagerState) {
                     snapshotFlow { pagerState.currentPage }
                         .distinctUntilChanged()
                         .collect { onArchivePageSelected(it) }
+                }
+                LaunchedEffect(visiblePage, uiState.availableDates.size) {
+                    if (pagerState.currentPage != visiblePage && visiblePage < pagerState.pageCount) {
+                        pagerState.scrollToPage(visiblePage)
+                    }
                 }
 
                 HorizontalPager(
@@ -161,6 +222,14 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 )
+            }
+            Button(
+                onClick = { showDatePicker = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { testTag = SettingsScreenTestTags.JUMP_TO_DATE_BUTTON },
+            ) {
+                Text(stringResource(R.string.jump_to_date))
             }
 
             // -- Metadata (title + artist) --
@@ -269,8 +338,19 @@ fun SettingsScreen(
         onSchedulingToggle = viewModel::setSchedulingEnabled,
         onSetWallpaperNow = viewModel::setWallpaperNow,
         onSaveImage = viewModel::saveImageToGallery,
+        onJumpToDate = viewModel::jumpToDate,
         onArchivePageSelected = viewModel::onArchivePageSelected,
         onRefresh = viewModel::refresh,
         modifier = modifier,
     )
 }
+
+private fun localDateToUtcMillis(date: LocalDate): Long = date
+    .atStartOfDay(ZoneOffset.UTC)
+    .toInstant()
+    .toEpochMilli()
+
+private fun utcMillisToLocalDate(millis: Long): LocalDate = Instant
+    .ofEpochMilli(millis)
+    .atZone(ZoneOffset.UTC)
+    .toLocalDate()

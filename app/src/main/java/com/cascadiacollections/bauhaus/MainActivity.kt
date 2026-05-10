@@ -95,6 +95,7 @@ class MainActivity : ComponentActivity() {
                         onSchedulingToggle = viewModel::setSchedulingEnabled,
                         onSetWallpaperNow = viewModel::setWallpaperNow,
                         onSaveImage = viewModel::saveImageToGallery,
+                        onJumpToDate = viewModel::jumpToDate,
                         onArchivePageSelected = viewModel::onArchivePageSelected,
                         onRefresh = viewModel::refresh,
                         modifier = Modifier.padding(innerPadding),

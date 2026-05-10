@@ -240,6 +240,31 @@ class BauhausViewModelTest {
         assertEquals(listOf(today), viewModel.uiState.value.availableDates)
     }
 
+    @Test
+    fun `jumpToDate appends missing archive dates and selects requested day`() {
+        val today = viewModel.uiState.value.visibleDate
+        val targetDate = today.minusDays(3)
+        val targetMetadata = ArtworkMetadata(title = "Jumped", artist = "Archive")
+        fakeApi.dateMetadata[targetDate] = targetMetadata
+
+        viewModel.jumpToDate(targetDate)
+
+        assertEquals(targetDate, viewModel.uiState.value.visibleDate)
+        assertEquals(listOf(today, today.minusDays(1), today.minusDays(2), targetDate), viewModel.uiState.value.availableDates)
+        assertEquals(targetMetadata, viewModel.uiState.value.metadata)
+    }
+
+    @Test
+    fun `jumpToDate ignores future dates`() {
+        val initialState = viewModel.uiState.value
+        val futureDate = initialState.visibleDate.plusDays(1)
+
+        viewModel.jumpToDate(futureDate)
+
+        assertEquals(initialState.visibleDate, viewModel.uiState.value.visibleDate)
+        assertEquals(initialState.availableDates, viewModel.uiState.value.availableDates)
+    }
+
     // ── Fakes ────────────────────────────────────────────────────────────────
 
     private class FakeBauhausApi : BauhausApi(OkHttpClient()) {

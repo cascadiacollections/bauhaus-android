@@ -289,4 +289,23 @@ class SettingsScreenTest {
 
         assertTrue("onSaveImage callback should be invoked on long press", callbackInvoked)
     }
+
+    @Test
+    fun settingsScreen_jumpToDateButton_opensDatePickerDialog() {
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState,
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = {},
+                onArchivePageSelected = {},
+                onRefresh = {},
+            )
+        }
+
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.JUMP_TO_DATE_BUTTON).performClick()
+        composeTestRule.onNodeWithText(getString(android.R.string.ok)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(getString(android.R.string.cancel)).assertIsDisplayed()
+    }
 }

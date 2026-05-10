@@ -148,6 +148,35 @@ class BauhausViewModel(
         }
     }
 
+    fun jumpToDate(date: LocalDate) {
+        if (date.isAfter(today)) return
+        val snapshot = _uiState.value
+        val oldestLoadedDate = snapshot.availableDates.lastOrNull() ?: today
+        val resolvedDates = if (date.isBefore(oldestLoadedDate)) {
+            val datesToAppend = buildList {
+                var nextDate = oldestLoadedDate.minusDays(1)
+                while (!nextDate.isBefore(date)) {
+                    add(nextDate)
+                    nextDate = nextDate.minusDays(1)
+                }
+            }
+            snapshot.availableDates + datesToAppend
+        } else {
+            snapshot.availableDates
+        }
+        val cached = metadataByDate[date]
+        _uiState.update {
+            it.copy(
+                visibleDate = date,
+                availableDates = resolvedDates,
+                metadata = cached,
+            )
+        }
+        if (cached == null) {
+            loadMetadataForDate(date, force = false)
+        }
+    }
+
     /** Persists the selected wallpaper target (home, lock, or both). */
     fun setWallpaperTarget(target: WallpaperTarget) {
         viewModelScope.launch {
