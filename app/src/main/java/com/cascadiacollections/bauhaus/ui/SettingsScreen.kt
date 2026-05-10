@@ -155,7 +155,7 @@ fun SettingsScreen(
                             .semantics { testTag = SettingsScreenTestTags.ARTWORK_PAGER },
                     ) { page ->
                         val date = uiState.availableDates[page]
-                        var artworkRetryAttempt by rememberSaveable(date, uiState.imageRevision) { mutableIntStateOf(0) }
+                        var artworkRetryCount by rememberSaveable(date, uiState.imageRevision) { mutableIntStateOf(0) }
                         val cacheKey = "${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}-${uiState.imageRevision}"
                         val imagePath = if (date == today) "/api/today" else "/api/${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}"
                         val contentDescription = if (date == today) {
@@ -176,8 +176,8 @@ fun SettingsScreen(
                             SubcomposeAsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data("${BauhausApi.BASE_URL}$imagePath")
-                                    .memoryCacheKey("$cacheKey-$artworkRetryAttempt")
-                                    .diskCacheKey("$cacheKey-$artworkRetryAttempt")
+                                    .memoryCacheKey("$cacheKey-$artworkRetryCount")
+                                    .diskCacheKey("$cacheKey-$artworkRetryCount")
                                     .build(),
                                 contentDescription = contentDescription,
                                 contentScale = ContentScale.Crop,
@@ -202,7 +202,7 @@ fun SettingsScreen(
                                             text = stringResource(R.string.artwork_error),
                                             buttonText = stringResource(R.string.retry),
                                             onRetry = {
-                                                artworkRetryAttempt += 1
+                                                artworkRetryCount += 1
                                                 onRefresh()
                                             },
                                             modifier = Modifier
@@ -226,6 +226,7 @@ fun SettingsScreen(
             }
 
             // -- Metadata (title + artist) --
+            val metadata = uiState.metadata
             when {
                 uiState.isMetadataLoading -> {
                     StateMessage(
@@ -252,8 +253,20 @@ fun SettingsScreen(
                     )
                 }
 
-                uiState.metadata == null ||
-                    (uiState.metadata.title.isBlank() && uiState.metadata.artist.isBlank()) -> {
+                metadata == null -> {
+                    RetryStateMessage(
+                        text = stringResource(R.string.metadata_unavailable),
+                        buttonText = stringResource(R.string.retry),
+                        onRetry = onRefresh,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = 72.dp)
+                            .semantics { testTag = SettingsScreenTestTags.METADATA_STATE },
+                        buttonModifier = Modifier.semantics { testTag = SettingsScreenTestTags.METADATA_RETRY_BUTTON },
+                    )
+                }
+
+                metadata.title.isBlank() && metadata.artist.isBlank() -> {
                     RetryStateMessage(
                         text = stringResource(R.string.metadata_unavailable),
                         buttonText = stringResource(R.string.retry),
@@ -267,8 +280,6 @@ fun SettingsScreen(
                 }
 
                 else -> {
-                    val metadata = uiState.metadata
-                    checkNotNull(metadata)
                     Column {
                         Text(
                             text = metadata.title.ifEmpty { stringResource(R.string.daily_bauhaus) },
