@@ -16,6 +16,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
 
     steps:
       - name: Checkout code
@@ -44,7 +47,7 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
       - name: Build, Lint, and Test
-        run: ./gradlew assembleFossRelease assembleFossDebug lintFossDebug testFossDebugUnitTest jacocoTestReport --no-daemon --parallel --build-cache
+        run: ./gradlew assembleFossRelease assembleFossDebug bundleFossRelease lintFossDebug testFossDebugUnitTest jacocoTestReport --no-daemon --parallel --build-cache
         env:
           KEYSTORE_PATH: ${{ env.KEYSTORE_PATH }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -53,7 +56,7 @@ jobs:
 
       - name: Test Report
         if: always()
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@v3
         with:
           name: Unit Tests
           path: '**/build/test-results/**/TEST-*.xml'
@@ -150,7 +153,6 @@ jobs:
         with:
           name: aab-${{ github.sha }}
           path: aab
-        continue-on-error: true
 
       - name: List downloaded artifacts
         run: find apks -type f; find aab -type f 2>/dev/null || true
@@ -164,10 +166,10 @@ jobs:
         run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
       - name: Update nightly release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: nightly-build
-          token: ${{ secrets.GH_RELEASE_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           name: "Nightly Build (${{ steps.date.outputs.date }})"
           body: |
             ## 🌙 Nightly Build
@@ -180,7 +182,6 @@ jobs:
             | Variant | Description |
             |---------|-------------|
             | `app-foss-release.apk` | FOSS release (no Google dependencies) |
-            | `app-full-release.apk` | Full release with Firebase Crashlytics |
             | `app-foss-debug.apk` | Debug build with LeakCanary |
 
             ### Installation
@@ -191,10 +192,8 @@ jobs:
             ---
             _This release is automatically replaced on each commit to main._
           files: |
-            apks/foss/release/app-foss-release*.apk
-            apks/full/release/app-full-release*.apk
-            apks/foss/debug/app-foss-debug.apk
-            aab/app-foss-release.aab
+            apks/release/app-foss-release*.apk
+            apks/debug/app-foss-debug.apk
           prerelease: true
           make_latest: false
         continue-on-error: true
@@ -217,15 +216,16 @@ jobs:
         with:
           name: aab-${{ github.sha }}
           path: aab
-        continue-on-error: true
 
       - name: Upload to Play Store internal track
+        if: ${{ env.PLAY_SERVICE_ACCOUNT_JSON != '' }}
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.cascadiacollections.bauhaus
-          releaseFiles: aab/app-release.aab
+          releaseFiles: aab/app-foss-release.aab
           track: internal
           status: completed
-        continue-on-error: true
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
 

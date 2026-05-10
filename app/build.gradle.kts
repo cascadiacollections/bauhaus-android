@@ -94,8 +94,11 @@ android {
         baseline = file("lint-baseline.xml")
         abortOnError = true
         warningsAsErrors = true
-        // Suppress opinionated checks handled by Dependabot or intentional SDK choices
-        disable += setOf("OldTargetApi", "NewerVersionAvailable", "ObsoleteSdkInt")
+        // Suppress opinionated checks handled by Dependabot or intentional SDK choices.
+        // GradleDependency is disabled because AGP/lint flags new compileSdk versions
+        // (e.g. API 37) before the matching platform is downloadable via sdkmanager,
+        // which would otherwise block CI on a transient upstream timing issue.
+        disable += setOf("OldTargetApi", "NewerVersionAvailable", "ObsoleteSdkInt", "GradleDependency")
     }
 
     packaging {
