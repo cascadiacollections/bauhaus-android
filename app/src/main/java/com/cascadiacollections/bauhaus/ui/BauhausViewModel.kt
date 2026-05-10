@@ -155,7 +155,7 @@ class BauhausViewModel(
         val resolvedDates = if (date.isBefore(oldestLoadedDate)) {
             val datesToAppend = buildList {
                 var nextDate = oldestLoadedDate.minusDays(1)
-                while (!nextDate.isBefore(date)) {
+                while (nextDate >= date) {
                     add(nextDate)
                     nextDate = nextDate.minusDays(1)
                 }

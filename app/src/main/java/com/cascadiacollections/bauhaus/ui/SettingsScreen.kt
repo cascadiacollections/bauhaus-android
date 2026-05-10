@@ -119,10 +119,7 @@ fun SettingsScreen(
                 TextButton(
                     onClick = {
                         datePickerState.selectedDateMillis?.let {
-                            val selectedDate = utcMillisToLocalDate(it)
-                            if (!selectedDate.isAfter(today)) {
-                                onJumpToDate(selectedDate)
-                            }
+                            onJumpToDate(utcMillisToLocalDate(it))
                         }
                         showDatePicker = false
                     },
