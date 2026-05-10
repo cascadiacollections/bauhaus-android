@@ -30,6 +30,8 @@ import org.junit.runner.RunWith
 private val TEST_METADATA = ArtworkMetadata(
     title = "Composition VIII",
     artist = "Wassily Kandinsky",
+    source = "Guggenheim Museum",
+    date = "1923-07-01",
 )
 
 @RunWith(AndroidJUnit4::class)
@@ -206,6 +208,8 @@ class SettingsScreenTest {
 
         composeTestRule.onNodeWithText(TEST_METADATA.title).assertIsDisplayed()
         composeTestRule.onNodeWithText(TEST_METADATA.artist).assertIsDisplayed()
+        composeTestRule.onNodeWithText(TEST_METADATA.date).assertIsDisplayed()
+        composeTestRule.onNodeWithText(TEST_METADATA.source).assertIsDisplayed()
     }
 
     @Test
@@ -224,6 +228,8 @@ class SettingsScreenTest {
 
         composeTestRule.onAllNodesWithText(TEST_METADATA.title).assertCountEquals(0)
         composeTestRule.onAllNodesWithText(TEST_METADATA.artist).assertCountEquals(0)
+        composeTestRule.onAllNodesWithText(TEST_METADATA.date).assertCountEquals(0)
+        composeTestRule.onAllNodesWithText(TEST_METADATA.source).assertCountEquals(0)
     }
 
     @Test
