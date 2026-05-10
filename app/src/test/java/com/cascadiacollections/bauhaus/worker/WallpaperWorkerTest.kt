@@ -91,6 +91,7 @@ class WallpaperWorkerTest {
         override val wallpaperTarget: Flow<WallpaperTarget> = MutableStateFlow(WallpaperTarget.BOTH)
         override val schedulingEnabled: Flow<Boolean> = MutableStateFlow(true)
         override val lastUpdated: Flow<String?> = MutableStateFlow(lastUpdated)
+        override val favorites: Flow<Set<String>> = MutableStateFlow(emptySet())
 
         override suspend fun isFirstRun(): Boolean = false
         override suspend fun setWallpaperTarget(target: WallpaperTarget) = Unit
@@ -99,6 +100,7 @@ class WallpaperWorkerTest {
         override suspend fun getLastPrefetchedDate(): String? = null
         override suspend fun setLastPrefetchedDate(date: String) = Unit
         override suspend fun markFirstRunComplete() = Unit
+        override suspend fun toggleFavorite(date: String) = Unit
     }
 
     private class FakeApi(
