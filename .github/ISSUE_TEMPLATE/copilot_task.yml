@@ -1,0 +1,92 @@
+name: Copilot Task
+description: Ledger-style task template for Copilot assignment and parallel execution
+labels: ["tech-debt"]
+body:
+  - type: input
+    id: issue-title
+    attributes:
+      label: Issue title
+      description: Short task title in ledger style
+      placeholder: "L#: concise task description"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      description: Work type for this issue
+      options:
+        - tech-debt
+        - bug
+        - feature
+        - chore
+    validations:
+      required: true
+
+  - type: input
+    id: owner-suggestion
+    attributes:
+      label: Owner suggestion
+      description: Suggested assignee or owner
+      placeholder: Repo maintainer
+    validations:
+      required: true
+
+  - type: textarea
+    id: copilot-assignment-prompt
+    attributes:
+      label: Copilot assignment prompt
+      description: Prompt Copilot should follow to execute the task
+      placeholder: Describe the exact task Copilot should complete.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Explicitly define in-scope files, folders, and constraints
+      placeholder: |
+        - path/to/file-or-folder only
+        - Any non-goals
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: Checklist-style completion criteria
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: files-touched
+    attributes:
+      label: Files touched
+      description: List expected files to be modified to support easy parallel assignment
+      value: |
+        - path/to/file
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: Link dependent issues/PRs or write "None"
+      placeholder: None
+    validations:
+      required: true
+
+  - type: textarea
+    id: comments-for-copilot
+    attributes:
+      label: Comments for Copilot (@copilot)
+      description: Optional clarifications for the assignee
+    validations:
+      required: false
