@@ -320,13 +320,21 @@ class BauhausViewModel(
                 }
                 metadataByDate[visibleDate] = metadata
                 _uiState.update {
-                    it.copy(
-                        metadata = metadata,
-                        isRefreshing = false,
-                        isMetadataLoading = false,
-                        metadataLoadFailed = false,
-                        imageRevision = it.imageRevision + 1,
-                    )
+                    if (it.visibleDate == visibleDate) {
+                        it.copy(
+                            metadata = metadata,
+                            isRefreshing = false,
+                            isMetadataLoading = false,
+                            metadataLoadFailed = false,
+                            imageRevision = it.imageRevision + 1,
+                        )
+                    } else {
+                        it.copy(
+                            isRefreshing = false,
+                            isMetadataLoading = false,
+                            metadataLoadFailed = false,
+                        )
+                    }
                 }
             } catch (e: IOException) {
                 _uiState.update {
