@@ -57,7 +57,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -247,11 +246,6 @@ fun SettingsScreen(
                                 }
                             }
                         }
-                }
-                LaunchedEffect(visiblePage, uiState.availableDates.size) {
-                    if (pagerState.currentPage != visiblePage && visiblePage < pagerState.pageCount) {
-                        pagerState.scrollToPage(visiblePage)
-                    }
                 }
                 LaunchedEffect(visiblePage, uiState.availableDates.size) {
                     if (pagerState.currentPage != visiblePage && visiblePage < pagerState.pageCount) {
@@ -472,30 +466,6 @@ fun SettingsScreen(
     }
 }
 
-/**
- * Convenience overload that wires a [BauhausViewModel] into the stateless
- * [SettingsScreen]. Used by [com.cascadiacollections.bauhaus.MainActivity].
- */
-@Composable
-fun SettingsScreen(
-    viewModel: BauhausViewModel,
-    modifier: Modifier = Modifier,
-) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    SettingsScreen(
-        uiState = uiState,
-        onWallpaperTargetChange = viewModel::setWallpaperTarget,
-        onSchedulingToggle = viewModel::setSchedulingEnabled,
-        onSetWallpaperNow = viewModel::setWallpaperNow,
-        onSaveImage = viewModel::saveImageToGallery,
-        onJumpToDate = viewModel::jumpToDate,
-        onFavoriteToggle = viewModel::toggleFavorite,
-        onFavoritesFilterToggle = viewModel::toggleFavoritesFilter,
-        onArchivePageSelected = viewModel::onArchivePageSelected,
-        onRefresh = viewModel::refresh,
-        modifier = modifier,
-    )
-}
 
 private fun localDateToUtcMillis(date: LocalDate): Long = date
     .atStartOfDay(ZoneOffset.UTC)

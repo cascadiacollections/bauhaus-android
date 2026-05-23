@@ -127,6 +127,8 @@ class MainActivity : ComponentActivity() {
                         onSetWallpaperNow = viewModel::setWallpaperNow,
                         onSaveImage = viewModel::saveImageToGallery,
                         onJumpToDate = viewModel::jumpToDate,
+                        onFavoriteToggle = viewModel::toggleFavorite,
+                        onFavoritesFilterToggle = viewModel::toggleFavoritesFilter,
                         onArchivePageSelected = viewModel::onArchivePageSelected,
                         onRefresh = viewModel::refresh,
                         modifier = Modifier.padding(innerPadding),

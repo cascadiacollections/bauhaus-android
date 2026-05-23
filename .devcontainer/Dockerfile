@@ -2,7 +2,7 @@ FROM mcr.microsoft.com/devcontainers/java:21
 
 ARG ANDROID_SDK_VERSION=11076708
 ARG ANDROID_BUILD_TOOLS=36.0.0
-ARG ANDROID_PLATFORM=android-36
+ARG ANDROID_PLATFORM=android-37
 
 ENV ANDROID_HOME=/usr/local/android-sdk
 ENV PATH="${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${PATH}"
@@ -20,3 +20,6 @@ RUN yes | sdkmanager --licenses > /dev/null 2>&1 \
         "platforms;${ANDROID_PLATFORM}" \
         "build-tools;${ANDROID_BUILD_TOOLS}" \
         "platform-tools"
+
+# Allow the container user to install additional SDK packages without sudo
+RUN chmod -R g+w ${ANDROID_HOME} && chgrp -R vscode ${ANDROID_HOME}
