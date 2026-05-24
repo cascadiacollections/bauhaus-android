@@ -22,6 +22,9 @@ class UiStateTest {
         assertFalse(state.isRefreshing)
         assertFalse(state.isSavingImage)
         assertEquals(0, state.imageRevision)
+        assertFalse(state.isFavorite)
+        assertFalse(state.showFavoritesOnly)
+        assertTrue(state.favoriteDates.isEmpty())
     }
 
     @Test

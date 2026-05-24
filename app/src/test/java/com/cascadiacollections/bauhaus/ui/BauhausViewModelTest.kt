@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -270,6 +271,7 @@ class BauhausViewModelTest {
         assertEquals(initialState.availableDates, viewModel.uiState.value.availableDates)
     }
 
+    @Test
     fun `shareCurrentArtwork emits current artwork uri with metadata`() = runTest {
         val events = mutableListOf<ShareArtworkEvent>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -321,6 +323,60 @@ class BauhausViewModelTest {
         assertNotNull(events[0].uri)
         assertEquals("${BauhausApi.BASE_URL}/api/today", events[0].text)
         assertEquals("${BauhausApi.BASE_URL}/api/today", events[0].text)
+    }
+
+    // ── toggleFavorite ───────────────────────────────────────────────────────
+
+    @Test
+    fun `toggleFavorite adds date to favorites`() {
+        val date = viewModel.uiState.value.visibleDate
+        assertFalse(viewModel.uiState.value.isFavorite)
+
+        viewModel.toggleFavorite()
+
+        assertTrue(viewModel.uiState.value.isFavorite)
+        assertTrue(fakeSettings.favoriteDatesSet.contains(date.toString()))
+    }
+
+    @Test
+    fun `toggleFavorite removes date when already favorited`() {
+        viewModel.toggleFavorite()
+        assertTrue(viewModel.uiState.value.isFavorite)
+
+        viewModel.toggleFavorite()
+
+        assertFalse(viewModel.uiState.value.isFavorite)
+    }
+
+    // ── toggleFavoritesFilter ────────────────────────────────────────────────
+
+    @Test
+    fun `toggleFavoritesFilter shows only favorites when favorites exist`() {
+        val today = viewModel.uiState.value.visibleDate
+        val older = today.minusDays(1)
+        fakeApi.dateMetadata[older] = ArtworkMetadata(title = "Older", artist = "Archive")
+        viewModel.onArchivePageSelected(0)
+
+        viewModel.toggleFavorite()
+        viewModel.toggleFavoritesFilter()
+
+        assertTrue(viewModel.uiState.value.showFavoritesOnly)
+        assertEquals(listOf(today), viewModel.uiState.value.availableDates)
+    }
+
+    @Test
+    fun `toggleFavoritesFilter restores full list when exiting favorites mode`() {
+        val today = viewModel.uiState.value.visibleDate
+        val older = today.minusDays(1)
+        fakeApi.dateMetadata[older] = ArtworkMetadata(title = "Older", artist = "Archive")
+        viewModel.onArchivePageSelected(0)
+        viewModel.toggleFavorite()
+        viewModel.toggleFavoritesFilter()
+
+        viewModel.toggleFavoritesFilter()
+
+        assertFalse(viewModel.uiState.value.showFavoritesOnly)
+        assertEquals(listOf(today, older), viewModel.uiState.value.availableDates)
     }
 
     // ── Fakes ────────────────────────────────────────────────────────────────
@@ -388,6 +444,11 @@ class BauhausViewModelTest {
         private val _lastUpdated = MutableStateFlow<String?>(null)
         override val lastUpdated: Flow<String?> = _lastUpdated
 
+        private val _favorites = MutableStateFlow<Set<String>>(emptySet())
+        override val favorites: Flow<Set<String>> = _favorites
+
+        val favoriteDatesSet: Set<String> get() = _favorites.value
+
         var lastSetTarget: WallpaperTarget? = null
 
         fun emitWallpaperTarget(target: WallpaperTarget) { _wallpaperTarget.value = target }
@@ -405,6 +466,14 @@ class BauhausViewModelTest {
 
         override suspend fun setLastUpdated(date: String) {
             _lastUpdated.value = date
+        }
+
+        override suspend fun toggleFavorite(date: String) {
+            _favorites.value = if (date in _favorites.value) {
+                _favorites.value - date
+            } else {
+                _favorites.value + date
+            }
         }
     }
 }

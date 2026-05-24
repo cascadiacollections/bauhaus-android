@@ -336,6 +336,95 @@ class SettingsScreenTest {
     }
 
     @Test
+    fun settingsScreen_favoriteButton_invokesCallback() {
+        var callbackInvoked = false
+
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState,
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = {},
+                onFavoriteToggle = { callbackInvoked = true },
+                onArchivePageSelected = {},
+                onRefresh = {},
+            )
+        }
+
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.FAVORITE_BUTTON).performClick()
+
+        assertTrue("onFavoriteToggle callback should be invoked on tap", callbackInvoked)
+    }
+
+    @Test
+    fun settingsScreen_favoriteButton_showsFilledIconWhenFavorited() {
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState.copy(isFavorite = true),
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = {},
+                onArchivePageSelected = {},
+                onRefresh = {},
+            )
+        }
+
+        composeTestRule
+            .onNodeWithTag(SettingsScreenTestTags.FAVORITE_BUTTON)
+            .assertIsDisplayed()
+        composeTestRule
+            .onNodeWithText(getString(R.string.unfavorite_artwork))
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun settingsScreen_favoritesFilterChip_invokesCallback() {
+        var callbackInvoked = false
+        val stateWithFavorites = defaultState.copy(
+            isFavorite = true,
+            favoriteDates = setOf(defaultState.visibleDate),
+        )
+
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = stateWithFavorites,
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = {},
+                onFavoritesFilterToggle = { callbackInvoked = true },
+                onArchivePageSelected = {},
+                onRefresh = {},
+            )
+        }
+
+        composeTestRule.onNodeWithTag(SettingsScreenTestTags.FAVORITES_FILTER_CHIP).performClick()
+
+        assertTrue("onFavoritesFilterToggle should be invoked on chip tap", callbackInvoked)
+    }
+
+    @Test
+    fun settingsScreen_favoritesFilterChip_isDisabledWhenNoFavorites() {
+        composeTestRule.setContent {
+            SettingsScreen(
+                uiState = defaultState.copy(favoriteDates = emptySet()),
+                onWallpaperTargetChange = {},
+                onSchedulingToggle = {},
+                onSetWallpaperNow = {},
+                onSaveImage = {},
+                onArchivePageSelected = {},
+                onRefresh = {},
+            )
+        }
+
+        composeTestRule
+            .onNodeWithTag(SettingsScreenTestTags.FAVORITES_FILTER_CHIP)
+            .assertIsNotEnabled()
+    }
+
+    @Test
     fun settingsScreen_jumpToDateButton_opensDatePickerDialog() {
         composeTestRule.setContent {
             SettingsScreen(
