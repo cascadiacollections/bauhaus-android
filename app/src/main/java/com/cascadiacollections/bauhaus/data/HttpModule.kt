@@ -34,6 +34,7 @@ object HttpModule {
     private const val CDN_HOST = "bauhaus.cascadiacollections.workers.dev"
     private const val IMAGE_ACCEPT_HEADER = "image/avif, image/webp, image/jpeg"
 
+    @Volatile
     private var instance: OkHttpClient? = null
 
     /**

@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
+import com.cascadiacollections.bauhaus.data.BauhausApiClient
 import com.cascadiacollections.bauhaus.data.BauhausHttpException
 import com.cascadiacollections.bauhaus.data.SettingsRepository
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
@@ -19,7 +20,6 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import okhttp3.OkHttpClient
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -261,6 +261,20 @@ class BauhausViewModelTest {
     }
 
     @Test
+    fun `jumpToDate keeps browsed archive dates when favorites filter toggles`() {
+        val today = viewModel.uiState.value.visibleDate
+        val targetDate = today.minusDays(3)
+        fakeApi.dateMetadata[targetDate] = ArtworkMetadata(title = "Jumped", artist = "Archive")
+
+        viewModel.jumpToDate(targetDate)
+        viewModel.toggleFavorite()
+        viewModel.toggleFavoritesFilter()
+        viewModel.toggleFavoritesFilter()
+
+        assertEquals(listOf(today, today.minusDays(1), today.minusDays(2), targetDate), viewModel.uiState.value.availableDates)
+    }
+
+    @Test
     fun `jumpToDate ignores future dates`() {
         val initialState = viewModel.uiState.value
         val futureDate = initialState.visibleDate.plusDays(1)
@@ -381,7 +395,7 @@ class BauhausViewModelTest {
 
     // ── Fakes ────────────────────────────────────────────────────────────────
 
-    private class FakeBauhausApi : BauhausApi(OkHttpClient()) {
+    private class FakeBauhausApi : BauhausApiClient {
         companion object {
             val DEFAULT_METADATA = ArtworkMetadata(title = "Test", artist = "Test Artist")
         }

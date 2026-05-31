@@ -110,7 +110,7 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
         val bytes = try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) throw BauhausHttpException(response.code, endpoint)
-                val body = response.body ?: throw BauhausEmptyBodyException(endpoint)
+                val body = response.body
                 body.bytes()
             }
         } catch (e: BauhausDataException) {

@@ -1,4 +1,4 @@
-package com.cascadiacollections.bauhaus.ui
+﻿package com.cascadiacollections.bauhaus.ui
 
 import android.app.Application
 import android.app.WallpaperManager
@@ -18,10 +18,14 @@ import com.cascadiacollections.bauhaus.CrashReporter
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
+import com.cascadiacollections.bauhaus.data.BauhausApiClient
 import com.cascadiacollections.bauhaus.data.BauhausHttpException
 import com.cascadiacollections.bauhaus.data.HttpModule
 import com.cascadiacollections.bauhaus.data.SettingsRepository
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,9 +36,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.io.IOException
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import java.util.LinkedHashMap
 
 /** One-shot event for [SnackbarHost][androidx.compose.material3.SnackbarHost] display. */
 data class SnackbarEvent(val message: String, val uri: Uri? = null)
@@ -88,11 +95,16 @@ data class UiState(
 class BauhausViewModel(
     application: Application,
     private val settings: SettingsRepository,
-    private val api: BauhausApi,
+    private val api: BauhausApiClient,
 ) : AndroidViewModel(application) {
     private val maxJumpExpansionDays: Long = 730
+    private val archiveFetchConcurrency: Int = 4
     private val today: LocalDate = LocalDate.now()
-    private val metadataByDate = mutableMapOf<LocalDate, ArtworkMetadata>()
+    private val metadataByDate = object : LinkedHashMap<LocalDate, ArtworkMetadata>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<LocalDate, ArtworkMetadata>): Boolean {
+            return size > MAX_METADATA_CACHE_SIZE
+        }
+    }
     private var isAppendingOlderDate: Boolean = false
 
     /**
@@ -241,34 +253,49 @@ class BauhausViewModel(
         }
 
         viewModelScope.launch {
+            val datesToLoad = buildList {
+                var cursor = oldestLoadedDate.minusDays(1)
+                while (cursor >= date && size < maxJumpExpansionDays.toInt()) {
+                    add(cursor)
+                    cursor = cursor.minusDays(1)
+                }
+            }
+
             val appendedDates = mutableListOf<LocalDate>()
             var reachedArchiveStart = false
-            var cursor = oldestLoadedDate.minusDays(1)
-            while (cursor >= date && appendedDates.size < maxJumpExpansionDays) {
-                try {
-                    val metadata = api.fetchMetadataForDate(cursor)
-                    metadataByDate[cursor] = metadata
-                    appendedDates += cursor
-                    if (cursor == date) break
-                } catch (e: BauhausHttpException) {
-                    if (e.code == 404) {
-                        reachedArchiveStart = true
-                        break
+            for ((archiveDate, result) in fetchArchiveMetadata(datesToLoad)) {
+                val throwable = result.exceptionOrNull()
+                if (throwable != null) {
+                    when (throwable) {
+                        is BauhausHttpException -> {
+                            if (throwable.code == 404) {
+                                reachedArchiveStart = true
+                                break
+                            }
+                            _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
+                            return@launch
+                        }
+                        is IOException -> {
+                            _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
+                            return@launch
+                        }
+                        else -> {
+                            CrashReporter.recordException(throwable)
+                            _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
+                            return@launch
+                        }
                     }
-                    _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
-                    return@launch
-                } catch (_: IOException) {
-                    _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
-                    return@launch
-                } catch (e: Exception) {
-                    CrashReporter.recordException(e)
-                    _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
-                    return@launch
                 }
-                cursor = cursor.minusDays(1)
+
+                metadataByDate[archiveDate] = result.getOrThrow()
+                appendedDates += archiveDate
+                if (archiveDate == date) break
             }
 
             val targetReached = appendedDates.contains(date)
+            if (appendedDates.isNotEmpty()) {
+                allBrowsableDates = allBrowsableDates + appendedDates
+            }
             _uiState.update {
                 val mergedDates = if (appendedDates.isNotEmpty()) {
                     it.availableDates + appendedDates
@@ -277,14 +304,14 @@ class BauhausViewModel(
                 }
                 if (targetReached) {
                     it.copy(
-                        availableDates = mergedDates,
+                        availableDates = if (it.showFavoritesOnly) it.availableDates else mergedDates,
                         visibleDate = date,
                         metadata = metadataByDate[date],
                         reachedArchiveStart = it.reachedArchiveStart || reachedArchiveStart,
                     )
                 } else {
                     it.copy(
-                        availableDates = mergedDates,
+                        availableDates = if (it.showFavoritesOnly) it.availableDates else mergedDates,
                         reachedArchiveStart = it.reachedArchiveStart || reachedArchiveStart,
                     )
                 }
@@ -444,6 +471,9 @@ class BauhausViewModel(
         if (_uiState.value.isSavingImage) return
         viewModelScope.launch {
             _uiState.update { it.copy(isSavingImage = true) }
+            val resolver = getApplication<Application>().contentResolver
+            var pendingUri: Uri? = null
+            var saveSucceeded = false
             try {
                 val visibleDate = _uiState.value.visibleDate
                 val (bytes, mimeType) = if (visibleDate == today) {
@@ -465,10 +495,10 @@ class BauhausViewModel(
                     put(MediaStore.Images.Media.IS_PENDING, 1)
                 }
 
-                val resolver = getApplication<Application>().contentResolver
                 val uri = checkNotNull(resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)) {
                     "MediaStore insert returned null"
                 }
+                pendingUri = uri
 
                 checkNotNull(resolver.openOutputStream(uri)) {
                     "Failed to open output stream for URI: $uri"
@@ -477,16 +507,21 @@ class BauhausViewModel(
                 contentValues.clear()
                 contentValues.put(MediaStore.Images.Media.IS_PENDING, 0)
                 resolver.update(uri, contentValues, null, null)
-
-                _uiState.update { it.copy(isSavingImage = false) }
-                _snackbarEvent.tryEmit(SnackbarEvent("Image saved", uri))
+                saveSucceeded = true
+                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.image_saved), uri))
             } catch (_: IOException) {
-                _uiState.update { it.copy(isSavingImage = false) }
                 _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
             } catch (e: Exception) {
-                _uiState.update { it.copy(isSavingImage = false) }
                 CrashReporter.recordException(e)
                 _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_save_image)))
+            } finally {
+                if (!saveSucceeded) {
+                    pendingUri?.let { uri ->
+                        runCatching { resolver.delete(uri, null, null) }
+                            .onFailure { CrashReporter.recordException(it) }
+                    }
+                }
+                _uiState.update { it.copy(isSavingImage = false) }
             }
         }
     }
@@ -603,6 +638,19 @@ class BauhausViewModel(
         }
     }
 
+    private suspend fun fetchArchiveMetadata(
+        datesToLoad: List<LocalDate>,
+    ): List<Pair<LocalDate, Result<ArtworkMetadata>>> = coroutineScope {
+        val semaphore = Semaphore(archiveFetchConcurrency)
+        datesToLoad.map { archiveDate ->
+            async {
+                semaphore.withPermit {
+                    archiveDate to runCatching { api.fetchMetadataForDate(archiveDate) }
+                }
+            }
+        }.awaitAll()
+    }
+
     private fun appendNextOlderDate() {
         if (isAppendingOlderDate || _uiState.value.reachedArchiveStart) return
         val oldest = allBrowsableDates.lastOrNull() ?: today
@@ -639,6 +687,8 @@ class BauhausViewModel(
     }
 
     companion object {
+        private const val MAX_METADATA_CACHE_SIZE = 256
+
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]) {
