@@ -145,12 +145,12 @@ fun SettingsScreen(
     onSchedulingToggle: (Boolean) -> Unit,
     onSetWallpaperNow: () -> Unit,
     onSaveImage: () -> Unit,
+    modifier: Modifier = Modifier,
     onJumpToDate: (LocalDate) -> Unit = {},
     onFavoriteToggle: () -> Unit = {},
     onFavoritesFilterToggle: () -> Unit = {},
     onArchivePageSelected: (Int) -> Unit,
     onRefresh: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     val today = LocalDate.now()

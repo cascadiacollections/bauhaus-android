@@ -1,5 +1,6 @@
 package com.cascadiacollections.bauhaus
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -74,10 +75,9 @@ class MainActivity : ComponentActivity() {
                             putExtra(Intent.EXTRA_TEXT, event.text)
                         }
                         val chooser = Intent.createChooser(intent, getString(R.string.share_artwork))
-                        val canResolve = chooser.resolveActivity(packageManager) != null
-                        if (canResolve) {
+                        try {
                             startActivity(chooser)
-                        } else {
+                        } catch (_: ActivityNotFoundException) {
                             snackbarHostState.showSnackbar(
                                 message = getString(R.string.error_share_unavailable),
                                 duration = SnackbarDuration.Short,
