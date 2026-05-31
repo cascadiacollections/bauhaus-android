@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Environment
 import android.os.SystemClock
 import android.provider.MediaStore
+import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -172,7 +173,7 @@ class BauhausViewModel(
                 val metadata = api.fetchTodayMetadata()
                 metadataByDate[today] = metadata
                 _uiState.update { it.copy(metadata = metadata, isMetadataLoading = false, metadataLoadFailed = false) }
-            } catch (e: IOException) {
+            } catch (_: IOException) {
                 _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
                 _uiState.update { it.copy(metadata = null, isMetadataLoading = false, metadataLoadFailed = true) }
             } catch (e: Exception) {
@@ -256,7 +257,7 @@ class BauhausViewModel(
                     }
                     _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
                     return@launch
-                } catch (e: IOException) {
+                } catch (_: IOException) {
                     _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
                     return@launch
                 } catch (e: Exception) {
@@ -404,7 +405,7 @@ class BauhausViewModel(
                 } finally {
                     bitmap.recycle()
                 }
-            } catch (e: IOException) {
+            } catch (_: IOException) {
                 _uiState.update { it.copy(isSettingWallpaper = false) }
                 _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
             } catch (e: Exception) {
@@ -418,7 +419,7 @@ class BauhausViewModel(
     fun shareCurrentArtwork() {
         val snapshot = _uiState.value
         val path = if (snapshot.visibleDate == today) "/api/today" else "/api/${snapshot.visibleDate}"
-        val artworkUri = Uri.parse("${BauhausApi.BASE_URL}$path")
+        val artworkUri = "${BauhausApi.BASE_URL}$path".toUri()
 
         val title = snapshot.metadata?.title?.trim().orEmpty()
         val artist = snapshot.metadata?.artist?.trim().orEmpty()
@@ -479,7 +480,7 @@ class BauhausViewModel(
 
                 _uiState.update { it.copy(isSavingImage = false) }
                 _snackbarEvent.tryEmit(SnackbarEvent("Image saved", uri))
-            } catch (e: IOException) {
+            } catch (_: IOException) {
                 _uiState.update { it.copy(isSavingImage = false) }
                 _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
             } catch (e: Exception) {
@@ -539,7 +540,7 @@ class BauhausViewModel(
                         )
                     }
                 }
-            } catch (e: IOException) {
+            } catch (_: IOException) {
                 _uiState.update {
                     it.copy(
                         isRefreshing = false,
@@ -626,7 +627,7 @@ class BauhausViewModel(
                 } else {
                     _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
                 }
-            } catch (e: IOException) {
+            } catch (_: IOException) {
                 _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
             } catch (e: Exception) {
                 CrashReporter.recordException(e)
