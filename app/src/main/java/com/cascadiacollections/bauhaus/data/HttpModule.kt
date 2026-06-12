@@ -34,9 +34,6 @@ object HttpModule {
     private const val CDN_HOST = "bauhaus.cascadiacollections.workers.dev"
     private const val IMAGE_ACCEPT_HEADER = "image/avif, image/webp, image/jpeg"
 
-    @Volatile
-    private var instance: OkHttpClient? = null
-
     /**
      * Interceptor that injects the `Accept` header for image format negotiation
      * on all requests to the bauhaus CDN. Ensures Coil and [BauhausApi] produce
@@ -61,15 +58,12 @@ object HttpModule {
      * @param context Application context, used to resolve the HTTP cache directory.
      *                Only read on first call; subsequent calls return the cached instance.
      */
-    fun client(context: Context): OkHttpClient =
-        instance ?: synchronized(this) {
-            instance ?: OkHttpClient.Builder()
-                .cache(Cache(File(context.cacheDir, "http_cache"), CACHE_SIZE_BYTES))
-                .addInterceptor(formatNegotiationInterceptor)
-                .connectTimeout(15.seconds.toJavaDuration())
-                .readTimeout(15.seconds.toJavaDuration())
-                .writeTimeout(15.seconds.toJavaDuration())
-                .build()
-                .also { instance = it }
-        }
+    fun create(context: Context): OkHttpClient =
+        OkHttpClient.Builder()
+            .cache(Cache(File(context.cacheDir, "http_cache"), CACHE_SIZE_BYTES))
+            .addInterceptor(formatNegotiationInterceptor)
+            .connectTimeout(15.seconds.toJavaDuration())
+            .readTimeout(15.seconds.toJavaDuration())
+            .writeTimeout(15.seconds.toJavaDuration())
+            .build()
 }

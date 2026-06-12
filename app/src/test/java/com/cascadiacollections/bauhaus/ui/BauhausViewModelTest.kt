@@ -44,6 +44,7 @@ class BauhausViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var fakeApi: FakeBauhausApi
     private lateinit var fakeSettings: FakeSettingsRepository
+    private lateinit var fakeScheduler: FakeWallpaperScheduler
     private lateinit var viewModel: BauhausViewModel
 
     @Before
@@ -51,6 +52,7 @@ class BauhausViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeApi = FakeBauhausApi()
         fakeSettings = FakeSettingsRepository(RuntimeEnvironment.getApplication())
+        fakeScheduler = FakeWallpaperScheduler()
         // SystemClock starts at 0 in Robolectric; advance past the 30 s refresh
         // cooldown so the first call to refresh() in tests is not blocked.
         ShadowSystemClock.advanceBy(Duration.ofSeconds(31))
@@ -58,6 +60,7 @@ class BauhausViewModelTest {
             RuntimeEnvironment.getApplication(),
             fakeSettings,
             fakeApi,
+            fakeScheduler,
         )
     }
 
@@ -97,6 +100,7 @@ class BauhausViewModelTest {
             RuntimeEnvironment.getApplication(),
             FakeSettingsRepository(RuntimeEnvironment.getApplication()),
             failingApi,
+            FakeWallpaperScheduler(),
         )
         assertNull(vm.uiState.value.metadata)
         assertFalse(vm.uiState.value.isMetadataLoading)
@@ -326,6 +330,7 @@ class BauhausViewModelTest {
             RuntimeEnvironment.getApplication(),
             FakeSettingsRepository(RuntimeEnvironment.getApplication()),
             failingApi,
+            FakeWallpaperScheduler(),
         )
         val events = mutableListOf<ShareArtworkEvent>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -443,6 +448,19 @@ class BauhausViewModelTest {
             if (shouldThrow) throw RuntimeException("Unexpected error")
             if (missingDates.contains(date)) throw BauhausHttpException(404, "/api/$date")
             return byteArrayOf(0) to "image/jpeg"
+        }
+    }
+
+    private class FakeWallpaperScheduler : com.cascadiacollections.bauhaus.WallpaperScheduler {
+        var scheduled = false
+        var cancelled = false
+
+        override fun scheduleDaily() {
+            scheduled = true
+        }
+
+        override fun cancelDaily() {
+            cancelled = true
         }
     }
 

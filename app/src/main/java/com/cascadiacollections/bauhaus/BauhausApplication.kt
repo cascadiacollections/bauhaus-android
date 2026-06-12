@@ -11,7 +11,6 @@ import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.CachePolicy
-import com.cascadiacollections.bauhaus.data.HttpModule
 import com.cascadiacollections.bauhaus.worker.WallpaperWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,18 +34,43 @@ import java.time.LocalDate
  * 4. **Startup prefetch** — opportunistically fetches today's image once per day
  *    to warm HTTP cache before UI render.
  */
-class BauhausApplication : Application(), SingletonImageLoader.Factory, Configuration.Provider {
+class BauhausApplication : Application(), AppContainerProvider, SingletonImageLoader.Factory, Configuration.Provider {
 
     companion object {
         private const val TAG = "BauhausApplication"
     }
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    lateinit var container: AppContainer
-        private set
+    override lateinit var container: AppContainer
 
     override fun onCreate() {
         super.onCreate()
+        if (BuildConfig.DEBUG) {
+            runCatching {
+                val watcherClass = Class.forName("leakcanary.AppWatcher")
+                val configClass = Class.forName("leakcanary.AppWatcher\$Config")
+                val config = watcherClass.getMethod("getConfig").invoke(null)
+                val copyMethod = configClass.getMethod(
+                    "copy",
+                    Boolean::class.javaPrimitiveType,
+                    Boolean::class.javaPrimitiveType,
+                    Boolean::class.javaPrimitiveType,
+                    Boolean::class.javaPrimitiveType,
+                    Long::class.javaPrimitiveType,
+                    Boolean::class.javaPrimitiveType,
+                )
+                val customConfig = copyMethod.invoke(
+                    config,
+                    true,
+                    false,
+                    false,
+                    true,
+                    5_000L,
+                    true,
+                )
+                watcherClass.getMethod("setConfig", configClass).invoke(null, customConfig)
+            }
+        }
         container = AppContainer(this)
         CrashReporter.init(this)
         scheduleWallpaperWorkerIfEnabled()
@@ -75,7 +99,7 @@ class BauhausApplication : Application(), SingletonImageLoader.Factory, Configur
             .components {
                 add(
                     OkHttpNetworkFetcherFactory(
-                        callFactory = { HttpModule.client(this@BauhausApplication) },
+                        callFactory = { container.okHttpClient },
                     ),
                 )
             }

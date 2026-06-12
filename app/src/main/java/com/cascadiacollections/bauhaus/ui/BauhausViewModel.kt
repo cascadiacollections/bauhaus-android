@@ -13,8 +13,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.cascadiacollections.bauhaus.BauhausApplication
+import com.cascadiacollections.bauhaus.AppContainerProvider
 import com.cascadiacollections.bauhaus.CrashReporter
+import com.cascadiacollections.bauhaus.WallpaperScheduler
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
@@ -97,6 +98,7 @@ class BauhausViewModel(
     application: Application,
     private val settings: SettingsStore,
     private val api: BauhausApiClient,
+    private val scheduler: WallpaperScheduler,
 ) : AndroidViewModel(application) {
     private val maxJumpExpansionDays: Long = 730
     private val archiveFetchConcurrency: Int = 4
@@ -397,10 +399,9 @@ class BauhausViewModel(
      * job is cancelled. Re-enabling re-enqueues it with [ExistingPeriodicWorkPolicy.KEEP][androidx.work.ExistingPeriodicWorkPolicy.KEEP].
      */
     fun setSchedulingEnabled(enabled: Boolean) {
-        val app = getApplication<BauhausApplication>()
         viewModelScope.launch {
             settings.setSchedulingEnabled(enabled)
-            if (enabled) app.scheduleWallpaperWorker() else app.cancelWallpaperWorker()
+            if (enabled) scheduler.scheduleDaily() else scheduler.cancelDaily()
         }
     }
 
@@ -703,11 +704,14 @@ class BauhausViewModel(
                 val app = checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]) {
                     "APPLICATION_KEY not found in CreationExtras"
                 }
-                val container = (app as BauhausApplication).container
+                val containerProvider = app as? AppContainerProvider
+                    ?: error("Application must implement AppContainerProvider")
+                val container = containerProvider.container
                 BauhausViewModel(
                     app,
                     container.settingsRepository,
                     container.bauhausApi,
+                    container.wallpaperScheduler,
                 )
             }
         }

@@ -10,8 +10,9 @@ import com.cascadiacollections.bauhaus.worker.BauhausWorkerFactory
 import com.cascadiacollections.bauhaus.worker.WallpaperWorker
 
 class AppContainer(app: Application) {
+    val okHttpClient = HttpModule.create(app)
     val settingsRepository: SettingsStore = SettingsRepository(app)
-    val bauhausApi: BauhausApiClient = BauhausApi(HttpModule.client(app))
+    val bauhausApi: BauhausApiClient = BauhausApi(okHttpClient)
     val wallpaperScheduler: WallpaperScheduler = WorkManagerWallpaperScheduler(app)
     val workerFactory = BauhausWorkerFactory(
         WallpaperWorker.Dependencies(
