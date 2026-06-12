@@ -16,6 +16,7 @@ import com.cascadiacollections.bauhaus.worker.WallpaperWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -48,7 +49,7 @@ class BauhausApplication : Application(), SingletonImageLoader.Factory, Configur
         super.onCreate()
         container = AppContainer(this)
         CrashReporter.init(this)
-        scheduleWallpaperWorker()
+        scheduleWallpaperWorkerIfEnabled()
         enqueueFirstRunIfNeeded()
         prefetchTodayImageIfNeeded()
     }
@@ -94,6 +95,16 @@ class BauhausApplication : Application(), SingletonImageLoader.Factory, Configur
         container.wallpaperScheduler.cancelDaily()
     }
 
+    /** Only schedules the worker if the user has not disabled daily updates. */
+    private fun scheduleWallpaperWorkerIfEnabled() {
+        appScope.launch {
+            val enabled = container.settingsRepository.schedulingEnabled.first()
+            if (enabled) {
+                scheduleWallpaperWorker()
+            }
+        }
+    }
+
     /**
      * On the very first launch, enqueues an expedited one-time worker so the
      * wallpaper is set immediately instead of waiting for the periodic window.
@@ -120,12 +131,17 @@ class BauhausApplication : Application(), SingletonImageLoader.Factory, Configur
     /**
      * Opportunistically warms the `/api/today` cache once per day so the first
      * foreground render can hit local cache on the happy path.
+     *
+     * Skips when the wallpaper was already set today (image already cached) or
+     * when prefetch already ran today.
      */
     private fun prefetchTodayImageIfNeeded() {
         val settings = container.settingsRepository
         val api = container.bauhausApi
         appScope.launch {
             val today = LocalDate.now().toString()
+            val lastUpdated = settings.lastUpdated.first()
+            if (lastUpdated == today) return@launch
             if (settings.getLastPrefetchedDate() == today) return@launch
             try {
                 api.fetchTodayImageRaw()
