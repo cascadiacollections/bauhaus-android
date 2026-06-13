@@ -458,12 +458,11 @@ class BauhausViewModel(
 
         val title = snapshot.metadata?.title?.trim().orEmpty()
         val artist = snapshot.metadata?.artist?.trim().orEmpty()
-        val metadataText = when {
-            title.isNotEmpty() && artist.isNotEmpty() -> "$title — $artist"
-            title.isNotEmpty() -> title
-            artist.isNotEmpty() -> artist
-            else -> null
-        }
+        val metadataText = listOfNotNull(
+            title.takeIf(String::isNotBlank),
+            artist.takeIf(String::isNotBlank),
+        ).joinToString(" — ")
+            .takeIf(String::isNotBlank)
         val shareText = listOfNotNull(metadataText, artworkUri.toString()).joinToString("\n")
         _shareArtworkEvent.tryEmit(ShareArtworkEvent(uri = artworkUri, text = shareText))
     }

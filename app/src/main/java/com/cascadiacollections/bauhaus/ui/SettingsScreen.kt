@@ -350,14 +350,15 @@ fun SettingsScreen(
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
+                        val title = metadata.title.trim().ifBlank { stringResource(R.string.daily_bauhaus) }
                         Text(
-                            text = metadata.title.ifEmpty { stringResource(R.string.daily_bauhaus) },
+                            text = title,
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.semantics { heading() },
                         )
-                        if (metadata.artist.isNotEmpty()) {
+                        if (metadata.artist.isNotBlank()) {
                             Text(
-                                text = metadata.artist,
+                                text = metadata.artist.trim(),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
