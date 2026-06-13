@@ -1,5 +1,6 @@
 package com.cascadiacollections.bauhaus.ui
 
+import androidx.compose.ui.unit.IntSize
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.LocalDate
@@ -54,5 +55,11 @@ class SettingsScreenPrefetchTest {
         )
 
         assertEquals(emptyList<ArchiveImageRequest>(), requests)
+    }
+
+    @Test
+    fun `previewImageSizePx clamps oversize artwork cards to a safe request size`() {
+        assertEquals(IntSize(1600, 1600), previewImageSizePx(IntSize(4000, 3000)))
+        assertEquals(IntSize(1080, 810), previewImageSizePx(IntSize(1080, 810)))
     }
 }
