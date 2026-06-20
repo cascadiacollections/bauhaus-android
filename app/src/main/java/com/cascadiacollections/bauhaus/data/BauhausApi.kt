@@ -146,7 +146,7 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
         return try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) throw BauhausHttpException(response.code, endpoint)
-                val body = response.body ?: throw BauhausEmptyBodyException(endpoint)
+                val body = response.body
                 val mimeType = response.header("Content-Type")
                     ?.substringBefore(";")
                     ?.trim()
@@ -182,7 +182,7 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
         try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) throw BauhausHttpException(response.code, endpoint)
-                val body = response.body ?: throw BauhausEmptyBodyException(endpoint)
+                val body = response.body
                 try {
                     json.decodeFromString<ArtworkMetadata>(body.string())
                 } catch (e: Exception) {
