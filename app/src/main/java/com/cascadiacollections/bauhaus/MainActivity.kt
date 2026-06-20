@@ -63,8 +63,10 @@ class MainActivity : ComponentActivity() {
                             actionLabel = event.uri?.let { "Open" },
                             duration = SnackbarDuration.Short,
                         )
-                        if (result == SnackbarResult.ActionPerformed && event.uri != null) {
-                            startActivity(Intent(Intent.ACTION_VIEW, event.uri))
+                        if (result == SnackbarResult.ActionPerformed) {
+                            event.uri?.let { uri ->
+                                startActivity(Intent(Intent.ACTION_VIEW, uri))
+                            }
                         }
                     }
                 }

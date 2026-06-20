@@ -49,9 +49,11 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -63,6 +65,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
+import coil3.request.allowHardware
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.BauhausApi
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
@@ -128,6 +131,15 @@ internal fun neighborPrefetchRequests(
             cacheKey = imageCacheKeyForDate(date, imageRevision),
         )
     }
+}
+
+internal fun previewImageSizePx(size: IntSize): IntSize {
+    val maxWidth = 1600
+    val maxHeight = 1600
+    return IntSize(
+        width = size.width.coerceAtLeast(1).coerceAtMost(maxWidth),
+        height = size.height.coerceAtLeast(1).coerceAtMost(maxHeight),
+    )
 }
 
 /**
@@ -203,9 +215,11 @@ fun SettingsScreen(
         ) {
             // -- Artwork preview --
             val view = LocalView.current
+            var artworkCardSize by remember { mutableStateOf(IntSize.Zero) }
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .onSizeChanged { artworkCardSize = it }
                     .combinedClickable(
                         onClick = {},
                         onLongClick = {
@@ -223,6 +237,7 @@ fun SettingsScreen(
                 val today = LocalDate.now()
                 val context = LocalContext.current
                 val imageLoader = remember(context) { SingletonImageLoader.get(context) }
+                val artworkPreviewSize = remember(artworkCardSize) { previewImageSizePx(artworkCardSize) }
                 val prefetchedNeighborKeys = remember(uiState.imageRevision) { mutableSetOf<String>() }
                 LaunchedEffect(pagerState, uiState.availableDates, uiState.imageRevision) {
                     snapshotFlow { pagerState.settledPage }
@@ -239,6 +254,8 @@ fun SettingsScreen(
                                     imageLoader.enqueue(
                                         ImageRequest.Builder(context)
                                             .data("${BauhausApi.BASE_URL}${request.imagePath}")
+                                            .size(artworkPreviewSize.width, artworkPreviewSize.height)
+                                            .allowHardware(false)
                                             .memoryCacheKey(request.cacheKey)
                                             .diskCacheKey(request.cacheKey)
                                             .build(),
@@ -268,12 +285,17 @@ fun SettingsScreen(
                     } else {
                         stringResource(R.string.artwork_for_date, date.toString())
                     }
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
+                    val imageRequest = remember(context, artworkPreviewSize, cacheKey, imagePath) {
+                        ImageRequest.Builder(context)
                             .data("${BauhausApi.BASE_URL}$imagePath")
+                            .size(artworkPreviewSize.width, artworkPreviewSize.height)
+                            .allowHardware(false)
                             .memoryCacheKey(cacheKey)
                             .diskCacheKey(cacheKey)
-                            .build(),
+                            .build()
+                    }
+                    AsyncImage(
+                        model = imageRequest,
                         contentDescription = contentDescription,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
@@ -350,14 +372,15 @@ fun SettingsScreen(
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
+                        val title = metadata.title.trim().ifBlank { stringResource(R.string.daily_bauhaus) }
                         Text(
-                            text = metadata.title.ifEmpty { stringResource(R.string.daily_bauhaus) },
+                            text = title,
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.semantics { heading() },
                         )
-                        if (metadata.artist.isNotEmpty()) {
+                        if (metadata.artist.isNotBlank()) {
                             Text(
-                                text = metadata.artist,
+                                text = metadata.artist.trim(),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

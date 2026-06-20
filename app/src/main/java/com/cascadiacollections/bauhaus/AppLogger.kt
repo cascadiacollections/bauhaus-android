@@ -34,23 +34,23 @@ object AppLogger {
     fun error(tag: String, message: String, throwable: Throwable? = null) {
         Log.e(tag, message, throwable)
         CrashReporter.log("E/$tag: $message")
-        if (throwable != null) {
-            CrashReporter.recordException(throwable)
-        }
+        throwable?.let(CrashReporter::recordException)
     }
 
     fun error(tag: String, event: Event, message: String, throwable: Throwable? = null) {
         val payload = format(event, message)
         Log.e(tag, payload, throwable)
         CrashReporter.log("E/$tag: $payload")
-        if (throwable != null) {
-            CrashReporter.recordException(throwable)
-        }
+        throwable?.let(CrashReporter::recordException)
     }
 
-    private fun format(event: Event, message: String): String {
-        if (event.attributes.isEmpty()) return "${event.name}: $message"
-        val attrs = event.attributes.entries.joinToString(",") { "${it.key}=${it.value}" }
-        return "${event.name}: $message | $attrs"
+    private fun format(event: Event, message: String): String = buildString {
+        append(event.name)
+        append(": ")
+        append(message)
+        if (event.attributes.isNotEmpty()) {
+            append(" | ")
+            append(event.attributes.entries.joinToString(",") { "${it.key}=${it.value}" })
+        }
     }
 }

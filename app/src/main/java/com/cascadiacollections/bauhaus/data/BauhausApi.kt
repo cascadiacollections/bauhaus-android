@@ -147,7 +147,11 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) throw BauhausHttpException(response.code, endpoint)
                 val body = response.body ?: throw BauhausEmptyBodyException(endpoint)
-                val mimeType = response.header("Content-Type")?.substringBefore(";")?.trim() ?: "image/jpeg"
+                val mimeType = response.header("Content-Type")
+                    ?.substringBefore(";")
+                    ?.trim()
+                    .takeUnless { it.isNullOrBlank() }
+                    ?: "image/jpeg"
                 val bytes = body.bytes()
                 bytes to mimeType
             }
@@ -206,11 +210,15 @@ private fun decodeSampled(bytes: ByteArray, maxWidth: Int, maxHeight: Int): Bitm
         }
     }
 
-    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    val options = BitmapFactory.Options().apply {
+        inJustDecodeBounds = true
+        inPreferredConfig = Bitmap.Config.RGB_565
+    }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
 
     options.inSampleSize = calculateInSampleSize(options.outWidth, options.outHeight, maxWidth, maxHeight)
     options.inJustDecodeBounds = false
+    options.inPreferredConfig = Bitmap.Config.RGB_565
 
     return checkNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)) {
         "Failed to decode image from ${bytes.size} bytes with sample size ${options.inSampleSize}"

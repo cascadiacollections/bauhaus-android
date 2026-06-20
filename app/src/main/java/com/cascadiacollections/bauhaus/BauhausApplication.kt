@@ -11,6 +11,7 @@ import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.CachePolicy
+import coil3.request.allowHardware
 import com.cascadiacollections.bauhaus.worker.WallpaperWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -103,6 +104,7 @@ class BauhausApplication : Application(), AppContainerProvider, SingletonImageLo
                     ),
                 )
             }
+            .allowHardware(false)
             .diskCachePolicy(CachePolicy.ENABLED)
             .memoryCachePolicy(CachePolicy.ENABLED)
             .build()
