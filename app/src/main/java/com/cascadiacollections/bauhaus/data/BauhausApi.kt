@@ -55,7 +55,7 @@ data class ArtworkMetadata(
  * (`max-age=300`), so opening the app, previewing the image, and tapping
  * "Set Now" in quick succession costs at most **one** CDN request.
  *
- * @param client Shared [OkHttpClient] with disk cache — obtain via [HttpModule.client].
+ * @param client Shared [OkHttpClient] with disk cache — obtain via [HttpModule.create].
  */
 open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
 
@@ -101,7 +101,6 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
         maxWidth: Int,
         maxHeight: Int,
     ): Bitmap = withContext(Dispatchers.IO) {
-        val endpoint = imagePath
         val request = Request.Builder()
             .url("$BASE_URL$imagePath")
             .header("Accept", IMAGE_ACCEPT_HEADER)
@@ -109,14 +108,14 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
 
         val bytes = try {
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) throw BauhausHttpException(response.code, endpoint)
+                if (!response.isSuccessful) throw BauhausHttpException(response.code, imagePath)
                 val body = response.body
                 body.bytes()
             }
         } catch (e: BauhausDataException) {
             throw e
         } catch (e: IOException) {
-            throw BauhausNetworkException(endpoint, e)
+            throw BauhausNetworkException(imagePath, e)
         }
 
         decodeSampled(bytes, maxWidth, maxHeight)
@@ -137,7 +136,6 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
     }
 
     private fun fetchImageRawForPath(path: String): Pair<ByteArray, String> {
-        val endpoint = path
         val request = Request.Builder()
             .url("$BASE_URL$path")
             .header("Accept", IMAGE_ACCEPT_HEADER)
@@ -145,7 +143,7 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
 
         return try {
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) throw BauhausHttpException(response.code, endpoint)
+                if (!response.isSuccessful) throw BauhausHttpException(response.code, path)
                 val body = response.body
                 val mimeType = response.header("Content-Type")
                     ?.substringBefore(";")
@@ -158,7 +156,7 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
         } catch (e: BauhausDataException) {
             throw e
         } catch (e: IOException) {
-            throw BauhausNetworkException(endpoint, e)
+            throw BauhausNetworkException(path, e)
         }
     }
 
@@ -174,25 +172,24 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
         fetchMetadataForPath("/api/${date.format(ISO_DATE_FORMAT)}.json")
 
     private suspend fun fetchMetadataForPath(path: String): ArtworkMetadata = withContext(Dispatchers.IO) {
-        val endpoint = path
         val request = Request.Builder()
             .url("$BASE_URL$path")
             .build()
 
         try {
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) throw BauhausHttpException(response.code, endpoint)
+                if (!response.isSuccessful) throw BauhausHttpException(response.code, path)
                 val body = response.body
                 try {
                     json.decodeFromString<ArtworkMetadata>(body.string())
                 } catch (e: Exception) {
-                    throw BauhausDecodeException(endpoint, e)
+                    throw BauhausDecodeException(path, e)
                 }
             }
         } catch (e: BauhausDataException) {
             throw e
         } catch (e: IOException) {
-            throw BauhausNetworkException(endpoint, e)
+            throw BauhausNetworkException(path, e)
         }
     }
 }
