@@ -24,6 +24,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.core.net.toUri
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -33,6 +35,7 @@ import com.cascadiacollections.bauhaus.ui.BauhausViewModel
 import com.cascadiacollections.bauhaus.ui.SettingsScreen
 import com.cascadiacollections.bauhaus.ui.SettingsScreenTestTags
 import com.cascadiacollections.bauhaus.ui.theme.BauhausTheme
+import kotlinx.coroutines.launch
 
 /**
  * Single-activity host for the bauhaus wallpaper app.
@@ -54,6 +57,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             BauhausTheme {
                 val snackbarHostState = remember { SnackbarHostState() }
+                val scope = rememberCoroutineScope()
                 val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
                 LaunchedEffect(Unit) {
@@ -131,6 +135,18 @@ class MainActivity : ComponentActivity() {
                         onJumpToDate = viewModel::jumpToDate,
                         onFavoriteToggle = viewModel::toggleFavorite,
                         onFavoritesFilterToggle = viewModel::toggleFavoritesFilter,
+                        onOpenUrl = { url ->
+                            try {
+                                startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                            } catch (_: ActivityNotFoundException) {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = getString(R.string.error_open_link_unavailable),
+                                        duration = SnackbarDuration.Short,
+                                    )
+                                }
+                            }
+                        },
                         onArchivePageSelected = viewModel::onArchivePageSelected,
                         onRefresh = viewModel::refresh,
                         modifier = Modifier.padding(innerPadding),

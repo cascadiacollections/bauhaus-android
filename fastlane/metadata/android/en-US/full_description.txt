@@ -1,16 +1,31 @@
-Bauhaus brings the Bauhaus art movement to your Android home screen and lock screen. Each day a new artwork is fetched and ready to set as your wallpaper — no account required, no ads, no tracking.
+Bauhaus puts a fresh piece of art on your home screen and lock screen every day.
+
+Each morning a public-domain landscape from the Metropolitan Museum of Art or the Art Institute of Chicago is run through neural style transfer against a curated reference — Monet, Hokusai, Cezanne, Turner, Hiroshige, Seurat, Degas, Klimt, Van Gogh, Gauguin — and published. The app fetches it and sets it as your wallpaper.
 
 Features:
-• Daily artwork delivered via a public CDN
-• Set artwork as your home screen wallpaper, lock screen wallpaper, or both
-• Browse archived artworks by date
-• Automatic background updates via WorkManager
-• Fully offline-capable once an image is cached
+• A new stylized artwork every day, applied automatically in the background
+• Set it on your home screen, lock screen, or both
+• Browse and re-apply any day from the archive
+• Save the full-resolution image to your gallery, or share it
+• Favorite the days you want to keep
+• Title, artist, source collection and licence shown for every piece, with links
 
 Privacy:
-• No account or sign-in required
-• No analytics or tracking of any kind
-• Only the INTERNET permission (to fetch artwork) and SET_WALLPAPER permission are used
-• No data is collected or shared
+• No account, no sign-in, no ads
+• No analytics, tracking, or crash reporting in this build
+• Two permissions only: INTERNET, to fetch the artwork, and SET_WALLPAPER
+• Nothing is collected or shared. The app sends no identifiers — it makes plain
+  GET requests to the artwork service and nothing else.
 
-Open source under the MIT license: https://github.com/cascadiacollections/bauhaus-android
+Licensing and attribution:
+• Source artwork is CC0 (public domain) from the Met and Art Institute of Chicago
+• The style-transfer model is AdaIN (MIT); the VGG-19 encoder is BSD-like
+• Generated artwork from the daily scheduled runs is CC0-1.0
+• Each image's licence and upstream source are shown in the app and published
+  alongside it in the artwork metadata
+
+The app is MIT licensed and builds from source with no proprietary dependencies:
+https://github.com/cascadiacollections/bauhaus-android
+
+The artwork service is also open source and self-hostable:
+https://github.com/cascadiacollections/bauhaus

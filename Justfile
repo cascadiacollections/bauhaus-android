@@ -1,7 +1,15 @@
 # bauhaus-android developer recipes
+#
+# Every Gradle task in this project is flavored — there is no bare
+# `assembleDebug` or `testDebugUnitTest`. Recipes default to `foss`; override
+# per-invocation with `just flavor=full build`.
 
 # Default flavor for local development
 flavor := "foss"
+
+# List available recipes
+default:
+    @just --list
 
 # Build debug APK
 build:
@@ -10,6 +18,20 @@ build:
 # Run unit tests
 test:
     ./gradlew test{{capitalize(flavor)}}DebugUnitTest --no-daemon
+
+# Run lint (warnings are errors)
+lint:
+    ./gradlew lint{{capitalize(flavor)}}Debug --no-daemon
+
+# Generate the JaCoCo coverage report (app/build/reports/jacoco/)
+coverage:
+    ./gradlew jacocoTestReport --no-daemon
+
+# Everything CI gates on, in one invocation
+check:
+    ./gradlew assemble{{capitalize(flavor)}}Release assemble{{capitalize(flavor)}}Debug \
+        lint{{capitalize(flavor)}}Debug test{{capitalize(flavor)}}DebugUnitTest jacocoTestReport \
+        --no-daemon --parallel --build-cache
 
 # Install debug build on connected device
 install:
@@ -33,3 +55,14 @@ build-foss:
 # Build full variant (with Firebase)
 build-full:
     ./gradlew assembleFullDebug --no-daemon
+
+# Run the macrobenchmarks / regenerate the baseline profile.
+# Requires a connected device or running emulator — there is no Gradle-managed
+# device configured for :benchmark.
+benchmark:
+    ./gradlew :benchmark:connectedBenchmarkAndroidTest --no-daemon
+
+# Refresh gradle/libs.versions.toml to the newest resolvable versions.
+# Review the diff before committing — this will happily pull in prereleases.
+deps:
+    ./gradlew versionCatalogUpdate --no-daemon

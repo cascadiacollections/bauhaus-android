@@ -1,6 +1,8 @@
 package com.cascadiacollections.bauhaus.ui
 
 import androidx.compose.ui.unit.IntSize
+import com.cascadiacollections.bauhaus.data.ArtworkMetadata
+import com.cascadiacollections.bauhaus.data.ArtworkVariant
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.LocalDate
@@ -16,7 +18,7 @@ class SettingsScreenPrefetchTest {
         val requests = neighborPrefetchRequests(
             dates = dates,
             settledPage = 1,
-            today = today,
+            latestDate = today,
             imageRevision = 3,
         )
 
@@ -36,7 +38,7 @@ class SettingsScreenPrefetchTest {
         val requests = neighborPrefetchRequests(
             dates = dates,
             settledPage = 0,
-            today = today,
+            latestDate = today,
             imageRevision = 1,
         )
 
@@ -50,7 +52,7 @@ class SettingsScreenPrefetchTest {
         val requests = neighborPrefetchRequests(
             dates = dates,
             settledPage = 10,
-            today = today,
+            latestDate = today,
             imageRevision = 1,
         )
 
@@ -61,5 +63,29 @@ class SettingsScreenPrefetchTest {
     fun `previewImageSizePx clamps oversize artwork cards to a safe request size`() {
         assertEquals(IntSize(1600, 1600), previewImageSizePx(IntSize(4000, 3000)))
         assertEquals(IntSize(1080, 810), previewImageSizePx(IntSize(1080, 810)))
+    }
+
+    @Test
+    fun `previewAspectRatio uses the published stylized dimensions`() {
+        val metadata = ArtworkMetadata(
+            variants = listOf(ArtworkVariant(type = "stylized", width = 1280, height = 853)),
+        )
+
+        assertEquals(1280f / 853f, resolvePreviewAspectRatio(metadata), 0.0001f)
+    }
+
+    @Test
+    fun `previewAspectRatio falls back when the service published no dimensions`() {
+        assertEquals(FALLBACK_ASPECT_RATIO, resolvePreviewAspectRatio(null), 0.0001f)
+        assertEquals(FALLBACK_ASPECT_RATIO, resolvePreviewAspectRatio(ArtworkMetadata()), 0.0001f)
+    }
+
+    @Test
+    fun `previewAspectRatio rejects implausible ratios rather than laying out a sliver`() {
+        val panorama = ArtworkMetadata(
+            variants = listOf(ArtworkVariant(type = "stylized", width = 10_000, height = 100)),
+        )
+
+        assertEquals(FALLBACK_ASPECT_RATIO, resolvePreviewAspectRatio(panorama), 0.0001f)
     }
 }

@@ -1,12 +1,69 @@
 version: 2
 updates:
+  # Gradle updates arrive grouped. Ungrouped, a single Compose BOM bump plus its
+  # satellites lands as several separate PRs that each run the full Android CI
+  # job, and recent history is dominated by one-line dependency commits.
   - package-ecosystem: "gradle"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      androidx-compose:
+        patterns:
+          - "androidx.compose*"
+          - "androidx.activity*"
+          - "androidx.lifecycle*"
+      androidx:
+        patterns:
+          - "androidx.*"
+        exclude-patterns:
+          - "androidx.compose*"
+          - "androidx.activity*"
+          - "androidx.lifecycle*"
+          - "androidx.benchmark*"
+          - "androidx.test*"
+      kotlin:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "org.jetbrains.kotlinx*"
+      firebase:
+        patterns:
+          - "com.google.firebase*"
+          - "com.google.gms*"
+      test-tooling:
+        patterns:
+          - "junit*"
+          - "org.robolectric*"
+          - "io.mockk*"
+          - "app.cash.turbine*"
+          - "androidx.test*"
+          - "androidx.benchmark*"
+      # AGP is deliberately not grouped: it is currently tracking an alpha line,
+      # and a bump can change build behaviour on its own. It stays reviewable in
+      # isolation rather than riding along with library updates.
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # The devcontainer's Debian base and its Android SDK layer are part of the
+  # enlistment: a stale base is a stale toolchain for everyone who opens the repo
+  # in a container, and nothing was watching it.
+  - package-ecosystem: "docker"
+    directory: "/.devcontainer"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 2
+
+  - package-ecosystem: "devcontainers"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 2

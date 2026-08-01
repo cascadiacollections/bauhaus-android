@@ -1,0 +1,50 @@
+# The devcontainer image was never built by CI. A stale Debian base, or an
+# Android SDK layer whose cmdline-tools build is too old to resolve the pinned
+# platform, only surfaced for whoever next opened the repo in a container — and
+# it surfaced as a confusing "package not found" mid-build.
+#
+# Path-filtered, so this costs nothing on ordinary changes.
+name: Devcontainer
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.devcontainer/**'
+      - '.github/workflows/devcontainer.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.devcontainer/**'
+      - '.github/workflows/devcontainer.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build devcontainer image
+        run: docker build -f .devcontainer/Dockerfile -t bauhaus-devcontainer .devcontainer
+
+      - name: Verify the toolchain the image actually provisioned
+        run: |
+          # Assert on what is installed rather than on the build succeeding: the
+          # licence and sdkmanager steps used to be able to no-op and still exit 0.
+          docker run --rm bauhaus-devcontainer bash -lc '
+            set -euo pipefail
+            java -version
+            sdkmanager --list_installed
+            sdkmanager --list_installed | grep -q "platforms;android-37"
+            sdkmanager --list_installed | grep -q "build-tools;37"
+          '

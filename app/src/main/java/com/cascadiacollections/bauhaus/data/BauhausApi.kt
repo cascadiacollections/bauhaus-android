@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -17,43 +16,41 @@ private val json = Json { ignoreUnknownKeys = true }
 /** Image format negotiation header shared by [BauhausApi] and [HttpModule]. */
 internal const val IMAGE_ACCEPT_HEADER = "image/avif, image/webp, image/jpeg"
 
-/**
- * Metadata returned by the bauhaus CDN for a given day's artwork.
- *
- * All fields default to empty strings so deserialization never fails on
- * missing keys — the CDN may omit fields for older archive entries.
- */
-@Serializable
-data class ArtworkMetadata(
-    val title: String = "",
-    val artist: String = "",
-    val source: String = "",
-    val license: String = "",
-    val date: String = "",
-)
+private const val HTTP_NOT_FOUND = 404
+private const val HTTP_UNAVAILABLE = 503
 
 /**
- * Client for the bauhaus Cloudflare Workers CDN.
+ * Client for the bauhaus Cloudflare Workers service.
  *
- * ## Endpoints
+ * ## Endpoints used
  *
  * | Route | Returns |
  * |-------|---------|
  * | `GET /api/today` | Today's stylized image (content-negotiated) |
  * | `GET /api/today.json` | Today's [ArtworkMetadata] |
  * | `GET /api/YYYY-MM-DD` | Archive image (immutable cache) |
+ * | `GET /api/YYYY-MM-DD.json` | Archive [ArtworkMetadata] |
+ * | `HEAD /api/YYYY-MM-DD.json` | Existence probe — see [hasArtworkForDate] |
+ * | `GET /api/health` | Publish freshness — see [fetchHealth] |
  *
  * ## Format Negotiation
  *
- * The `Accept` header requests AVIF > WebP > JPEG. The CDN picks the best
+ * The `Accept` header requests AVIF > WebP > JPEG. The service picks the best
  * pre-generated variant and falls back to JPEG when others are unavailable.
+ * The `?format=` override is deliberately not used: it rejects unknown values
+ * with `400`, and `Accept` already expresses everything the app needs.
  *
  * ## Caching & COGs
  *
  * Pass the shared [OkHttpClient] from [HttpModule] so that the disk cache
- * deduplicates requests. `/api/today` responses are cached for 5 minutes
- * (`max-age=300`), so opening the app, previewing the image, and tapping
- * "Set Now" in quick succession costs at most **one** CDN request.
+ * deduplicates requests. `/api/today*` responses carry `max-age=300`, so opening
+ * the app, previewing the image, and tapping "Set Now" in quick succession costs
+ * at most **one** service request. Every response also carries an `ETag`, so once
+ * the 5-minute window lapses OkHttp revalidates conditionally and the service
+ * answers `304` without re-sending the body.
+ *
+ * Date-keyed routes are `immutable` with a one-year TTL, so archived artwork is
+ * fetched exactly once per device.
  *
  * @param client Shared [OkHttpClient] with disk cache — obtain via [HttpModule.create].
  */
@@ -62,6 +59,12 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
     companion object {
         const val BASE_URL = "https://bauhaus.cascadiacollections.workers.dev"
         private val ISO_DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+
+        /** Path of the stylized image for [date]. */
+        fun imagePath(date: LocalDate): String = "/api/${date.format(ISO_DATE_FORMAT)}"
+
+        /** Path of the metadata document for [date]. */
+        fun metadataPath(date: LocalDate): String = "${imagePath(date)}.json"
     }
 
     /**
@@ -75,7 +78,7 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
      * @param maxWidth  Target width in pixels (0 = no downsampling).
      * @param maxHeight Target height in pixels (0 = no downsampling).
      * @return Decoded bitmap, sized to fit within the requested bounds.
-     * @throws IllegalStateException if the CDN response cannot be decoded.
+     * @throws IllegalStateException if the response cannot be decoded.
      */
     override suspend fun fetchTodayImage(
         maxWidth: Int,
@@ -91,7 +94,7 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
         maxWidth: Int,
         maxHeight: Int,
     ): Bitmap = fetchImageForPath(
-        imagePath = "/api/${date.format(ISO_DATE_FORMAT)}",
+        imagePath = imagePath(date),
         maxWidth = maxWidth,
         maxHeight = maxHeight,
     )
@@ -123,7 +126,7 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
 
     /**
      * Fetches today's artwork as raw bytes, preserving the original format
-     * (AVIF, WebP, or JPEG) negotiated by the CDN.
+     * (AVIF, WebP, or JPEG) negotiated by the service.
      *
      * @return The image bytes paired with the MIME type from the `Content-Type` header.
      */
@@ -132,7 +135,7 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
     }
 
     override suspend fun fetchImageRawForDate(date: LocalDate): Pair<ByteArray, String> = withContext(Dispatchers.IO) {
-        fetchImageRawForPath("/api/${date.format(ISO_DATE_FORMAT)}")
+        fetchImageRawForPath(imagePath(date))
     }
 
     private fun fetchImageRawForPath(path: String): Pair<ByteArray, String> {
@@ -161,15 +164,16 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
     }
 
     /**
-     * Fetches today's artwork metadata (title, artist, source, license).
+     * Fetches today's artwork metadata.
      *
-     * This is a lightweight JSON call (~200 bytes) and is safe to call on
-     * every app open. The CDN caches the response for 5 minutes.
+     * This is a lightweight JSON call and is safe to call on every app open. The
+     * service caches the response for 5 minutes and serves an `ETag`, so repeat
+     * calls are either a local cache hit or a `304`.
      */
     override suspend fun fetchTodayMetadata(): ArtworkMetadata = fetchMetadataForPath("/api/today.json")
 
     override suspend fun fetchMetadataForDate(date: LocalDate): ArtworkMetadata =
-        fetchMetadataForPath("/api/${date.format(ISO_DATE_FORMAT)}.json")
+        fetchMetadataForPath(metadataPath(date))
 
     private suspend fun fetchMetadataForPath(path: String): ArtworkMetadata = withContext(Dispatchers.IO) {
         val request = Request.Builder()
@@ -182,6 +186,77 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
                 val body = response.body
                 try {
                     json.decodeFromString<ArtworkMetadata>(body.string())
+                } catch (e: Exception) {
+                    throw BauhausDecodeException(path, e)
+                }
+            }
+        } catch (e: BauhausDataException) {
+            throw e
+        } catch (e: IOException) {
+            throw BauhausNetworkException(path, e)
+        }
+    }
+
+    /**
+     * Probes whether the service has published artwork for [date], without
+     * transferring a body.
+     *
+     * Uses `HEAD`, which the service answers with the same headers as `GET` and
+     * resolves with a metadata-only storage lookup. That matters for the archive
+     * pager: establishing that a date exists used to cost a full metadata `GET`
+     * per candidate day, so a two-year jump issued one request per day in the span.
+     *
+     * @return `true` for `200`, `false` for `404`.
+     * @throws BauhausHttpException for any other status.
+     * @throws BauhausNetworkException if the request cannot be completed.
+     */
+    override suspend fun hasArtworkForDate(date: LocalDate): Boolean = withContext(Dispatchers.IO) {
+        val path = metadataPath(date)
+        val request = Request.Builder()
+            .url("$BASE_URL$path")
+            .head()
+            .build()
+
+        try {
+            client.newCall(request).execute().use { response ->
+                when {
+                    response.isSuccessful -> true
+                    response.code == HTTP_NOT_FOUND -> false
+                    else -> throw BauhausHttpException(response.code, path)
+                }
+            }
+        } catch (e: BauhausDataException) {
+            throw e
+        } catch (e: IOException) {
+            throw BauhausNetworkException(path, e)
+        }
+    }
+
+    /**
+     * Reads `GET /api/health` — the service's own view of whether it is current.
+     *
+     * The endpoint answers `503` for both "stale" and "unhealthy", and both of
+     * those carry a useful JSON body, so a non-2xx status is *not* an error here.
+     * Only a status outside {200, 503} or an unparseable body is.
+     *
+     * `Cache-Control: no-store` on this route means every call reaches the
+     * service, so it is used only after something else has already failed —
+     * never on the startup path.
+     */
+    override suspend fun fetchHealth(): ServiceHealth = withContext(Dispatchers.IO) {
+        val path = "/api/health"
+        val request = Request.Builder()
+            .url("$BASE_URL$path")
+            .build()
+
+        try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful && response.code != HTTP_UNAVAILABLE) {
+                    throw BauhausHttpException(response.code, path)
+                }
+                val body = response.body.string()
+                try {
+                    json.decodeFromString<ServiceHealth>(body)
                 } catch (e: Exception) {
                     throw BauhausDecodeException(path, e)
                 }

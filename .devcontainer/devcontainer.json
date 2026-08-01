@@ -9,7 +9,6 @@
       "version": "lts"
     }
   },
-  "postStartCommand": "npm install -g @anthropic-ai/claude-code || true",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -26,9 +25,11 @@
       }
     }
   },
-  "postCreateCommand": "sudo chown -R vscode:vscode /home/vscode/.gradle && ./gradlew --version",
+  "onCreateCommand": "sudo chown -R vscode:vscode /home/vscode/.gradle",
+  "postCreateCommand": "npm install -g @anthropic-ai/claude-code || echo 'claude-code install failed; container is otherwise usable'; ./gradlew --version",
   "containerEnv": {
     "ANDROID_HOME": "/usr/local/android-sdk",
+    "ANDROID_SDK_ROOT": "/usr/local/android-sdk",
     "GRADLE_USER_HOME": "/home/vscode/.gradle"
   },
   "mounts": [
