@@ -41,10 +41,20 @@ jobs:
         run: |
           # Assert on what is installed rather than on the build succeeding: the
           # licence and sdkmanager steps used to be able to no-op and still exit 0.
-          docker run --rm bauhaus-devcontainer bash -lc '
+          #
+          # `bash -c`, not `bash -lc`: a login shell re-sources the profile and
+          # rebuilds PATH, discarding the image's ENV PATH — so sdkmanager was
+          # "not found" in an image that has it. ANDROID_HOME is used explicitly,
+          # which also asserts that variable points somewhere real.
+          #
+          # The listing is captured once and grepped from a file. Piping into
+          # `grep -q` under pipefail fails on success: grep exits at the first
+          # match, and sdkmanager then dies of SIGPIPE (141).
+          docker run --rm bauhaus-devcontainer bash -c '
             set -euo pipefail
             java -version
-            sdkmanager --list_installed
-            sdkmanager --list_installed | grep -q "platforms;android-37"
-            sdkmanager --list_installed | grep -q "build-tools;37"
+            "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --list_installed > /tmp/installed.txt
+            cat /tmp/installed.txt
+            grep -q "platforms;android-37" /tmp/installed.txt
+            grep -q "build-tools;37" /tmp/installed.txt
           '
