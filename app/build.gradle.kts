@@ -98,7 +98,19 @@ android {
         // GradleDependency is disabled because AGP/lint flags new compileSdk versions
         // (e.g. API 37) before the matching platform is downloadable via sdkmanager,
         // which would otherwise block CI on a transient upstream timing issue.
-        disable += setOf("OldTargetApi", "NewerVersionAvailable", "ObsoleteSdkInt", "GradleDependency")
+        //
+        // AndroidGradlePluginVersion is disabled for the same reason, and it bites
+        // harder: with warningsAsErrors it turns "Google published a new AGP" into a
+        // red build on every branch, with no change to this repository. While AGP
+        // tracks an alpha that fires every few days. Dependabot already opens the
+        // bump; CI does not also need to fail until it is merged.
+        disable += setOf(
+            "OldTargetApi",
+            "NewerVersionAvailable",
+            "ObsoleteSdkInt",
+            "GradleDependency",
+            "AndroidGradlePluginVersion",
+        )
     }
 
     packaging {
