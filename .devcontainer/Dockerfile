@@ -18,7 +18,10 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # "package not found" rather than "your tools are stale".
 ARG ANDROID_SDK_VERSION=13114758
 ARG ANDROID_BUILD_TOOLS=37.0.0
-ARG ANDROID_PLATFORM=android-37
+# Matches the package ID the CI workflow installs. Recent platforms are
+# published with a minor component (`android-37.0`), and the bare `android-37`
+# that used to be here is a different — possibly non-existent — package.
+ARG ANDROID_PLATFORM=android-37.0
 
 ENV ANDROID_HOME=/usr/local/android-sdk
 # ANDROID_SDK_ROOT is deprecated but still what some tooling reads; set both so
@@ -35,9 +38,17 @@ RUN mkdir -p ${ANDROID_HOME}/cmdline-tools \
 
 # Accept licenses and install SDK components.
 #
+# The licence input is a finite file rather than `yes | sdkmanager`. Under
+# `pipefail` that pipeline always fails: sdkmanager exits as soon as it has read
+# the last prompt, `yes` then takes SIGPIPE, and the pipeline reports 141. A
+# bounded stdin removes the pipe entirely, so pipefail keeps protecting the rest
+# of the chain instead of having to be turned off.
+#
 # stderr is kept: swallowing it with 2>&1 is what let a broken licence step pass
 # unnoticed. Only the (very long) accepted-licence text goes to /dev/null.
-RUN yes | sdkmanager --licenses > /dev/null \
+RUN printf 'y\n%.0s' $(seq 100) > /tmp/sdk-licenses \
+    && sdkmanager --licenses < /tmp/sdk-licenses > /dev/null \
+    && rm /tmp/sdk-licenses \
     && sdkmanager --install \
         "platforms;${ANDROID_PLATFORM}" \
         "build-tools;${ANDROID_BUILD_TOOLS}" \
