@@ -7,8 +7,10 @@ import androidx.work.WorkerParameters
 import com.cascadiacollections.bauhaus.AppLogger
 import com.cascadiacollections.bauhaus.data.BauhausApiClient
 import com.cascadiacollections.bauhaus.data.SettingsStore
+import com.cascadiacollections.bauhaus.data.isConnectivityFailure
+import com.cascadiacollections.bauhaus.data.serviceToday
 import kotlinx.coroutines.flow.first
-import java.time.LocalDate
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Background worker that fetches today's bauhaus artwork from the CDN and
@@ -71,7 +73,12 @@ class WallpaperWorker(
 
         // Skip if we already set today's wallpaper (e.g. user tapped "Set Now",
         // or the worker ran twice within the flex window). Saves a CDN request.
-        val today = LocalDate.now().toString()
+        //
+        // Read the date once and reuse it: the guard and the stamp below must
+        // agree, and two separate clock reads can straddle midnight. serviceToday()
+        // rather than LocalDate.now() so this matches the UTC day the service keys
+        // artwork by — and the day the ViewModel stamps after "Set Now".
+        val today = serviceToday().toString()
         val lastUpdated = settings.lastUpdated.first()
         if (lastUpdated == today) {
             AppLogger.info(
@@ -95,7 +102,7 @@ class WallpaperWorker(
                 val target = settings.wallpaperTarget.first()
                 val wallpaperManager = WallpaperManager.getInstance(applicationContext)
                 wallpaperManager.setBitmap(bitmap, null, true, target.flag)
-                settings.setLastUpdated(LocalDate.now().toString())
+                settings.setLastUpdated(today)
                 AppLogger.info(
                     TAG,
                     AppLogger.Event("worker_set_success", mapOf("target" to target.name)),
@@ -105,13 +112,24 @@ class WallpaperWorker(
             } finally {
                 bitmap.recycle()
             }
+        } catch (e: CancellationException) {
+            // WorkManager stopped us. Not a failure, and reporting it as one would
+            // both retry pointlessly and file a non-bug with the crash reporter.
+            throw e
         } catch (e: Exception) {
-            AppLogger.error(
-                TAG,
-                AppLogger.Event("worker_set_failure", mapOf("attempt" to "${runAttemptCount + 1}", "maxRetries" to "$MAX_RETRIES")),
-                "Failed to set wallpaper (attempt ${runAttemptCount + 1}/$MAX_RETRIES)",
-                e,
+            val event = AppLogger.Event(
+                "worker_set_failure",
+                mapOf("attempt" to "${runAttemptCount + 1}", "maxRetries" to "$MAX_RETRIES"),
             )
+            val message = "Failed to set wallpaper (attempt ${runAttemptCount + 1}/$MAX_RETRIES)"
+            // A background job finding the device offline is routine. Logging it as
+            // an error records an exception per retry per device, which buries real
+            // faults in connectivity noise.
+            if (e.isConnectivityFailure) {
+                AppLogger.warn(TAG, event, "$message: ${e.message}")
+            } else {
+                AppLogger.error(TAG, event, message, e)
+            }
             Result.retry()
         }
     }

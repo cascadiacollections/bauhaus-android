@@ -8,8 +8,10 @@ import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
 import com.cascadiacollections.bauhaus.data.BauhausApiClient
 import com.cascadiacollections.bauhaus.data.BauhausHttpException
+import com.cascadiacollections.bauhaus.data.ServiceHealth
 import com.cascadiacollections.bauhaus.data.SettingsRepository
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
+import com.cascadiacollections.bauhaus.data.serviceToday
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -107,6 +109,64 @@ class BauhausViewModelTest {
         assertTrue(vm.uiState.value.metadataLoadFailed)
     }
 
+    @Test
+    fun `init anchors browsing to the date the service says it published`() {
+        // The device clock and the service's UTC publish date disagree for part of
+        // every day; the service's answer wins.
+        val published = serviceToday().minusDays(1)
+        val api = FakeBauhausApi().apply {
+            metadataToReturn = ArtworkMetadata(title = "Yesterday", date = published.toString())
+        }
+        val vm = BauhausViewModel(
+            RuntimeEnvironment.getApplication(),
+            FakeSettingsRepository(RuntimeEnvironment.getApplication()),
+            api,
+            FakeWallpaperScheduler(),
+        )
+
+        assertEquals(published, vm.uiState.value.latestDate)
+        assertEquals(published, vm.uiState.value.visibleDate)
+        assertEquals(listOf(published), vm.uiState.value.availableDates)
+        assertEquals("Yesterday", vm.uiState.value.metadata?.title)
+    }
+
+    @Test
+    fun `init falls back to the utc clock when metadata omits a date`() {
+        assertEquals(serviceToday(), viewModel.uiState.value.latestDate)
+        assertEquals(serviceToday(), viewModel.uiState.value.visibleDate)
+    }
+
+    @Test
+    fun `a missing latest day is reported as a stale service and re-anchors`() = runTest {
+        val staleDate = serviceToday().minusDays(3)
+        val api = FakeBauhausApi().apply {
+            todayMetadataError = BauhausHttpException(404, "/api/today.json")
+            healthToReturn = ServiceHealth(
+                status = ServiceHealth.STATUS_STALE,
+                date = staleDate.toString(),
+                staleDays = 3,
+            )
+        }
+        val vm = BauhausViewModel(
+            RuntimeEnvironment.getApplication(),
+            FakeSettingsRepository(RuntimeEnvironment.getApplication()),
+            api,
+            FakeWallpaperScheduler(),
+        )
+        val events = mutableListOf<SnackbarEvent>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            vm.snackbarEvent.collect { events.add(it) }
+        }
+
+        // The init fetch already ran; re-trigger the same path through refresh so
+        // the collector above sees the event.
+        vm.refresh()
+
+        val expected = RuntimeEnvironment.getApplication().getString(R.string.error_service_stale)
+        assertEquals(listOf(expected), events.map { it.message })
+        assertEquals(staleDate, vm.uiState.value.latestDate)
+    }
+
     // ── settings flow reactivity ─────────────────────────────────────────────
 
     @Test
@@ -201,6 +261,23 @@ class BauhausViewModelTest {
     }
 
     @Test
+    fun `a failed refresh does not consume the cooldown`() {
+        // Offline is exactly when a user pulls again; locking them out for 30 s
+        // after a failure that never reached the service punishes the retry.
+        fakeApi.throwIOException = true
+        viewModel.refresh()
+        assertEquals(0, viewModel.uiState.value.imageRevision)
+
+        fakeApi.throwIOException = false
+        val newMetadata = ArtworkMetadata(title = "Recovered", artist = "Artist")
+        fakeApi.metadataToReturn = newMetadata
+        viewModel.refresh()
+
+        assertEquals(1, viewModel.uiState.value.imageRevision)
+        assertEquals(newMetadata, viewModel.uiState.value.metadata)
+    }
+
+    @Test
     fun `refresh succeeds after cooldown expires`() {
         viewModel.refresh()
         assertEquals(1, viewModel.uiState.value.imageRevision)
@@ -276,6 +353,60 @@ class BauhausViewModelTest {
         viewModel.toggleFavoritesFilter()
 
         assertEquals(listOf(today, today.minusDays(1), today.minusDays(2), targetDate), viewModel.uiState.value.availableDates)
+    }
+
+    @Test
+    fun `jumpToDate probes only the target date instead of every day in the span`() {
+        val today = viewModel.uiState.value.visibleDate
+        val targetDate = today.minusDays(400)
+        fakeApi.dateMetadata[targetDate] = ArtworkMetadata(title = "Jumped", artist = "Archive")
+        fakeApi.probedDates.clear()
+        fakeApi.fetchedMetadataDates.clear()
+
+        viewModel.jumpToDate(targetDate)
+
+        assertEquals(listOf(targetDate), fakeApi.probedDates)
+        // Only the landed-on page needs its metadata; the 399 pages skipped over
+        // must not each cost a request.
+        assertEquals(listOf(targetDate), fakeApi.fetchedMetadataDates)
+        assertEquals(targetDate, viewModel.uiState.value.visibleDate)
+        assertEquals(401, viewModel.uiState.value.availableDates.size)
+    }
+
+    @Test
+    fun `jumpToDate reports when the service has no artwork for that date`() = runTest {
+        val events = mutableListOf<SnackbarEvent>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.snackbarEvent.collect { events.add(it) }
+        }
+
+        val today = viewModel.uiState.value.visibleDate
+        val targetDate = today.minusDays(5)
+        fakeApi.missingDates += targetDate
+
+        viewModel.jumpToDate(targetDate)
+
+        val expected = RuntimeEnvironment.getApplication().getString(R.string.error_no_artwork_for_date)
+        assertEquals(listOf(expected), events.map { it.message })
+        assertEquals(today, viewModel.uiState.value.visibleDate)
+        assertEquals(listOf(today), viewModel.uiState.value.availableDates)
+    }
+
+    @Test
+    fun `jumpToDate refuses spans beyond the expansion limit without a request`() = runTest {
+        val events = mutableListOf<SnackbarEvent>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.snackbarEvent.collect { events.add(it) }
+        }
+
+        val today = viewModel.uiState.value.visibleDate
+        fakeApi.probedDates.clear()
+
+        viewModel.jumpToDate(today.minusDays(1000))
+
+        val expected = RuntimeEnvironment.getApplication().getString(R.string.error_archive_jump_too_far)
+        assertEquals(listOf(expected), events.map { it.message })
+        assertTrue(fakeApi.probedDates.isEmpty())
     }
 
     @Test
@@ -408,16 +539,37 @@ class BauhausViewModelTest {
         var metadataToReturn: ArtworkMetadata = DEFAULT_METADATA
         var shouldThrow = false
         var throwIOException = false
+        var healthToReturn: ServiceHealth = ServiceHealth(status = ServiceHealth.STATUS_OK)
         val dateMetadata: MutableMap<LocalDate, ArtworkMetadata> = mutableMapOf()
         val missingDates: MutableSet<LocalDate> = mutableSetOf()
 
+        /** Dates probed via [hasArtworkForDate], in call order. */
+        val probedDates: MutableList<LocalDate> = mutableListOf()
+
+        /** Dates whose metadata was actually fetched, in call order. */
+        val fetchedMetadataDates: MutableList<LocalDate> = mutableListOf()
+
+        override suspend fun hasArtworkForDate(date: LocalDate): Boolean {
+            probedDates += date
+            if (throwIOException) throw java.io.IOException("Unable to resolve host")
+            if (shouldThrow) throw RuntimeException("Unexpected error")
+            return date !in missingDates
+        }
+
+        override suspend fun fetchHealth(): ServiceHealth = healthToReturn
+
+        /** Thrown from [fetchTodayMetadata] when set, in preference to the flags above. */
+        var todayMetadataError: Throwable? = null
+
         override suspend fun fetchTodayMetadata(): ArtworkMetadata {
+            todayMetadataError?.let { throw it }
             if (throwIOException) throw java.io.IOException("Unable to resolve host")
             if (shouldThrow) throw RuntimeException("Unexpected error")
             return metadataToReturn
         }
 
         override suspend fun fetchMetadataForDate(date: LocalDate): ArtworkMetadata {
+            fetchedMetadataDates += date
             if (throwIOException) throw java.io.IOException("Unable to resolve host")
             if (shouldThrow) throw RuntimeException("Unexpected error")
             if (missingDates.contains(date)) throw BauhausHttpException(404, "/api/$date.json")

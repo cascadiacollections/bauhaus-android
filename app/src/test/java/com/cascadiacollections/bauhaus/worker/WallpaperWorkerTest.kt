@@ -9,13 +9,16 @@ import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApiClient
+import com.cascadiacollections.bauhaus.data.ServiceHealth
 import com.cascadiacollections.bauhaus.data.SettingsStore
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
+import com.cascadiacollections.bauhaus.data.serviceToday
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.RobolectricTestRunner
@@ -28,14 +31,30 @@ import java.time.LocalDate
 class WallpaperWorkerTest {
     @Test
     fun `worker skips fetch when already updated today`() = runTest {
+        // serviceToday(), not LocalDate.now(): the worker's skip guard is keyed to
+        // the service's UTC day so it agrees with what the ViewModel stamps.
         val api = FakeApi()
-        val settings = FakeSettings(lastUpdated = LocalDate.now().toString())
+        val settings = FakeSettings(lastUpdated = serviceToday().toString())
         val worker = buildWorker(settings, api)
 
         val result = worker.doWork()
 
         assertEquals(ListenableWorker.Result.success(), result)
         assertFalse(api.fetchCalled)
+    }
+
+    @Test
+    fun `worker does not skip when lastUpdated names a day the service is not on`() = runTest {
+        // A device east of UTC can have stamped tomorrow's local date. That must not
+        // read as "today is already done". shouldThrow keeps the test off the
+        // WallpaperManager path — reaching the fetch is the whole assertion.
+        val api = FakeApi(shouldThrow = true)
+        val settings = FakeSettings(lastUpdated = serviceToday().plusDays(1).toString())
+        val worker = buildWorker(settings, api)
+
+        worker.doWork()
+
+        assertTrue(api.fetchCalled)
     }
 
     @Test
@@ -138,5 +157,13 @@ class WallpaperWorkerTest {
             if (shouldThrow) throw RuntimeException("boom")
             return ArtworkMetadata(date = date.toString())
         }
+
+        override suspend fun hasArtworkForDate(date: LocalDate): Boolean {
+            if (shouldThrow) throw RuntimeException("boom")
+            return true
+        }
+
+        override suspend fun fetchHealth(): ServiceHealth =
+            ServiceHealth(status = ServiceHealth.STATUS_OK, date = serviceToday().toString())
     }
 }

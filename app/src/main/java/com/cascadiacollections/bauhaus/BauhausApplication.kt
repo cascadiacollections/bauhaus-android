@@ -12,13 +12,14 @@ import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.CachePolicy
 import coil3.request.allowHardware
+import com.cascadiacollections.bauhaus.data.serviceToday
 import com.cascadiacollections.bauhaus.worker.WallpaperWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.time.LocalDate
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Application entry point. Responsible for:
@@ -165,7 +166,7 @@ class BauhausApplication : Application(), AppContainerProvider, SingletonImageLo
         val settings = container.settingsRepository
         val api = container.bauhausApi
         appScope.launch {
-            val today = LocalDate.now().toString()
+            val today = serviceToday().toString()
             val lastUpdated = settings.lastUpdated.first()
             if (lastUpdated == today) return@launch
             if (settings.getLastPrefetchedDate() == today) return@launch
@@ -177,11 +178,15 @@ class BauhausApplication : Application(), AppContainerProvider, SingletonImageLo
                     AppLogger.Event("startup_prefetch_success", mapOf("date" to today)),
                     "Prefetched today's image into cache",
                 )
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
+                // Best-effort cache warming: a miss just means the first render
+                // goes to the network. Never escalated beyond a warning.
                 AppLogger.warn(
                     TAG,
                     AppLogger.Event("startup_prefetch_failure", mapOf("date" to today)),
-                    "Failed to prefetch today's image",
+                    "Failed to prefetch today's image: ${e.message}",
                 )
             }
         }

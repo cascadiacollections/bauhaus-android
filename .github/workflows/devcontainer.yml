@@ -1,0 +1,60 @@
+# The devcontainer image was never built by CI. A stale Debian base, or an
+# Android SDK layer whose cmdline-tools build is too old to resolve the pinned
+# platform, only surfaced for whoever next opened the repo in a container — and
+# it surfaced as a confusing "package not found" mid-build.
+#
+# Path-filtered, so this costs nothing on ordinary changes.
+name: Devcontainer
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.devcontainer/**'
+      - '.github/workflows/devcontainer.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.devcontainer/**'
+      - '.github/workflows/devcontainer.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build devcontainer image
+        run: docker build -f .devcontainer/Dockerfile -t bauhaus-devcontainer .devcontainer
+
+      - name: Verify the toolchain the image actually provisioned
+        run: |
+          # Assert on what is installed rather than on the build succeeding: the
+          # licence and sdkmanager steps used to be able to no-op and still exit 0.
+          #
+          # `bash -c`, not `bash -lc`: a login shell re-sources the profile and
+          # rebuilds PATH, discarding the image's ENV PATH — so sdkmanager was
+          # "not found" in an image that has it. ANDROID_HOME is used explicitly,
+          # which also asserts that variable points somewhere real.
+          #
+          # The listing is captured once and grepped from a file. Piping into
+          # `grep -q` under pipefail fails on success: grep exits at the first
+          # match, and sdkmanager then dies of SIGPIPE (141).
+          docker run --rm bauhaus-devcontainer bash -c '
+            set -euo pipefail
+            java -version
+            "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --list_installed > /tmp/installed.txt
+            cat /tmp/installed.txt
+            grep -q "platforms;android-37" /tmp/installed.txt
+            grep -q "build-tools;37" /tmp/installed.txt
+          '

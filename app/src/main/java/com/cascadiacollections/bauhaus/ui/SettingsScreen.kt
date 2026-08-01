@@ -67,6 +67,7 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import com.cascadiacollections.bauhaus.R
+import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 import java.time.Instant
@@ -93,6 +94,8 @@ object SettingsScreenTestTags {
     const val JUMP_TO_DATE_BUTTON = "jump_to_date_button"
     const val FAVORITE_BUTTON = "favorite_button"
     const val FAVORITES_FILTER_CHIP = "favorites_filter_chip"
+    const val VIEW_SOURCE_BUTTON = "view_source_button"
+    const val VIEW_LICENSE_BUTTON = "view_license_button"
 }
 
 internal data class ArchiveImageRequest(
@@ -100,13 +103,21 @@ internal data class ArchiveImageRequest(
     val cacheKey: String,
 )
 
+/**
+ * Route for [date]'s image.
+ *
+ * [latestDate] is the newest date the *service* has published, not the device's
+ * idea of today — see [UiState.latestDate]. The newest page goes through
+ * `/api/today`, which resolves server-side and shares a cache entry with the
+ * startup prefetch and the daily worker.
+ */
 internal fun imagePathForDate(
     date: LocalDate,
-    today: LocalDate,
-): String = if (date == today) {
+    latestDate: LocalDate,
+): String = if (date == latestDate) {
     "/api/today"
 } else {
-    "/api/${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}"
+    BauhausApi.imagePath(date)
 }
 
 internal fun imageCacheKeyForDate(
@@ -117,7 +128,7 @@ internal fun imageCacheKeyForDate(
 internal fun neighborPrefetchRequests(
     dates: List<LocalDate>,
     settledPage: Int,
-    today: LocalDate,
+    latestDate: LocalDate,
     imageRevision: Int,
 ): List<ArchiveImageRequest> {
     if (dates.isEmpty()) return emptyList()
@@ -127,7 +138,7 @@ internal fun neighborPrefetchRequests(
         .distinct()
     return neighbors.map { date ->
         ArchiveImageRequest(
-            imagePath = imagePathForDate(date, today),
+            imagePath = imagePathForDate(date, latestDate),
             cacheKey = imageCacheKeyForDate(date, imageRevision),
         )
     }
@@ -141,6 +152,25 @@ internal fun previewImageSizePx(size: IntSize): IntSize {
         height = size.height.coerceAtLeast(1).coerceAtMost(maxHeight),
     )
 }
+
+/**
+ * Aspect ratio to lay the preview card out at.
+ *
+ * The service publishes the stylized artwork's pixel dimensions in the metadata
+ * `variants` array, so the real ratio is known without a decode or a second
+ * request — the preview can frame the whole artwork instead of cropping it into a
+ * guessed 4:3 box.
+ *
+ * Ratios outside a plausible range are ignored, so a malformed variant entry
+ * cannot produce a sliver-thin or screen-swallowing card.
+ */
+internal fun resolvePreviewAspectRatio(metadata: ArtworkMetadata?): Float {
+    val ratio = metadata?.aspectRatio ?: return FALLBACK_ASPECT_RATIO
+    return if (ratio in MIN_PREVIEW_ASPECT_RATIO..MAX_PREVIEW_ASPECT_RATIO) ratio else FALLBACK_ASPECT_RATIO
+}
+
+internal const val MIN_PREVIEW_ASPECT_RATIO = 0.4f
+internal const val MAX_PREVIEW_ASPECT_RATIO = 2.5f
 
 /**
  * Stateless settings screen — accepts [UiState] and event callbacks directly.
@@ -161,19 +191,22 @@ fun SettingsScreen(
     onJumpToDate: (LocalDate) -> Unit = {},
     onFavoriteToggle: () -> Unit = {},
     onFavoritesFilterToggle: () -> Unit = {},
+    onOpenUrl: (String) -> Unit = {},
     onArchivePageSelected: (Int) -> Unit,
     onRefresh: () -> Unit,
 ) {
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
-    val today = LocalDate.now()
-    val todayUtcMillis = remember(today) { localDateToUtcMillis(today) }
+    // Bound the picker by the newest date the service has published rather than
+    // by the device clock, which can name a day the archive does not have.
+    val newestDate = uiState.latestDate
+    val newestUtcMillis = remember(newestDate) { localDateToUtcMillis(newestDate) }
     if (showDatePicker) {
         val datePickerState = androidx.compose.material3.rememberDatePickerState(
             initialSelectedDateMillis = localDateToUtcMillis(uiState.visibleDate),
-            selectableDates = remember(todayUtcMillis, today.year) {
+            selectableDates = remember(newestUtcMillis, newestDate.year) {
                 object : SelectableDates {
-                    override fun isSelectableDate(utcTimeMillis: Long): Boolean = utcTimeMillis <= todayUtcMillis
-                    override fun isSelectableYear(year: Int): Boolean = year <= today.year
+                    override fun isSelectableDate(utcTimeMillis: Long): Boolean = utcTimeMillis <= newestUtcMillis
+                    override fun isSelectableYear(year: Int): Boolean = year <= newestDate.year
                 }
             },
         )
@@ -234,12 +267,13 @@ fun SettingsScreen(
                     initialPage = visiblePage,
                     pageCount = { uiState.availableDates.size },
                 )
-                val today = LocalDate.now()
+                val latestDate = uiState.latestDate
+                val aspectRatio = uiState.previewAspectRatio
                 val context = LocalContext.current
                 val imageLoader = remember(context) { SingletonImageLoader.get(context) }
                 val artworkPreviewSize = remember(artworkCardSize) { previewImageSizePx(artworkCardSize) }
                 val prefetchedNeighborKeys = remember(uiState.imageRevision) { mutableSetOf<String>() }
-                LaunchedEffect(pagerState, uiState.availableDates, uiState.imageRevision) {
+                LaunchedEffect(pagerState, uiState.availableDates, uiState.imageRevision, latestDate) {
                     snapshotFlow { pagerState.settledPage }
                         .distinctUntilChanged()
                         .collect { pageIndex ->
@@ -247,7 +281,7 @@ fun SettingsScreen(
                             neighborPrefetchRequests(
                                 dates = uiState.availableDates,
                                 settledPage = pageIndex,
-                                today = today,
+                                latestDate = latestDate,
                                 imageRevision = uiState.imageRevision,
                             ).forEach { request ->
                                 if (prefetchedNeighborKeys.add(request.cacheKey)) {
@@ -274,13 +308,13 @@ fun SettingsScreen(
                     state = pagerState,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(4f / 3f)
+                        .aspectRatio(aspectRatio)
                         .semantics { testTag = SettingsScreenTestTags.ARTWORK_PAGER },
                 ) { page ->
                     val date = uiState.availableDates[page]
                     val cacheKey = imageCacheKeyForDate(date, uiState.imageRevision)
-                    val imagePath = imagePathForDate(date, today)
-                    val contentDescription = if (date == today) {
+                    val imagePath = imagePathForDate(date, latestDate)
+                    val contentDescription = if (date == latestDate) {
                         stringResource(R.string.todays_artwork)
                     } else {
                         stringResource(R.string.artwork_for_date, date.toString())
@@ -294,13 +328,16 @@ fun SettingsScreen(
                             .diskCacheKey(cacheKey)
                             .build()
                     }
+                    // Fit, not Crop: the frame is already the artwork's own ratio,
+                    // and days whose dimensions differ should letterbox rather than
+                    // lose their edges — this is the preview someone decides from.
                     AsyncImage(
                         model = imageRequest,
                         contentDescription = contentDescription,
-                        contentScale = ContentScale.Crop,
+                        contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .aspectRatio(4f / 3f)
+                            .aspectRatio(aspectRatio)
                             .semantics {
                                 if (date == uiState.visibleDate) {
                                     testTag = SettingsScreenTestTags.ARTWORK_PREVIEW
@@ -363,7 +400,7 @@ fun SettingsScreen(
                 }
             }
 
-            // -- Metadata (title + artist + date + source) --
+            // -- Metadata (title, creator, date, source, style credit, licence) --
             uiState.metadata?.let { metadata ->
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
@@ -378,9 +415,9 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.semantics { heading() },
                         )
-                        if (metadata.artist.isNotBlank()) {
+                        if (metadata.creator.isNotBlank()) {
                             Text(
-                                text = metadata.artist.trim(),
+                                text = metadata.creator,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -395,6 +432,57 @@ fun SettingsScreen(
                         if (metadata.source.isNotBlank()) {
                             Text(
                                 text = metadata.source,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (metadata.styleCredit.isNotBlank()) {
+                            Text(
+                                text = stringResource(R.string.style_credit, metadata.styleCredit),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+
+                        // The service publishes source_url / license_url so consumers
+                        // can credit the upstream collection properly. Both are CC0
+                        // museum links on scheduled runs; surfacing them is the whole
+                        // point of the pipeline republishing them.
+                        val attributionUrl = metadata.attributionUrl
+                        val licenseLink = metadata.licenseLink
+                        val licenseLabel = metadata.licenseLabel
+                        if (attributionUrl.isNotBlank() || licenseLink.isNotBlank()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                if (attributionUrl.isNotBlank()) {
+                                    TextButton(
+                                        onClick = { onOpenUrl(attributionUrl) },
+                                        modifier = Modifier.semantics {
+                                            testTag = SettingsScreenTestTags.VIEW_SOURCE_BUTTON
+                                        },
+                                    ) {
+                                        Text(stringResource(R.string.view_source))
+                                    }
+                                }
+                                if (licenseLink.isNotBlank()) {
+                                    TextButton(
+                                        onClick = { onOpenUrl(licenseLink) },
+                                        modifier = Modifier.semantics {
+                                            testTag = SettingsScreenTestTags.VIEW_LICENSE_BUTTON
+                                        },
+                                    ) {
+                                        Text(licenseLabel.ifBlank { stringResource(R.string.view_license) })
+                                    }
+                                }
+                            }
+                        } else if (licenseLabel.isNotBlank()) {
+                            Text(
+                                text = licenseLabel,
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
