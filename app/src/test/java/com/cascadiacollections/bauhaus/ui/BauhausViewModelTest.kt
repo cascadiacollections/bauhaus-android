@@ -414,6 +414,35 @@ class BauhausViewModelTest {
     }
 
     @Test
+    fun `metadata for a page the user swiped away from does not reach the screen`() {
+        val today = viewModel.uiState.value.visibleDate
+        val jumped = today.minusDays(3)
+        val settled = today.minusDays(2)
+        fakeApi.dateMetadata[jumped] = ArtworkMetadata(title = "Jumped", artist = "Archive")
+        fakeApi.dateMetadata[settled] = ArtworkMetadata(title = "Settled", artist = "Archive")
+
+        // Park the jumped page's metadata mid-flight.
+        val gate = CompletableDeferred<Unit>()
+        fakeApi.dateMetadataGates[jumped] = gate
+        viewModel.jumpToDate(jumped)
+        assertEquals(jumped, viewModel.uiState.value.visibleDate)
+        assertTrue(viewModel.uiState.value.isMetadataLoading)
+
+        // Swipe to a nearer page, whose own load settles first.
+        viewModel.onArchivePageSelected(2)
+        assertEquals(settled, viewModel.uiState.value.visibleDate)
+        assertEquals("Settled", viewModel.uiState.value.metadata?.title)
+
+        // The late arrival is still cached, but must not overwrite what is shown
+        // or clear a spinner that now belongs to a different page.
+        gate.complete(Unit)
+
+        assertEquals(settled, viewModel.uiState.value.visibleDate)
+        assertEquals("Settled", viewModel.uiState.value.metadata?.title)
+        assertFalse(viewModel.uiState.value.isMetadataLoading)
+    }
+
+    @Test
     fun `jumpToDate keeps browsed archive dates when favorites filter toggles`() {
         val today = viewModel.uiState.value.visibleDate
         val targetDate = today.minusDays(3)
@@ -658,8 +687,12 @@ class BauhausViewModelTest {
             return metadataToReturn
         }
 
+        /** Dates whose [fetchMetadataForDate] parks until the deferred completes. */
+        val dateMetadataGates: MutableMap<LocalDate, CompletableDeferred<Unit>> = mutableMapOf()
+
         override suspend fun fetchMetadataForDate(date: LocalDate): ArtworkMetadata {
             fetchedMetadataDates += date
+            dateMetadataGates[date]?.await()
             if (throwIOException) throw java.io.IOException("Unable to resolve host")
             if (shouldThrow) throw RuntimeException("Unexpected error")
             if (missingDates.contains(date)) throw BauhausHttpException(404, "/api/$date.json")
