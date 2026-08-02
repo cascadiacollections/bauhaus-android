@@ -12,6 +12,7 @@ import com.cascadiacollections.bauhaus.data.ServiceHealth
 import com.cascadiacollections.bauhaus.data.SettingsRepository
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 import com.cascadiacollections.bauhaus.data.serviceToday
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -292,6 +293,27 @@ class BauhausViewModelTest {
     }
 
     @Test
+    fun `a refresh requested while one is in flight costs one service call`() {
+        val gate = CompletableDeferred<Unit>()
+        fakeApi.todayMetadataGate = gate
+        val callsBefore = fakeApi.todayMetadataCalls
+
+        viewModel.refresh()
+        assertTrue(viewModel.uiState.value.isRefreshing)
+
+        // Second pull while the first is still waiting on the service. The
+        // request channel has no free slot, so it is dropped rather than queued.
+        viewModel.refresh()
+
+        fakeApi.todayMetadataGate = null
+        gate.complete(Unit)
+
+        assertFalse(viewModel.uiState.value.isRefreshing)
+        assertEquals(1, viewModel.uiState.value.imageRevision)
+        assertEquals(1, fakeApi.todayMetadataCalls - callsBefore)
+    }
+
+    @Test
     fun `selecting oldest page appends older date when archive has data`() {
         val today = viewModel.uiState.value.visibleDate
         val expectedOlder = today.minusDays(1)
@@ -561,7 +583,15 @@ class BauhausViewModelTest {
         /** Thrown from [fetchTodayMetadata] when set, in preference to the flags above. */
         var todayMetadataError: Throwable? = null
 
+        /** Number of times [fetchTodayMetadata] has been entered. */
+        var todayMetadataCalls = 0
+
+        /** When set, [fetchTodayMetadata] parks until it completes, simulating a slow service. */
+        var todayMetadataGate: CompletableDeferred<Unit>? = null
+
         override suspend fun fetchTodayMetadata(): ArtworkMetadata {
+            todayMetadataCalls++
+            todayMetadataGate?.await()
             todayMetadataError?.let { throw it }
             if (throwIOException) throw java.io.IOException("Unable to resolve host")
             if (shouldThrow) throw RuntimeException("Unexpected error")

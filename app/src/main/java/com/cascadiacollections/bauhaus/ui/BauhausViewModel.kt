@@ -27,12 +27,18 @@ import com.cascadiacollections.bauhaus.data.WallpaperTarget
 import com.cascadiacollections.bauhaus.data.isConnectivityFailure
 import com.cascadiacollections.bauhaus.data.serviceToday
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -139,7 +145,6 @@ class BauhausViewModel(
             return size > MAX_METADATA_CACHE_SIZE
         }
     }
-    private var isAppendingOlderDate: Boolean = false
 
     /**
      * Tracks the full chronological list of dates available for browsing
@@ -151,6 +156,12 @@ class BauhausViewModel(
     /** Minimum milliseconds between user-initiated refreshes (DOS guard). */
     private val refreshCooldownMs: Long = 30_000L
     private var lastRefreshAt: Long = 0L
+
+    /** Pull-to-refresh gestures, served one at a time by the collector in [init]. */
+    private val refreshRequests = requestChannel()
+
+    /** Pager-reached-the-end signals, served one at a time by the collector in [init]. */
+    private val archiveAppendRequests = requestChannel()
 
     private fun getString(@StringRes resId: Int): String =
         getApplication<Application>().getString(resId)
@@ -214,6 +225,16 @@ class BauhausViewModel(
                 }
                 metadataDateToLoad?.let { loadMetadataForDate(it, force = false) }
             }
+        }
+        viewModelScope.launch {
+            refreshRequests.receiveAsFlow()
+                .filter { isPastRefreshCooldown() }
+                .collectRequests { handleRefresh() }
+        }
+        viewModelScope.launch {
+            archiveAppendRequests.receiveAsFlow()
+                .filter { !_uiState.value.reachedArchiveStart }
+                .collectRequests { appendNextOlderDate() }
         }
         viewModelScope.launch {
             try {
@@ -288,7 +309,7 @@ class BauhausViewModel(
         }
 
         if (!snapshot.showFavoritesOnly && !snapshot.reachedArchiveStart && pageIndex == snapshot.availableDates.lastIndex) {
-            appendNextOlderDate()
+            archiveAppendRequests.trySend(Unit)
         }
     }
 
@@ -585,70 +606,83 @@ class BauhausViewModel(
     }
 
     /**
-     * Refreshes the visible artwork's metadata via a pull-to-refresh gesture.
+     * Requests a refresh of the visible artwork's metadata (pull-to-refresh).
      *
-     * Includes two abuse/DOS guards:
-     * 1. **In-flight guard**: drops the call immediately if a refresh is already
-     *    in progress, preventing concurrent network requests.
-     * 2. **Cooldown guard**: successive calls within [refreshCooldownMs] are
-     *    silently dropped to prevent hammering the upstream bauhaus service.
-     *    Uses [SystemClock.elapsedRealtime] (monotonic) so the check is immune
-     *    to wall-clock adjustments (NTP, manual time changes).
-     *
-     * The cooldown is only consumed by a refresh that actually reached the
-     * service. A failed attempt — most often because the device was offline —
-     * used to lock the user out of retrying for the full window, which is exactly
-     * when they are most likely to pull again.
+     * The request is offered to [refreshRequests] rather than executed here, so
+     * the two abuse/DOS guards are properties of the pipeline instead of checks
+     * every caller has to get right:
+     * 1. **In-flight guard**: [requestChannel] is a rendezvous channel, so
+     *    [Channel.trySend] hands off only while the collector is parked waiting.
+     *    A gesture made while a refresh is still running is dropped, not queued.
+     * 2. **Cooldown guard**: [isPastRefreshCooldown] filters out requests inside
+     *    the [refreshCooldownMs] window, so the service is not hammered.
      */
     fun refresh() {
-        if (_uiState.value.isRefreshing) return
-        val now = SystemClock.elapsedRealtime()
-        if (lastRefreshAt != 0L && now - lastRefreshAt < refreshCooldownMs) return
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    isRefreshing = true,
-                    isMetadataLoading = it.metadata == null,
-                    metadataLoadFailed = false,
-                )
+        refreshRequests.trySend(Unit)
+    }
+
+    /**
+     * Whether enough time has passed since the last refresh that *reached the
+     * service* to allow another one.
+     *
+     * Uses [SystemClock.elapsedRealtime] (monotonic) so the check is immune to
+     * wall-clock adjustments (NTP, manual time changes).
+     *
+     * This is deliberately not `throttleFirst`/`sample`: the window is armed by
+     * [handleRefresh] only on success. A failed attempt — most often because the
+     * device was offline — used to lock the user out for the full window, which
+     * is exactly when they are most likely to pull again.
+     */
+    private fun isPastRefreshCooldown(): Boolean {
+        val last = lastRefreshAt
+        return last == 0L || SystemClock.elapsedRealtime() - last >= refreshCooldownMs
+    }
+
+    /** Serves one refresh request; see [refresh] for the guards that gate it. */
+    private suspend fun handleRefresh() {
+        _uiState.update {
+            it.copy(
+                isRefreshing = true,
+                isMetadataLoading = it.metadata == null,
+                metadataLoadFailed = false,
+            )
+        }
+        try {
+            val visibleDate = _uiState.value.visibleDate
+            val metadata = if (visibleDate == anchorDate) {
+                api.fetchTodayMetadata()
+            } else {
+                api.fetchMetadataForDate(visibleDate)
             }
-            try {
-                val visibleDate = _uiState.value.visibleDate
-                val metadata = if (visibleDate == anchorDate) {
-                    api.fetchTodayMetadata()
-                } else {
-                    api.fetchMetadataForDate(visibleDate)
-                }
-                lastRefreshAt = SystemClock.elapsedRealtime()
-                metadataByDate[visibleDate] = metadata
-                _uiState.update { state ->
-                    val next = if (state.visibleDate == visibleDate) {
-                        state.copy(
-                            metadata = metadata,
-                            isRefreshing = false,
-                            isMetadataLoading = false,
-                            metadataLoadFailed = false,
-                            imageRevision = state.imageRevision + 1,
-                        )
-                    } else {
-                        state.copy(
-                            isRefreshing = false,
-                            isMetadataLoading = false,
-                            metadataLoadFailed = false,
-                        )
-                    }
-                    next.withPreviewRatioFrom(metadata)
-                }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
+            lastRefreshAt = SystemClock.elapsedRealtime()
+            metadataByDate[visibleDate] = metadata
+            _uiState.update { state ->
+                val next = if (state.visibleDate == visibleDate) {
+                    state.copy(
+                        metadata = metadata,
                         isRefreshing = false,
                         isMetadataLoading = false,
-                        metadataLoadFailed = true,
+                        metadataLoadFailed = false,
+                        imageRevision = state.imageRevision + 1,
+                    )
+                } else {
+                    state.copy(
+                        isRefreshing = false,
+                        isMetadataLoading = false,
+                        metadataLoadFailed = false,
                     )
                 }
-                reportMetadataFailure(e)
+                next.withPreviewRatioFrom(metadata)
             }
+        } catch (e: Exception) {
+            _uiState.update {
+                it.copy(
+                    isRefreshing = false,
+                    isMetadataLoading = false,
+                    metadataLoadFailed = true,
+                )
+            }
+            reportMetadataFailure(e)
         }
     }
 
@@ -697,36 +731,39 @@ class BauhausViewModel(
         }
     }
 
-    private fun appendNextOlderDate() {
-        if (isAppendingOlderDate || _uiState.value.reachedArchiveStart) return
-        val oldest = allBrowsableDates.lastOrNull() ?: anchorDate
-        val nextOlderDate = oldest.minusDays(1)
-        isAppendingOlderDate = true
-
-        viewModelScope.launch {
-            archiveMutex.withLock {
-                try {
-                    val metadata = api.fetchMetadataForDate(nextOlderDate)
-                    metadataByDate[nextOlderDate] = metadata
-                    allBrowsableDates = allBrowsableDates + nextOlderDate
-                    _uiState.update { state ->
-                        if (!state.showFavoritesOnly) {
-                            state.copy(availableDates = allBrowsableDates)
-                        } else {
-                            state
-                        }
-                    }
-                } catch (e: BauhausHttpException) {
-                    if (e.code == HTTP_NOT_FOUND) {
-                        _uiState.update { it.copy(reachedArchiveStart = true) }
+    /**
+     * Extends the pager by one older day.
+     *
+     * Serves one request from [archiveAppendRequests]; because that collection is
+     * sequential, appends cannot overlap each other and no "already appending"
+     * flag is needed. [archiveMutex] is still required — it serializes this
+     * against [jumpToDate], which mutates [allBrowsableDates] from its own
+     * coroutine. For the same reason the oldest loaded date is read *inside* the
+     * lock: a jump that lands while this request is queued moves it.
+     */
+    private suspend fun appendNextOlderDate() {
+        archiveMutex.withLock {
+            val oldest = allBrowsableDates.lastOrNull() ?: anchorDate
+            val nextOlderDate = oldest.minusDays(1)
+            try {
+                val metadata = api.fetchMetadataForDate(nextOlderDate)
+                metadataByDate[nextOlderDate] = metadata
+                allBrowsableDates = allBrowsableDates + nextOlderDate
+                _uiState.update { state ->
+                    if (!state.showFavoritesOnly) {
+                        state.copy(availableDates = allBrowsableDates)
                     } else {
-                        emitError(e, R.string.error_refresh)
+                        state
                     }
-                } catch (e: Exception) {
-                    emitError(e, R.string.error_refresh)
-                } finally {
-                    isAppendingOlderDate = false
                 }
+            } catch (e: BauhausHttpException) {
+                if (e.code == HTTP_NOT_FOUND) {
+                    _uiState.update { it.copy(reachedArchiveStart = true) }
+                } else {
+                    emitError(e, R.string.error_refresh)
+                }
+            } catch (e: Exception) {
+                emitError(e, R.string.error_refresh)
             }
         }
     }
@@ -806,6 +843,52 @@ class BauhausViewModel(
                     container.wallpaperScheduler,
                 )
             }
+        }
+    }
+}
+
+/**
+ * A request channel that holds at most the one request currently being served.
+ *
+ * Rendezvous means [Channel.trySend] hands off only while the collector is parked
+ * in `receive`; a request raised while one is still in flight is dropped rather
+ * than queued. That makes "only one at a time" a property of the channel instead
+ * of a boolean flag every code path has to set and clear correctly.
+ *
+ * The dropping is the point: these are user gestures (a pull, a swipe to the end
+ * of the pager) where a second one during the first should cost nothing, not
+ * schedule a second request to a service the maintainer pays for.
+ *
+ * This must not be "simplified" to `MutableSharedFlow(replay = 0,
+ * extraBufferCapacity = 0)`. That looks equivalent but is not: with a zero
+ * buffer, `emit` is the only way to complete the handoff, so `tryEmit` returns
+ * false whenever there is a collector and *every* request is silently dropped.
+ * Giving the shared flow a buffer instead would queue the second gesture rather
+ * than drop it, which is also wrong.
+ *
+ * Both producer and collector run on the main dispatcher, so there is no window
+ * between the collector finishing one request and re-entering `receive` in which
+ * a gesture could be dropped spuriously.
+ */
+private fun requestChannel(): Channel<Unit> = Channel(Channel.RENDEZVOUS)
+
+/**
+ * Serves requests from a [requestChannel] one at a time, forever.
+ *
+ * A failure in [serve] must not tear down the collector, or the first error
+ * would silently disable the feature for the rest of the ViewModel's life.
+ * [CancellationException] needs care in particular: on the JVM
+ * `kotlin.coroutines.cancellation.CancellationException` is an alias for
+ * `java.util.concurrent.CancellationException`, so a library throwing the latter
+ * as an ordinary error would otherwise stop every later request.
+ * [ensureActive] rethrows only when the surrounding scope is genuinely cancelled.
+ */
+private suspend fun Flow<Unit>.collectRequests(serve: suspend () -> Unit) {
+    collect {
+        try {
+            serve()
+        } catch (_: CancellationException) {
+            currentCoroutineContext().ensureActive()
         }
     }
 }
