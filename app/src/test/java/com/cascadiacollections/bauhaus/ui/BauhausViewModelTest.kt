@@ -168,6 +168,56 @@ class BauhausViewModelTest {
         assertEquals(staleDate, vm.uiState.value.latestDate)
     }
 
+    @Test
+    fun `an offline metadata failure does not probe health`() = runTest {
+        // The probe costs a request that is certain to fail, and being offline
+        // already explains the error.
+        val events = mutableListOf<SnackbarEvent>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.snackbarEvent.collect { events.add(it) }
+        }
+
+        fakeApi.throwIOException = true
+        viewModel.refresh()
+
+        assertEquals(0, fakeApi.healthCalls)
+        val expected = RuntimeEnvironment.getApplication().getString(R.string.error_network)
+        assertEquals(listOf(expected), events.map { it.message })
+    }
+
+    @Test
+    fun `a 404 whose health probe fails falls back to the generic report`() = runTest {
+        // An unanswered health check is no evidence that the service is behind.
+        val events = mutableListOf<SnackbarEvent>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.snackbarEvent.collect { events.add(it) }
+        }
+
+        fakeApi.todayMetadataError = BauhausHttpException(404, "/api/today.json")
+        fakeApi.healthError = RuntimeException("health unreachable")
+        viewModel.refresh()
+
+        assertEquals(1, fakeApi.healthCalls)
+        val expected = RuntimeEnvironment.getApplication().getString(R.string.error_refresh)
+        assertEquals(listOf(expected), events.map { it.message })
+    }
+
+    @Test
+    fun `a 404 on a healthy service is reported as a fault not a stale service`() = runTest {
+        val events = mutableListOf<SnackbarEvent>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.snackbarEvent.collect { events.add(it) }
+        }
+
+        fakeApi.todayMetadataError = BauhausHttpException(404, "/api/today.json")
+        fakeApi.healthToReturn = ServiceHealth(status = ServiceHealth.STATUS_OK)
+        viewModel.refresh()
+
+        assertEquals(1, fakeApi.healthCalls)
+        val expected = RuntimeEnvironment.getApplication().getString(R.string.error_refresh)
+        assertEquals(listOf(expected), events.map { it.message })
+    }
+
     // ── settings flow reactivity ─────────────────────────────────────────────
 
     @Test
@@ -578,7 +628,17 @@ class BauhausViewModelTest {
             return date !in missingDates
         }
 
-        override suspend fun fetchHealth(): ServiceHealth = healthToReturn
+        /** Number of times [fetchHealth] has been called. */
+        var healthCalls = 0
+
+        /** Thrown from [fetchHealth] when set, simulating an unreachable probe. */
+        var healthError: Throwable? = null
+
+        override suspend fun fetchHealth(): ServiceHealth {
+            healthCalls++
+            healthError?.let { throw it }
+            return healthToReturn
+        }
 
         /** Thrown from [fetchTodayMetadata] when set, in preference to the flags above. */
         var todayMetadataError: Throwable? = null
