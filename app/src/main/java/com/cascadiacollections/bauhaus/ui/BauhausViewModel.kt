@@ -27,6 +27,7 @@ import com.cascadiacollections.bauhaus.data.WallpaperTarget
 import com.cascadiacollections.bauhaus.data.isConnectivityFailure
 import com.cascadiacollections.bauhaus.data.serviceToday
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
@@ -37,6 +38,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -225,12 +227,12 @@ class BauhausViewModel(
             }
         }
         viewModelScope.launch {
-            refreshRequests
+            refreshRequests.receiveAsFlow()
                 .filter { isPastRefreshCooldown() }
                 .collectRequests { handleRefresh() }
         }
         viewModelScope.launch {
-            archiveAppendRequests
+            archiveAppendRequests.receiveAsFlow()
                 .filter { !_uiState.value.reachedArchiveStart }
                 .collectRequests { appendNextOlderDate() }
         }
@@ -307,7 +309,7 @@ class BauhausViewModel(
         }
 
         if (!snapshot.showFavoritesOnly && !snapshot.reachedArchiveStart && pageIndex == snapshot.availableDates.lastIndex) {
-            archiveAppendRequests.tryEmit(Unit)
+            archiveAppendRequests.trySend(Unit)
         }
     }
 
@@ -609,14 +611,14 @@ class BauhausViewModel(
      * The request is offered to [refreshRequests] rather than executed here, so
      * the two abuse/DOS guards are properties of the pipeline instead of checks
      * every caller has to get right:
-     * 1. **In-flight guard**: [requestChannel] has no buffer, so [MutableSharedFlow.tryEmit]
-     *    only succeeds while the collector is parked waiting. A gesture made
-     *    while a refresh is still running is dropped, not queued.
+     * 1. **In-flight guard**: [requestChannel] is a rendezvous channel, so
+     *    [Channel.trySend] hands off only while the collector is parked waiting.
+     *    A gesture made while a refresh is still running is dropped, not queued.
      * 2. **Cooldown guard**: [isPastRefreshCooldown] filters out requests inside
      *    the [refreshCooldownMs] window, so the service is not hammered.
      */
     fun refresh() {
-        refreshRequests.tryEmit(Unit)
+        refreshRequests.trySend(Unit)
     }
 
     /**
@@ -848,18 +850,27 @@ class BauhausViewModel(
 /**
  * A request channel that holds at most the one request currently being served.
  *
- * With no replay and no buffer, [MutableSharedFlow.tryEmit] succeeds only while
- * the collector is parked waiting for work; a request raised while one is still
- * in flight is dropped rather than queued. That makes "only one at a time" a
- * property of the channel instead of a boolean flag every code path has to set
- * and clear correctly.
+ * Rendezvous means [Channel.trySend] hands off only while the collector is parked
+ * in `receive`; a request raised while one is still in flight is dropped rather
+ * than queued. That makes "only one at a time" a property of the channel instead
+ * of a boolean flag every code path has to set and clear correctly.
  *
  * The dropping is the point: these are user gestures (a pull, a swipe to the end
  * of the pager) where a second one during the first should cost nothing, not
  * schedule a second request to a service the maintainer pays for.
+ *
+ * This must not be "simplified" to `MutableSharedFlow(replay = 0,
+ * extraBufferCapacity = 0)`. That looks equivalent but is not: with a zero
+ * buffer, `emit` is the only way to complete the handoff, so `tryEmit` returns
+ * false whenever there is a collector and *every* request is silently dropped.
+ * Giving the shared flow a buffer instead would queue the second gesture rather
+ * than drop it, which is also wrong.
+ *
+ * Both producer and collector run on the main dispatcher, so there is no window
+ * between the collector finishing one request and re-entering `receive` in which
+ * a gesture could be dropped spuriously.
  */
-private fun requestChannel(): MutableSharedFlow<Unit> =
-    MutableSharedFlow(replay = 0, extraBufferCapacity = 0)
+private fun requestChannel(): Channel<Unit> = Channel(Channel.RENDEZVOUS)
 
 /**
  * Serves requests from a [requestChannel] one at a time, forever.
