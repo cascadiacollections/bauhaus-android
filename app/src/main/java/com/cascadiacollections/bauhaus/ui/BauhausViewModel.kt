@@ -771,6 +771,10 @@ class BauhausViewModel(
     /**
      * Maps a failed service call onto a user-facing message.
      *
+     * This is the common tail for every failure the user sees; specialised
+     * handlers such as [reportMetadataFailure] deal with the case they know
+     * about and then delegate here.
+     *
      * A connectivity failure is a fact about the device, not a defect, so it gets
      * the offline message and is **not** reported to the crash reporter. Note that
      * [com.cascadiacollections.bauhaus.data.BauhausNetworkException] is not an
@@ -793,35 +797,44 @@ class BauhausViewModel(
      * Reports a failed metadata load, asking the service whether it is simply
      * behind on publishing before blaming the network or ourselves.
      *
+     * Everything other than that one case is [emitError]'s job. The health probe
+     * is skipped for connectivity failures: it would cost a request that is
+     * certain to fail, and the device being offline already explains the error.
+     */
+    private suspend fun reportMetadataFailure(error: Throwable) {
+        if (error is CancellationException) throw error
+        if (!error.isConnectivityFailure && handledAsStaleService(error)) return
+        emitError(error, R.string.error_refresh)
+    }
+
+    /**
+     * Handles the case where the service has not published the requested day yet.
+     *
      * A `404` on the day we believe is current is expected during the window
      * between 00:00 UTC and the 04:00 UTC publish run, and whenever a run has
      * failed. `/api/health` answers which case it is and hands back the newest
      * date it does have, which also lets browsing re-anchor to something real.
+     *
+     * Returns `true` when it has explained the failure to the user, and `false`
+     * when the caller should fall through to the generic report — including when
+     * the probe itself fails, since an unanswered health check is no evidence
+     * that the service is behind.
      */
-    private suspend fun reportMetadataFailure(error: Throwable) {
-        if (error is CancellationException) throw error
-        if (error.isConnectivityFailure) {
-            _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_network)))
-            return
-        }
+    private suspend fun handledAsStaleService(error: Throwable): Boolean {
+        if (error !is BauhausHttpException || error.code != HTTP_NOT_FOUND) return false
 
-        if (error is BauhausHttpException && error.code == HTTP_NOT_FOUND) {
-            val health = try {
-                api.fetchHealth()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (_: Exception) {
-                null
-            }
-            if (health != null && !health.isCurrent) {
-                health.latestDate?.let { rebaseToLatest(it) }
-                _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_service_stale)))
-                return
-            }
+        val health = try {
+            api.fetchHealth()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return false
         }
+        if (health.isCurrent) return false
 
-        CrashReporter.recordException(error)
-        _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_refresh)))
+        health.latestDate?.let { rebaseToLatest(it) }
+        _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_service_stale)))
+        return true
     }
 
     companion object {
