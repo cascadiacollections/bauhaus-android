@@ -238,16 +238,14 @@ class BauhausViewModel(
         }
         viewModelScope.launch {
             try {
-                val metadata = api.fetchTodayMetadata()
+                val metadata = fetchMetadata(anchorDate)
                 metadata.publishedDate?.let { rebaseToLatest(it) }
+                // Read anchorDate only after the rebase: the clock's guess is the
+                // wrong cache key once the service has named the day it served.
                 metadataByDate[anchorDate] = metadata
-                _uiState.update { state ->
-                    val next = if (state.visibleDate == anchorDate) {
-                        state.copy(metadata = metadata, isMetadataLoading = false, metadataLoadFailed = false)
-                    } else {
-                        state.copy(isMetadataLoading = false, metadataLoadFailed = false)
-                    }
-                    next.withPreviewRatioFrom(metadata)
+                _uiState.update {
+                    it.copy(isMetadataLoading = false, metadataLoadFailed = false)
+                        .showingMetadataFor(anchorDate, metadata)
                 }
             } catch (e: Exception) {
                 _uiState.update { it.copy(metadata = null, isMetadataLoading = false, metadataLoadFailed = true) }
@@ -267,6 +265,50 @@ class BauhausViewModel(
         val ratio = resolvePreviewAspectRatio(metadata)
         return if (ratio == FALLBACK_ASPECT_RATIO) this else copy(previewAspectRatio = ratio)
     }
+
+    /**
+     * Folds a freshly fetched [metadata] for [date] into the state.
+     *
+     * Every load path shares two rules, and this is where they live: metadata
+     * reaches the screen only if [date] is *still* the visible page, because the
+     * user can swipe away while a request is in flight; and the preview card's
+     * shape is adopted from whatever artwork loaded, visible or not, since
+     * [withPreviewRatioFrom] only takes the first one it is offered.
+     *
+     * [bumpImageRevision] is for pull-to-refresh, which has to force Coil to
+     * re-read a URL whose contents may have changed. Only a refresh of the page
+     * the user is looking at should do it.
+     *
+     * Loading and failure flags stay with the caller: startup and pull-to-refresh
+     * own a screen-wide spinner and clear it unconditionally, while a pager load
+     * owns only its own page and must not clear a spinner that now belongs to a
+     * different one.
+     */
+    private fun UiState.showingMetadataFor(
+        date: LocalDate,
+        metadata: ArtworkMetadata,
+        bumpImageRevision: Boolean = false,
+    ): UiState {
+        val next = if (visibleDate == date) {
+            copy(
+                metadata = metadata,
+                imageRevision = if (bumpImageRevision) imageRevision + 1 else imageRevision,
+            )
+        } else {
+            this
+        }
+        return next.withPreviewRatioFrom(metadata)
+    }
+
+    /**
+     * Fetches [date]'s metadata over whichever route the service caches best.
+     *
+     * The newest published day goes through `/api/today.json`, which carries a
+     * 5-minute TTL and an `ETag`; older days go through `/api/<date>.json`, which
+     * is `immutable` with a one-year TTL because publishing is write-once.
+     */
+    private suspend fun fetchMetadata(date: LocalDate): ArtworkMetadata =
+        if (date == anchorDate) api.fetchTodayMetadata() else api.fetchMetadataForDate(date)
 
     /**
      * Adopts [latest] as the newest published date.
@@ -649,30 +691,15 @@ class BauhausViewModel(
         }
         try {
             val visibleDate = _uiState.value.visibleDate
-            val metadata = if (visibleDate == anchorDate) {
-                api.fetchTodayMetadata()
-            } else {
-                api.fetchMetadataForDate(visibleDate)
-            }
+            val metadata = fetchMetadata(visibleDate)
             lastRefreshAt = SystemClock.elapsedRealtime()
             metadataByDate[visibleDate] = metadata
-            _uiState.update { state ->
-                val next = if (state.visibleDate == visibleDate) {
-                    state.copy(
-                        metadata = metadata,
-                        isRefreshing = false,
-                        isMetadataLoading = false,
-                        metadataLoadFailed = false,
-                        imageRevision = state.imageRevision + 1,
-                    )
-                } else {
-                    state.copy(
-                        isRefreshing = false,
-                        isMetadataLoading = false,
-                        metadataLoadFailed = false,
-                    )
-                }
-                next.withPreviewRatioFrom(metadata)
+            _uiState.update {
+                it.copy(
+                    isRefreshing = false,
+                    isMetadataLoading = false,
+                    metadataLoadFailed = false,
+                ).showingMetadataFor(visibleDate, metadata, bumpImageRevision = true)
             }
         } catch (e: Exception) {
             _uiState.update {
@@ -705,15 +732,15 @@ class BauhausViewModel(
                 }
             }
             try {
-                val metadata = if (date == anchorDate) api.fetchTodayMetadata() else api.fetchMetadataForDate(date)
+                val metadata = fetchMetadata(date)
                 metadataByDate[date] = metadata
                 _uiState.update { state ->
-                    val next = if (state.visibleDate == date) {
-                        state.copy(metadata = metadata, isMetadataLoading = false, metadataLoadFailed = false)
+                    val shown = state.showingMetadataFor(date, metadata)
+                    if (state.visibleDate == date) {
+                        shown.copy(isMetadataLoading = false, metadataLoadFailed = false)
                     } else {
-                        state
+                        shown
                     }
-                    next.withPreviewRatioFrom(metadata)
                 }
             } catch (e: CancellationException) {
                 throw e
