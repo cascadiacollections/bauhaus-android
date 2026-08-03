@@ -736,7 +736,7 @@ class BauhausViewModel(
                 metadataByDate[date] = metadata
                 _uiState.update { state ->
                     val shown = state.showingMetadataFor(date, metadata)
-                    if (shown.visibleDate == date) {
+                    if (state.visibleDate == date) {
                         shown.copy(isMetadataLoading = false, metadataLoadFailed = false)
                     } else {
                         shown
