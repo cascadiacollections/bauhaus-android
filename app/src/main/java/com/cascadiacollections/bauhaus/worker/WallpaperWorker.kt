@@ -9,6 +9,7 @@ import com.cascadiacollections.bauhaus.data.BauhausApiClient
 import com.cascadiacollections.bauhaus.data.SettingsStore
 import com.cascadiacollections.bauhaus.data.isConnectivityFailure
 import com.cascadiacollections.bauhaus.data.serviceToday
+import com.cascadiacollections.bauhaus.data.wallpaperTargetSize
 import kotlinx.coroutines.flow.first
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -92,10 +93,10 @@ class WallpaperWorker(
         val api = dependencies.api
 
         return try {
-            val metrics = applicationContext.resources.displayMetrics
+            val targetSize = wallpaperTargetSize(applicationContext)
             val bitmap = api.fetchTodayImage(
-                maxWidth = metrics.widthPixels,
-                maxHeight = metrics.heightPixels,
+                maxWidth = targetSize.width,
+                maxHeight = targetSize.height,
             )
 
             try {

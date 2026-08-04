@@ -26,6 +26,7 @@ import com.cascadiacollections.bauhaus.data.SettingsStore
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 import com.cascadiacollections.bauhaus.data.isConnectivityFailure
 import com.cascadiacollections.bauhaus.data.serviceToday
+import com.cascadiacollections.bauhaus.data.wallpaperTargetSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
@@ -531,17 +532,17 @@ class BauhausViewModel(
             try {
                 val visibleDate = _uiState.value.visibleDate
                 val isLatest = visibleDate == anchorDate
-                val metrics = getApplication<Application>().resources.displayMetrics
+                val targetSize = wallpaperTargetSize(getApplication())
                 val bitmap = if (isLatest) {
                     api.fetchTodayImage(
-                        maxWidth = metrics.widthPixels,
-                        maxHeight = metrics.heightPixels,
+                        maxWidth = targetSize.width,
+                        maxHeight = targetSize.height,
                     )
                 } else {
                     api.fetchImageForDate(
                         date = visibleDate,
-                        maxWidth = metrics.widthPixels,
-                        maxHeight = metrics.heightPixels,
+                        maxWidth = targetSize.width,
+                        maxHeight = targetSize.height,
                     )
                 }
                 try {

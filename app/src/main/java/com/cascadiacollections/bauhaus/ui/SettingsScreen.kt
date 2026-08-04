@@ -65,7 +65,6 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
-import coil3.request.allowHardware
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
@@ -289,7 +288,6 @@ fun SettingsScreen(
                                         ImageRequest.Builder(context)
                                             .data("${BauhausApi.BASE_URL}${request.imagePath}")
                                             .size(artworkPreviewSize.width, artworkPreviewSize.height)
-                                            .allowHardware(false)
                                             .memoryCacheKey(request.cacheKey)
                                             .diskCacheKey(request.cacheKey)
                                             .build(),
@@ -323,7 +321,6 @@ fun SettingsScreen(
                         ImageRequest.Builder(context)
                             .data("${BauhausApi.BASE_URL}$imagePath")
                             .size(artworkPreviewSize.width, artworkPreviewSize.height)
-                            .allowHardware(false)
                             .memoryCacheKey(cacheKey)
                             .diskCacheKey(cacheKey)
                             .build()

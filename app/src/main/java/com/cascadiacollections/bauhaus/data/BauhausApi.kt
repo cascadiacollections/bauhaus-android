@@ -1,13 +1,14 @@
 package com.cascadiacollections.bauhaus.data
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.IOException
+import java.nio.ByteBuffer
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -270,50 +271,65 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
 }
 
 /**
- * Decodes [bytes] into a [Bitmap], downsampling if [maxWidth]/[maxHeight] > 0.
+ * Decodes [bytes] into a [Bitmap], scaled to fit [maxWidth] x [maxHeight] when
+ * both are > 0.
  *
- * Uses a two-pass approach: first decode bounds only, then compute an
- * appropriate `inSampleSize` power-of-two and decode at reduced resolution.
+ * Uses [ImageDecoder] rather than [BitmapFactory] for three reasons that all
+ * matter for artwork destined to become a wallpaper:
+ *
+ * - **Exact scaling.** `BitmapFactory.inSampleSize` only halves, so the result
+ *   landed anywhere between 1x and 2x the requested size — and because the old
+ *   loop required *both* axes to still exceed the target, a landscape source
+ *   against a portrait target was not downsampled at all.
+ *   [ImageDecoder.setTargetSize] scales to the size actually asked for.
+ * - **Colour depth.** The previous decode forced `RGB_565`, which is 16-bit and
+ *   bands visibly across the flat fields and gradients this artwork is made of.
+ *   [ImageDecoder] produces `ARGB_8888` and preserves the encoded colour space,
+ *   so wide-gamut sources survive to the wallpaper.
+ * - **AVIF.** The `Accept` header asks for AVIF first; [ImageDecoder] decodes it
+ *   natively.
+ *
+ * The allocator is forced to software because
+ * [WallpaperManager.setBitmap][android.app.WallpaperManager.setBitmap] and
+ * `Bitmap.compress` cannot read a hardware bitmap.
  */
 private fun decodeSampled(bytes: ByteArray, maxWidth: Int, maxHeight: Int): Bitmap {
-    if (maxWidth <= 0 || maxHeight <= 0) {
-        return checkNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size)) {
-            "Failed to decode image from ${bytes.size} bytes"
+    val source = ImageDecoder.createSource(ByteBuffer.wrap(bytes))
+    return try {
+        ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            if (maxWidth > 0 && maxHeight > 0) {
+                val (targetWidth, targetHeight) = scaleToFit(
+                    sourceWidth = info.size.width,
+                    sourceHeight = info.size.height,
+                    maxWidth = maxWidth,
+                    maxHeight = maxHeight,
+                )
+                decoder.setTargetSize(targetWidth, targetHeight)
+            }
         }
-    }
-
-    val options = BitmapFactory.Options().apply {
-        inJustDecodeBounds = true
-        inPreferredConfig = Bitmap.Config.RGB_565
-    }
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
-
-    options.inSampleSize = calculateInSampleSize(options.outWidth, options.outHeight, maxWidth, maxHeight)
-    options.inJustDecodeBounds = false
-    options.inPreferredConfig = Bitmap.Config.RGB_565
-
-    return checkNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)) {
-        "Failed to decode image from ${bytes.size} bytes with sample size ${options.inSampleSize}"
+    } catch (e: IOException) {
+        throw IllegalStateException("Failed to decode image from ${bytes.size} bytes", e)
     }
 }
 
 /**
- * Computes the largest power-of-two `inSampleSize` such that the decoded
- * dimensions are still >= [reqWidth] x [reqHeight].
+ * Largest size that fits inside [maxWidth] x [maxHeight] without changing the
+ * source aspect ratio. Never upscales — a source smaller than the target is
+ * returned at its own size, because inventing pixels only costs memory.
  */
-private fun calculateInSampleSize(
-    rawWidth: Int,
-    rawHeight: Int,
-    reqWidth: Int,
-    reqHeight: Int,
-): Int {
-    var inSampleSize = 1
-    if (rawHeight > reqHeight || rawWidth > reqWidth) {
-        val halfHeight = rawHeight / 2
-        val halfWidth = rawWidth / 2
-        while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
-            inSampleSize *= 2
-        }
-    }
-    return inSampleSize
+internal fun scaleToFit(
+    sourceWidth: Int,
+    sourceHeight: Int,
+    maxWidth: Int,
+    maxHeight: Int,
+): Pair<Int, Int> {
+    if (sourceWidth <= 0 || sourceHeight <= 0) return maxWidth to maxHeight
+    val scale = minOf(
+        maxWidth.toDouble() / sourceWidth,
+        maxHeight.toDouble() / sourceHeight,
+    )
+    if (scale >= 1.0) return sourceWidth to sourceHeight
+    return maxOf(1, Math.round(sourceWidth * scale).toInt()) to
+        maxOf(1, Math.round(sourceHeight * scale).toInt())
 }

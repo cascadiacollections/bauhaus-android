@@ -16,6 +16,45 @@ import java.io.IOException
 import java.time.LocalDate
 
 class BauhausApiTest {
+
+    // ── decode sizing ────────────────────────────────────────────────────────
+
+    @Test
+    fun `scaleToFit fits a landscape source into a portrait target`() {
+        // The old power-of-two path left this case at full size, because it
+        // required both axes to still exceed the target before halving.
+        assertEquals(1080 to 720, scaleToFit(3000, 2000, 1080, 2400))
+    }
+
+    @Test
+    fun `scaleToFit fits a portrait source into a portrait target`() {
+        assertEquals(1080 to 1920, scaleToFit(2160, 3840, 1080, 2400))
+    }
+
+    @Test
+    fun `scaleToFit preserves aspect ratio`() {
+        val (width, height) = scaleToFit(4000, 3000, 1000, 1000)
+        assertEquals(1000, width)
+        assertEquals(750, height)
+    }
+
+    @Test
+    fun `scaleToFit never upscales a source smaller than the target`() {
+        assertEquals(800 to 600, scaleToFit(800, 600, 1080, 2400))
+    }
+
+    @Test
+    fun `scaleToFit does not collapse an extreme ratio to zero`() {
+        val (width, height) = scaleToFit(10_000, 5, 100, 100)
+        assertTrue(width >= 1)
+        assertTrue(height >= 1)
+    }
+
+    @Test
+    fun `scaleToFit falls back to the target for a degenerate source`() {
+        assertEquals(1080 to 2400, scaleToFit(0, 0, 1080, 2400))
+    }
+
     @Test
     fun `fetchTodayMetadata decodes successful response`() = runTest {
         val api = BauhausApi(clientResponding(200, """{"title":"Composition VIII","artist":"Kandinsky"}"""))

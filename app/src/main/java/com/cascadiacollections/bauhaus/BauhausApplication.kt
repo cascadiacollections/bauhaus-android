@@ -11,7 +11,6 @@ import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.CachePolicy
-import coil3.request.allowHardware
 import com.cascadiacollections.bauhaus.data.serviceToday
 import com.cascadiacollections.bauhaus.worker.WallpaperWorker
 import kotlinx.coroutines.CoroutineScope
@@ -95,6 +94,11 @@ class BauhausApplication : Application(), AppContainerProvider, SingletonImageLo
      * - AVIF/WebP format negotiation works via the `Accept` header interceptor
      * - OkHttp disk cache is shared (5-min TTL for `/api/today`)
      * - Memory cache uses Coil's default (25 % of heap — plenty for one image)
+ *
+ * Hardware bitmaps are left enabled: nothing reads pixels back out of a Coil
+ * result. The wallpaper path decodes its own software bitmap in
+ * [BauhausApi][com.cascadiacollections.bauhaus.data.BauhausApi], and saving to
+ * the gallery writes the original bytes without decoding at all.
      */
     override fun newImageLoader(context: coil3.PlatformContext): ImageLoader =
         ImageLoader.Builder(context)
@@ -105,7 +109,6 @@ class BauhausApplication : Application(), AppContainerProvider, SingletonImageLo
                     ),
                 )
             }
-            .allowHardware(false)
             .diskCachePolicy(CachePolicy.ENABLED)
             .memoryCachePolicy(CachePolicy.ENABLED)
             .build()
