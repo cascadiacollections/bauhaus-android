@@ -9,8 +9,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -27,10 +26,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.net.toUri
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.cascadiacollections.bauhaus.ui.BauhausViewModel
 import com.cascadiacollections.bauhaus.ui.SettingsScreen
 import com.cascadiacollections.bauhaus.ui.SettingsScreenTestTags
@@ -60,34 +63,43 @@ class MainActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
                 val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-                LaunchedEffect(Unit) {
-                    viewModel.snackbarEvent.collect { event ->
-                        val result = snackbarHostState.showSnackbar(
-                            message = event.message,
-                            actionLabel = event.uri?.let { "Open" },
-                            duration = SnackbarDuration.Short,
-                        )
-                        if (result == SnackbarResult.ActionPerformed) {
-                            event.uri?.let { uri ->
-                                startActivity(Intent(Intent.ACTION_VIEW, uri))
+                // repeatOnLifecycle, not a bare LaunchedEffect: composition
+                // outlives the Activity being stopped, so a plain collect would
+                // consume events into a SnackbarHost nobody can see, and would call
+                // startActivity from the background — which the system blocks.
+                val lifecycleOwner = LocalLifecycleOwner.current
+                LaunchedEffect(lifecycleOwner) {
+                    lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                        viewModel.snackbarEvent.collect { event ->
+                            val result = snackbarHostState.showSnackbar(
+                                message = event.message,
+                                actionLabel = event.uri?.let { getString(R.string.action_open) },
+                                duration = SnackbarDuration.Short,
+                            )
+                            if (result == SnackbarResult.ActionPerformed) {
+                                event.uri?.let { uri ->
+                                    startActivity(Intent(Intent.ACTION_VIEW, uri))
+                                }
                             }
                         }
                     }
                 }
-                LaunchedEffect(Unit) {
-                    viewModel.shareArtworkEvent.collect { event ->
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, event.text)
-                        }
-                        val chooser = Intent.createChooser(intent, getString(R.string.share_artwork))
-                        try {
-                            startActivity(chooser)
-                        } catch (_: ActivityNotFoundException) {
-                            snackbarHostState.showSnackbar(
-                                message = getString(R.string.error_share_unavailable),
-                                duration = SnackbarDuration.Short,
-                            )
+                LaunchedEffect(lifecycleOwner) {
+                    lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                        viewModel.shareArtworkEvent.collect { event ->
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, event.text)
+                            }
+                            val chooser = Intent.createChooser(intent, getString(R.string.share_artwork))
+                            try {
+                                startActivity(chooser)
+                            } catch (_: ActivityNotFoundException) {
+                                snackbarHostState.showSnackbar(
+                                    message = getString(R.string.error_share_unavailable),
+                                    duration = SnackbarDuration.Short,
+                                )
+                            }
                         }
                     }
                 }
@@ -105,7 +117,7 @@ class MainActivity : ComponentActivity() {
                                     },
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Outlined.Share,
+                                        imageVector = Icons.Filled.Share,
                                         contentDescription = stringResource(R.string.share_artwork),
                                     )
                                 }
@@ -117,7 +129,7 @@ class MainActivity : ComponentActivity() {
                                     },
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Outlined.Download,
+                                        painter = painterResource(R.drawable.ic_download),
                                         contentDescription = stringResource(R.string.save_image),
                                     )
                                 }

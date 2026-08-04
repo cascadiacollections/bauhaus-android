@@ -140,8 +140,18 @@ android {
 
 kotlin {
     jvmToolchain(21)
-    compilerOptions {
-        freeCompilerArgs.addAll(
+}
+
+// Strip Kotlin's generated null checks from shipping builds only.
+//
+// These are what turn "a platform API handed us null for a non-null parameter"
+// into an immediate, well-located NPE — at response.header(), resolver.insert(),
+// and the other platform boundaries this app crosses. Applying them to every
+// variant, as the top-level kotlin {} block did, bought a small release win at
+// the cost of debug builds failing later and further from the cause.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    if (name.contains("Release") || name.contains("Benchmark")) {
+        compilerOptions.freeCompilerArgs.addAll(
             "-Xno-call-assertions",
             "-Xno-param-assertions",
             "-Xno-receiver-assertions",
@@ -159,6 +169,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.lifecycle.viewmodel.savedstate)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
@@ -166,7 +177,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.core)
-    implementation(libs.androidx.compose.material.icons.extended)
 
     implementation(platform(libs.okhttp.bom))
     implementation(libs.okhttp)

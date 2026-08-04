@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Download glyph, vendored so the app does not depend on
+    material-icons-extended for a single icon. Core carries Share, Favorite, and
+    FavoriteBorder; it has no download equivalent.
+
+    Two subpaths: a downward arrow (shaft + head) and the tray line beneath it.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M11,3h2v9h3l-4,5 -4,-5h3z" />
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M5,18h14v2h-14z" />
+</vector>

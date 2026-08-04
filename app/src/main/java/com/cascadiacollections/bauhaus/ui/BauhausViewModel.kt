@@ -10,7 +10,9 @@ import android.provider.MediaStore
 import androidx.annotation.StringRes
 import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -26,6 +28,7 @@ import com.cascadiacollections.bauhaus.data.SettingsStore
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 import com.cascadiacollections.bauhaus.data.isConnectivityFailure
 import com.cascadiacollections.bauhaus.data.serviceToday
+import com.cascadiacollections.bauhaus.data.wallpaperTargetSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
@@ -127,6 +130,7 @@ class BauhausViewModel(
     private val settings: SettingsStore,
     private val api: BauhausApiClient,
     private val scheduler: WallpaperScheduler,
+    private val savedState: SavedStateHandle,
 ) : AndroidViewModel(application) {
     private val maxJumpExpansionDays: Long = 730
 
@@ -152,6 +156,12 @@ class BauhausViewModel(
      * favorites-only mode.
      */
     private var allBrowsableDates: List<LocalDate> = listOf(anchorDate)
+        set(value) {
+            field = value
+            // Only the oldest date is stored: publishing is contiguous, so the
+            // whole pager rebuilds from [anchorDate] down to this one.
+            savedState[KEY_OLDEST_BROWSED_DATE] = value.lastOrNull()?.toString()
+        }
 
     /** Minimum milliseconds between user-initiated refreshes (DOS guard). */
     private val refreshCooldownMs: Long = 30_000L
@@ -181,6 +191,15 @@ class BauhausViewModel(
     val shareArtworkEvent: SharedFlow<ShareArtworkEvent> = _shareArtworkEvent.asSharedFlow()
 
     init {
+        restoreBrowsingState()
+        viewModelScope.launch {
+            // One writer for the two scalars, so no action has to remember to
+            // persist. The archive extent is written by allBrowsableDates' setter.
+            uiState.collect { state ->
+                savedState[KEY_VISIBLE_DATE] = state.visibleDate.toString()
+                savedState[KEY_SHOW_FAVORITES_ONLY] = state.showFavoritesOnly
+            }
+        }
         viewModelScope.launch {
             settings.wallpaperTarget.collect { target ->
                 _uiState.update { it.copy(wallpaperTarget = target) }
@@ -309,6 +328,56 @@ class BauhausViewModel(
      */
     private suspend fun fetchMetadata(date: LocalDate): ArtworkMetadata =
         if (date == anchorDate) api.fetchTodayMetadata() else api.fetchMetadataForDate(date)
+
+    /**
+     * Rebuilds where the user was browsing before the process was killed.
+     *
+     * Only three things are persisted — the oldest date paged to, the visible
+     * date, and the favorites filter — because publishing is contiguous, so the
+     * pager reconstructs from [anchorDate] down to the oldest without storing the
+     * list itself.
+     *
+     * [anchorDate] is deliberately *not* restored. It is a claim about what the
+     * service has published, which may have moved on while the app was dead, so
+     * it stays seeded from the clock and corrected by the startup fetch. A
+     * restored span that no longer makes sense against it is dropped rather than
+     * trusted.
+     */
+    private fun restoreBrowsingState() {
+        val restoredOldest = savedState.get<String>(KEY_OLDEST_BROWSED_DATE)?.toLocalDateOrNull()
+        val span = restoredOldest?.let { ChronoUnit.DAYS.between(it, anchorDate) }
+        if (span != null && span in 0..maxJumpExpansionDays) {
+            allBrowsableDates = buildList {
+                var cursor = anchorDate
+                while (!cursor.isBefore(restoredOldest)) {
+                    add(cursor)
+                    cursor = cursor.minusDays(1)
+                }
+            }
+        }
+
+        val restoredVisible = savedState.get<String>(KEY_VISIBLE_DATE)
+            ?.toLocalDateOrNull()
+            ?.takeIf { it in allBrowsableDates }
+            ?: anchorDate
+        val restoredFavoritesOnly = savedState.get<Boolean>(KEY_SHOW_FAVORITES_ONLY) == true
+
+        _uiState.update {
+            it.copy(
+                availableDates = allBrowsableDates,
+                visibleDate = restoredVisible,
+                showFavoritesOnly = restoredFavoritesOnly,
+            )
+        }
+
+        // The startup fetch below asks for anchorDate. If the restored page is a
+        // different day, nothing would ever populate it — and that fetch clears
+        // isMetadataLoading, so the card would settle into "no metadata, not
+        // loading, not failed" and render nothing at all.
+        if (restoredVisible != anchorDate) {
+            loadMetadataForDate(restoredVisible, force = false)
+        }
+    }
 
     /**
      * Adopts [latest] as the newest published date.
@@ -531,17 +600,17 @@ class BauhausViewModel(
             try {
                 val visibleDate = _uiState.value.visibleDate
                 val isLatest = visibleDate == anchorDate
-                val metrics = getApplication<Application>().resources.displayMetrics
+                val targetSize = wallpaperTargetSize(getApplication())
                 val bitmap = if (isLatest) {
                     api.fetchTodayImage(
-                        maxWidth = metrics.widthPixels,
-                        maxHeight = metrics.heightPixels,
+                        maxWidth = targetSize.width,
+                        maxHeight = targetSize.height,
                     )
                 } else {
                     api.fetchImageForDate(
                         date = visibleDate,
-                        maxWidth = metrics.widthPixels,
-                        maxHeight = metrics.heightPixels,
+                        maxWidth = targetSize.width,
+                        maxHeight = targetSize.height,
                     )
                 }
                 try {
@@ -868,6 +937,10 @@ class BauhausViewModel(
         private const val MAX_METADATA_CACHE_SIZE = 256
         private const val HTTP_NOT_FOUND = 404
 
+        private const val KEY_VISIBLE_DATE = "visible_date"
+        private const val KEY_OLDEST_BROWSED_DATE = "oldest_browsed_date"
+        private const val KEY_SHOW_FAVORITES_ONLY = "show_favorites_only"
+
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]) {
@@ -881,6 +954,7 @@ class BauhausViewModel(
                     container.settingsRepository,
                     container.bauhausApi,
                     container.wallpaperScheduler,
+                    createSavedStateHandle(),
                 )
             }
         }
@@ -911,6 +985,10 @@ class BauhausViewModel(
  * a gesture could be dropped spuriously.
  */
 private fun requestChannel(): Channel<Unit> = Channel(Channel.RENDEZVOUS)
+
+/** Parses an ISO date, or null if the stored value is not one. */
+private fun String.toLocalDateOrNull(): LocalDate? =
+    runCatching { LocalDate.parse(this) }.getOrNull()
 
 /**
  * Serves requests from a [requestChannel] one at a time, forever.

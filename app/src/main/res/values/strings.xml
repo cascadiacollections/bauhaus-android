@@ -28,6 +28,10 @@
     <string name="error_service_stale">No new artwork published yet</string>
     <string name="error_no_artwork_for_date">No artwork for that date</string>
     <string name="error_archive_jump_too_far">That date is too far back to load</string>
+    <string name="action_open">Open</string>
+    <string name="metadata_loading">Loading artwork details…</string>
+    <string name="metadata_unavailable">Couldn\'t load artwork details</string>
+    <string name="metadata_pull_to_retry">Pull down to try again</string>
     <string name="wallpaper_target_home">Home</string>
     <string name="wallpaper_target_lock">Lock</string>
     <string name="wallpaper_target_both">Both</string>

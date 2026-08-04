@@ -3,6 +3,7 @@ package com.cascadiacollections.bauhaus.ui
 import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
+import androidx.lifecycle.SavedStateHandle
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
@@ -64,6 +65,7 @@ class BauhausViewModelTest {
             fakeSettings,
             fakeApi,
             fakeScheduler,
+            SavedStateHandle(),
         )
     }
 
@@ -104,6 +106,7 @@ class BauhausViewModelTest {
             FakeSettingsRepository(RuntimeEnvironment.getApplication()),
             failingApi,
             FakeWallpaperScheduler(),
+            SavedStateHandle(),
         )
         assertNull(vm.uiState.value.metadata)
         assertFalse(vm.uiState.value.isMetadataLoading)
@@ -123,6 +126,7 @@ class BauhausViewModelTest {
             FakeSettingsRepository(RuntimeEnvironment.getApplication()),
             api,
             FakeWallpaperScheduler(),
+            SavedStateHandle(),
         )
 
         assertEquals(published, vm.uiState.value.latestDate)
@@ -153,6 +157,7 @@ class BauhausViewModelTest {
             FakeSettingsRepository(RuntimeEnvironment.getApplication()),
             api,
             FakeWallpaperScheduler(),
+            SavedStateHandle(),
         )
         val events = mutableListOf<SnackbarEvent>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -216,6 +221,114 @@ class BauhausViewModelTest {
         assertEquals(1, fakeApi.healthCalls)
         val expected = RuntimeEnvironment.getApplication().getString(R.string.error_refresh)
         assertEquals(listOf(expected), events.map { it.message })
+    }
+
+    // ── saved state restoration ──────────────────────────────────────────────
+
+    private fun viewModelWith(savedState: SavedStateHandle, api: FakeBauhausApi = FakeBauhausApi()) =
+        BauhausViewModel(
+            RuntimeEnvironment.getApplication(),
+            FakeSettingsRepository(RuntimeEnvironment.getApplication()),
+            api,
+            FakeWallpaperScheduler(),
+            savedState,
+        )
+
+    @Test
+    fun `browsing position is restored after process death`() {
+        val today = serviceToday()
+        val vm = viewModelWith(
+            SavedStateHandle(
+                mapOf(
+                    "visible_date" to today.minusDays(2).toString(),
+                    "oldest_browsed_date" to today.minusDays(4).toString(),
+                ),
+            ),
+        )
+
+        assertEquals(today.minusDays(2), vm.uiState.value.visibleDate)
+        assertEquals(
+            listOf(
+                today,
+                today.minusDays(1),
+                today.minusDays(2),
+                today.minusDays(3),
+                today.minusDays(4),
+            ),
+            vm.uiState.value.availableDates,
+        )
+    }
+
+    @Test
+    fun `a restored page loads its own metadata rather than todays`() {
+        // The startup fetch asks for the anchor date. Without an explicit load for
+        // the restored page the card would settle into "no metadata, not loading,
+        // not failed" and render nothing.
+        val today = serviceToday()
+        val restoredDate = today.minusDays(2)
+        val api = FakeBauhausApi().apply {
+            dateMetadata[restoredDate] = ArtworkMetadata(title = "Restored", artist = "Archive")
+        }
+        val vm = viewModelWith(
+            SavedStateHandle(
+                mapOf(
+                    "visible_date" to restoredDate.toString(),
+                    "oldest_browsed_date" to restoredDate.toString(),
+                ),
+            ),
+            api,
+        )
+
+        assertEquals("Restored", vm.uiState.value.metadata?.title)
+        assertFalse(vm.uiState.value.isMetadataLoading)
+    }
+
+    @Test
+    fun `the favorites filter survives process death`() {
+        val vm = viewModelWith(SavedStateHandle(mapOf("show_favorites_only" to true)))
+
+        assertTrue(vm.uiState.value.showFavoritesOnly)
+    }
+
+    @Test
+    fun `a restored span beyond the expansion limit is discarded`() {
+        val today = serviceToday()
+        val vm = viewModelWith(
+            SavedStateHandle(mapOf("oldest_browsed_date" to today.minusDays(5_000).toString())),
+        )
+
+        assertEquals(listOf(today), vm.uiState.value.availableDates)
+        assertEquals(today, vm.uiState.value.visibleDate)
+    }
+
+    @Test
+    fun `a restored visible date outside the restored span falls back to today`() {
+        val today = serviceToday()
+        val vm = viewModelWith(
+            SavedStateHandle(
+                mapOf(
+                    "visible_date" to today.minusDays(30).toString(),
+                    "oldest_browsed_date" to today.minusDays(2).toString(),
+                ),
+            ),
+        )
+
+        assertEquals(today, vm.uiState.value.visibleDate)
+    }
+
+    @Test
+    fun `unparseable saved dates are ignored rather than crashing`() {
+        val vm = viewModelWith(
+            SavedStateHandle(
+                mapOf(
+                    "visible_date" to "not-a-date",
+                    "oldest_browsed_date" to "also-not-a-date",
+                ),
+            ),
+        )
+
+        assertEquals(serviceToday(), vm.uiState.value.visibleDate)
+        assertEquals(listOf(serviceToday()), vm.uiState.value.availableDates)
     }
 
     // ── settings flow reactivity ─────────────────────────────────────────────
@@ -563,6 +676,7 @@ class BauhausViewModelTest {
             FakeSettingsRepository(RuntimeEnvironment.getApplication()),
             failingApi,
             FakeWallpaperScheduler(),
+            SavedStateHandle(),
         )
         val events = mutableListOf<ShareArtworkEvent>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
