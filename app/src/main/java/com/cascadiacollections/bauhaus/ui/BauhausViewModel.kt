@@ -130,7 +130,7 @@ class BauhausViewModel(
     private val settings: SettingsStore,
     private val api: BauhausApiClient,
     private val scheduler: WallpaperScheduler,
-    private val savedState: SavedStateHandle = SavedStateHandle(),
+    private val savedState: SavedStateHandle,
 ) : AndroidViewModel(application) {
     private val maxJumpExpansionDays: Long = 730
 

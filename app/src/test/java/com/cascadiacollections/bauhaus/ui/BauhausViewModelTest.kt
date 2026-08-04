@@ -65,6 +65,7 @@ class BauhausViewModelTest {
             fakeSettings,
             fakeApi,
             fakeScheduler,
+            SavedStateHandle(),
         )
     }
 
@@ -105,6 +106,7 @@ class BauhausViewModelTest {
             FakeSettingsRepository(RuntimeEnvironment.getApplication()),
             failingApi,
             FakeWallpaperScheduler(),
+            SavedStateHandle(),
         )
         assertNull(vm.uiState.value.metadata)
         assertFalse(vm.uiState.value.isMetadataLoading)
@@ -124,6 +126,7 @@ class BauhausViewModelTest {
             FakeSettingsRepository(RuntimeEnvironment.getApplication()),
             api,
             FakeWallpaperScheduler(),
+            SavedStateHandle(),
         )
 
         assertEquals(published, vm.uiState.value.latestDate)
@@ -154,6 +157,7 @@ class BauhausViewModelTest {
             FakeSettingsRepository(RuntimeEnvironment.getApplication()),
             api,
             FakeWallpaperScheduler(),
+            SavedStateHandle(),
         )
         val events = mutableListOf<SnackbarEvent>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -672,6 +676,7 @@ class BauhausViewModelTest {
             FakeSettingsRepository(RuntimeEnvironment.getApplication()),
             failingApi,
             FakeWallpaperScheduler(),
+            SavedStateHandle(),
         )
         val events = mutableListOf<ShareArtworkEvent>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
