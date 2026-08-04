@@ -9,8 +9,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -27,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.net.toUri
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
@@ -117,7 +117,7 @@ class MainActivity : ComponentActivity() {
                                     },
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Outlined.Share,
+                                        imageVector = Icons.Filled.Share,
                                         contentDescription = stringResource(R.string.share_artwork),
                                     )
                                 }
@@ -129,7 +129,7 @@ class MainActivity : ComponentActivity() {
                                     },
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Outlined.Download,
+                                        painter = painterResource(R.drawable.ic_download),
                                         contentDescription = stringResource(R.string.save_image),
                                     )
                                 }
