@@ -1,8 +1,7 @@
 package com.cascadiacollections.bauhaus.ui
 
-import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -43,19 +43,24 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
@@ -73,6 +78,8 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.LinkedHashMap
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
@@ -168,6 +175,18 @@ internal fun resolvePreviewAspectRatio(metadata: ArtworkMetadata?): Float {
     return if (ratio in MIN_PREVIEW_ASPECT_RATIO..MAX_PREVIEW_ASPECT_RATIO) ratio else FALLBACK_ASPECT_RATIO
 }
 
+/**
+ * Widest the content column is allowed to measure.
+ *
+ * Beyond roughly this, line lengths and button widths stop reading as a
+ * single control surface. Phones never reach it, so the cap only takes
+ * effect on tablets, unfolded foldables, and free-form windows.
+ */
+internal val CONTENT_MAX_WIDTH = 640.dp
+
+/** Upper bound on remembered prefetch keys; see the LRU in [SettingsScreen]. */
+private const val MAX_TRACKED_PREFETCH_KEYS = 64
+
 internal const val MIN_PREVIEW_ASPECT_RATIO = 0.4f
 internal const val MAX_PREVIEW_ASPECT_RATIO = 2.5f
 
@@ -240,26 +259,48 @@ fun SettingsScreen(
     ) {
         Column(
             modifier = Modifier
+                // A single column stretched across a tablet or an unfolded
+                // foldable gives full-width buttons a foot wide and a preview
+                // card with nothing to relate to. Cap the measure and centre it;
+                // phones are unaffected because they never reach the cap.
+                //
+                // widthIn precedes fillMaxSize deliberately: it narrows the
+                // incoming constraint so the fill lands on the cap rather than on
+                // the parent's full width.
+                .align(Alignment.TopCenter)
+                .widthIn(max = CONTENT_MAX_WIDTH)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             // -- Artwork preview --
-            val view = LocalView.current
+            val haptics = LocalHapticFeedback.current
             var artworkCardSize by remember { mutableStateOf(IntSize.Zero) }
+            val saveImageLabel = stringResource(R.string.save_image)
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .onSizeChanged { artworkCardSize = it }
-                    .combinedClickable(
-                        onClick = {},
-                        onLongClick = {
-                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    // Long-press to save, and nothing on tap. The previous
+                    // combinedClickable(onClick = {}) made this a focusable target
+                    // that TalkBack announced as actionable and that did nothing
+                    // when activated. detectTapGestures adds no click semantics,
+                    // so the long-press action is declared explicitly instead.
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onLongPress = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onSaveImage()
+                            },
+                        )
+                    }
+                    .semantics {
+                        onLongClick(label = saveImageLabel) {
                             onSaveImage()
-                        },
-                        onLongClickLabel = stringResource(R.string.save_image),
-                    ),
+                            true
+                        }
+                    },
             ) {
                 val visiblePage = uiState.availableDates.indexOf(uiState.visibleDate).coerceAtLeast(0)
                 val pagerState = rememberPagerState(
@@ -271,19 +312,36 @@ fun SettingsScreen(
                 val context = LocalContext.current
                 val imageLoader = remember(context) { SingletonImageLoader.get(context) }
                 val artworkPreviewSize = remember(artworkCardSize) { previewImageSizePx(artworkCardSize) }
-                val prefetchedNeighborKeys = remember(uiState.imageRevision) { mutableSetOf<String>() }
-                LaunchedEffect(pagerState, uiState.availableDates, uiState.imageRevision, latestDate) {
+                // Bounded, because the archive pages backwards without limit and an
+                // unbounded set would accumulate a key per day the user ever visits.
+                // Access-ordered so the entries evicted are the pages furthest from
+                // wherever they are now.
+                val prefetchedNeighborKeys = remember(uiState.imageRevision) {
+                    object : LinkedHashMap<String, Unit>(16, 0.75f, true) {
+                        override fun removeEldestEntry(
+                            eldest: MutableMap.MutableEntry<String, Unit>,
+                        ): Boolean = size > MAX_TRACKED_PREFETCH_KEYS
+                    }
+                }
+                // Keyed on pagerState alone. Keying on availableDates restarted this
+                // on every archive append, and a fresh snapshotFlow re-emits the
+                // current settledPage — re-firing onArchivePageSelected for the page
+                // already on screen. rememberUpdatedState keeps the body reading
+                // current values without making them restart keys.
+                val currentState by rememberUpdatedState(uiState)
+                val currentOnArchivePageSelected by rememberUpdatedState(onArchivePageSelected)
+                LaunchedEffect(pagerState) {
                     snapshotFlow { pagerState.settledPage }
                         .distinctUntilChanged()
                         .collect { pageIndex ->
-                            onArchivePageSelected(pageIndex)
+                            currentOnArchivePageSelected(pageIndex)
                             neighborPrefetchRequests(
-                                dates = uiState.availableDates,
+                                dates = currentState.availableDates,
                                 settledPage = pageIndex,
-                                latestDate = latestDate,
-                                imageRevision = uiState.imageRevision,
+                                latestDate = currentState.latestDate,
+                                imageRevision = currentState.imageRevision,
                             ).forEach { request ->
-                                if (prefetchedNeighborKeys.add(request.cacheKey)) {
+                                if (prefetchedNeighborKeys.put(request.cacheKey, Unit) == null) {
                                     imageLoader.enqueue(
                                         ImageRequest.Builder(context)
                                             .data("${BauhausApi.BASE_URL}${request.imagePath}")
@@ -315,7 +373,7 @@ fun SettingsScreen(
                     val contentDescription = if (date == latestDate) {
                         stringResource(R.string.todays_artwork)
                     } else {
-                        stringResource(R.string.artwork_for_date, date.toString())
+                        stringResource(R.string.artwork_for_date, rememberDisplayDate(date))
                     }
                     val imageRequest = remember(context, artworkPreviewSize, cacheKey, imagePath) {
                         ImageRequest.Builder(context)
@@ -344,7 +402,7 @@ fun SettingsScreen(
                 }
 
                 Text(
-                    text = stringResource(R.string.viewing_date, uiState.visibleDate.toString()),
+                    text = stringResource(R.string.viewing_date, rememberDisplayDate(uiState.visibleDate)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -398,7 +456,46 @@ fun SettingsScreen(
             }
 
             // -- Metadata (title, creator, date, source, style credit, licence) --
-            uiState.metadata?.let { metadata ->
+            //
+            // The loading and failure branches are not decoration: a page whose
+            // metadata 404s has nothing to put in this slot, and without them the
+            // card simply vanished with no spinner and no explanation. Retry is
+            // pull-to-refresh rather than a button, because refresh() is rate
+            // limited and a button that silently does nothing is worse than none.
+            val loadedMetadata = uiState.metadata
+            if (loadedMetadata == null && (uiState.isMetadataLoading || uiState.metadataLoadFailed)) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (uiState.isMetadataLoading) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                            Text(
+                                text = stringResource(R.string.metadata_loading),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    text = stringResource(R.string.metadata_unavailable),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                                Text(
+                                    text = stringResource(R.string.metadata_pull_to_retry),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            loadedMetadata?.let { metadata ->
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier
@@ -421,7 +518,7 @@ fun SettingsScreen(
                         }
                         if (metadata.date.isNotBlank()) {
                             Text(
-                                text = metadata.date,
+                                text = rememberDisplayDate(metadata.date),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -534,7 +631,7 @@ fun SettingsScreen(
 
             uiState.lastUpdated?.let { date ->
                 Text(
-                    text = stringResource(R.string.last_updated, date),
+                    text = stringResource(R.string.last_updated, rememberDisplayDate(date)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -574,6 +671,44 @@ fun SettingsScreen(
     }
 }
 
+
+/**
+ * Formats [date] the way the reader's locale writes dates.
+ *
+ * The service keys everything by ISO UTC date and that is the correct wire
+ * format, but "2026-08-04" is not how most of the world writes a date. Keyed on
+ * the configuration so a locale change recomposes.
+ */
+@Composable
+internal fun rememberDisplayDate(date: LocalDate): String {
+    val configuration = LocalConfiguration.current
+    return remember(date, configuration) {
+        date.format(
+            DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+                .withLocale(configuration.locales[0]),
+        )
+    }
+}
+
+/**
+ * Same as [rememberDisplayDate] for a value that reaches the UI as a string —
+ * DataStore's `lastUpdated` stamp and the service's own `date` field.
+ *
+ * Falls back to the raw text if it does not parse, because showing the service's
+ * answer verbatim beats showing nothing.
+ */
+@Composable
+internal fun rememberDisplayDate(isoDate: String): String {
+    val configuration = LocalConfiguration.current
+    return remember(isoDate, configuration) {
+        runCatching {
+            LocalDate.parse(isoDate).format(
+                DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+                    .withLocale(configuration.locales[0]),
+            )
+        }.getOrDefault(isoDate)
+    }
+}
 
 private fun localDateToUtcMillis(date: LocalDate): Long = date
     .atStartOfDay(ZoneOffset.UTC)
