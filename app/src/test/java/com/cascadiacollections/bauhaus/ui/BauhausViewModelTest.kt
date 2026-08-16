@@ -284,6 +284,43 @@ class BauhausViewModelTest {
     }
 
     @Test
+    fun `a slow anchor-date fetch does not clobber an already-settled restored page`() {
+        // The restored page's own load can settle before the startup fetch for
+        // anchorDate returns. That startup fetch must not touch isMetadataLoading,
+        // metadataLoadFailed, or metadata for a page other than the one it is for.
+        val today = serviceToday()
+        val restoredDate = today.minusDays(2)
+        val gate = CompletableDeferred<Unit>()
+        val api = FakeBauhausApi().apply {
+            dateMetadata[restoredDate] = ArtworkMetadata(title = "Restored", artist = "Archive")
+            todayMetadataGate = gate
+            todayMetadataError = BauhausHttpException(404, "/api/today.json")
+        }
+        val vm = viewModelWith(
+            SavedStateHandle(
+                mapOf(
+                    "visible_date" to restoredDate.toString(),
+                    "oldest_browsed_date" to restoredDate.toString(),
+                ),
+            ),
+            api,
+        )
+
+        // The restored page's own fetch already completed synchronously.
+        assertEquals("Restored", vm.uiState.value.metadata?.title)
+        assertFalse(vm.uiState.value.isMetadataLoading)
+        assertFalse(vm.uiState.value.metadataLoadFailed)
+
+        // Now let the anchor-date fetch fail. It must not wipe the restored page.
+        gate.complete(Unit)
+
+        assertEquals(restoredDate, vm.uiState.value.visibleDate)
+        assertEquals("Restored", vm.uiState.value.metadata?.title)
+        assertFalse(vm.uiState.value.isMetadataLoading)
+        assertFalse(vm.uiState.value.metadataLoadFailed)
+    }
+
+    @Test
     fun `the favorites filter survives process death`() {
         val vm = viewModelWith(SavedStateHandle(mapOf("show_favorites_only" to true)))
 
