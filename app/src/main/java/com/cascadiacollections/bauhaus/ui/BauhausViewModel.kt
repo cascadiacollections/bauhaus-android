@@ -263,11 +263,23 @@ class BauhausViewModel(
                 // wrong cache key once the service has named the day it served.
                 metadataByDate[anchorDate] = metadata
                 _uiState.update {
-                    it.copy(isMetadataLoading = false, metadataLoadFailed = false)
-                        .showingMetadataFor(anchorDate, metadata)
+                    if (it.visibleDate == anchorDate) {
+                        it.copy(isMetadataLoading = false, metadataLoadFailed = false)
+                            .showingMetadataFor(anchorDate, metadata)
+                    } else {
+                        it.withPreviewRatioFrom(metadata)
+                    }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                _uiState.update { it.copy(metadata = null, isMetadataLoading = false, metadataLoadFailed = true) }
+                _uiState.update {
+                    if (it.visibleDate == anchorDate) {
+                        it.copy(metadata = null, isMetadataLoading = false, metadataLoadFailed = true)
+                    } else {
+                        it
+                    }
+                }
                 reportMetadataFailure(e)
             }
         }
