@@ -76,18 +76,29 @@ object HttpModule {
         }
     }
 
+    @Volatile
+    private var instance: OkHttpClient? = null
+
     /**
      * Returns the shared [OkHttpClient] instance, creating it on first access.
+     *
+     * OkHttp's disk [Cache] requires exactly one live instance per directory, so
+     * this must actually memoize rather than build a fresh client per call — a
+     * second instance over the same `http_cache` directory can corrupt the cache
+     * journal and silently defeat the `Vary: Accept` cache-key sharing described
+     * above.
      *
      * @param context Application context, used to resolve the HTTP cache directory.
      *                Only read on first call; subsequent calls return the cached instance.
      */
-    fun create(context: Context): OkHttpClient =
-        OkHttpClient.Builder()
-            .cache(Cache(File(context.cacheDir, "http_cache"), CACHE_SIZE_BYTES))
+    fun create(context: Context): OkHttpClient = instance ?: synchronized(this) {
+        instance ?: OkHttpClient.Builder()
+            .cache(Cache(File(context.applicationContext.cacheDir, "http_cache"), CACHE_SIZE_BYTES))
             .addInterceptor(formatNegotiationInterceptor)
             .connectTimeout(15.seconds.toJavaDuration())
             .readTimeout(15.seconds.toJavaDuration())
             .writeTimeout(15.seconds.toJavaDuration())
             .build()
+            .also { instance = it }
+    }
 }
