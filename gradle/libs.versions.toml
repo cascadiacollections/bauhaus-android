@@ -1,5 +1,5 @@
 [versions]
-agp = "9.5.0-alpha02"
+agp = "9.5.0-alpha03"
 macrobenchmark = "1.5.0-rc01"
 profileinstaller = "1.4.1"
 uiautomator = "2.4.0"
