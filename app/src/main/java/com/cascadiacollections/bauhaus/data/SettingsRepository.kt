@@ -47,11 +47,17 @@ interface SettingsStore {
  * | `first_run` | Boolean | `true` | Guards the expedited first-launch fetch |
  * | `favorites` | Set&lt;String&gt; (ISO dates) | `emptySet()` | Dates the user has favorited |
  *
- * @param context Application context — the DataStore file lives in the app's
- *                private data directory and is excluded from cloud backup via
- *                `backup_rules.xml`.
+ * @param dataStore Backing preferences store. The production constructor derives
+ *                  it from an application [Context]; the file lives in the app's
+ *                  private data directory and is excluded from cloud backup via
+ *                  `backup_rules.xml`. Tests pass a store over a temporary file so
+ *                  each case starts from an empty set of preferences.
  */
-open class SettingsRepository(private val context: Context) : SettingsStore {
+open class SettingsRepository(
+    private val dataStore: DataStore<Preferences>,
+) : SettingsStore {
+
+    constructor(context: Context) : this(context.dataStore)
 
     private object Keys {
         val WALLPAPER_TARGET = stringPreferencesKey("wallpaper_target")
@@ -63,56 +69,56 @@ open class SettingsRepository(private val context: Context) : SettingsStore {
     }
 
     /** Which screen(s) the wallpaper should be applied to. */
-    override val wallpaperTarget: Flow<WallpaperTarget> = context.dataStore.data.map { prefs ->
+    override val wallpaperTarget: Flow<WallpaperTarget> = dataStore.data.map { prefs ->
         prefs[Keys.WALLPAPER_TARGET]?.let { WallpaperTarget.valueOf(it) } ?: WallpaperTarget.BOTH
     }
 
     /** Whether the daily periodic WorkManager job is enabled. */
-    override val schedulingEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+    override val schedulingEnabled: Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[Keys.SCHEDULING_ENABLED] ?: true
     }
 
     /** ISO-8601 date string of the last successful wallpaper update, or `null`. */
-    override val lastUpdated: Flow<String?> = context.dataStore.data.map { prefs ->
+    override val lastUpdated: Flow<String?> = dataStore.data.map { prefs ->
         prefs[Keys.LAST_UPDATED]
     }
 
     /** Set of ISO-8601 date strings that the user has favorited. */
-    override val favorites: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+    override val favorites: Flow<Set<String>> = dataStore.data.map { prefs ->
         prefs[Keys.FAVORITES] ?: emptySet()
     }
 
     /** `true` on the very first app launch; `false` after the expedited worker runs. */
     override suspend fun isFirstRun(): Boolean =
-        context.dataStore.data.first()[Keys.FIRST_RUN] ?: true
+        dataStore.data.first()[Keys.FIRST_RUN] ?: true
 
     override suspend fun setWallpaperTarget(target: WallpaperTarget) {
-        context.dataStore.edit { it[Keys.WALLPAPER_TARGET] = target.name }
+        dataStore.edit { it[Keys.WALLPAPER_TARGET] = target.name }
     }
 
     override suspend fun setSchedulingEnabled(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.SCHEDULING_ENABLED] = enabled }
+        dataStore.edit { it[Keys.SCHEDULING_ENABLED] = enabled }
     }
 
     override suspend fun setLastUpdated(date: String) {
-        context.dataStore.edit { it[Keys.LAST_UPDATED] = date }
+        dataStore.edit { it[Keys.LAST_UPDATED] = date }
     }
 
     override suspend fun getLastPrefetchedDate(): String? =
-        context.dataStore.data.first()[Keys.LAST_PREFETCHED_DATE]
+        dataStore.data.first()[Keys.LAST_PREFETCHED_DATE]
 
     override suspend fun setLastPrefetchedDate(date: String) {
-        context.dataStore.edit { it[Keys.LAST_PREFETCHED_DATE] = date }
+        dataStore.edit { it[Keys.LAST_PREFETCHED_DATE] = date }
     }
 
     /** Marks first-run as complete so the expedited worker is not re-enqueued. */
     override suspend fun markFirstRunComplete() {
-        context.dataStore.edit { it[Keys.FIRST_RUN] = false }
+        dataStore.edit { it[Keys.FIRST_RUN] = false }
     }
 
     /** Adds the date to favorites if absent; removes it if present. */
     override suspend fun toggleFavorite(date: String) {
-        context.dataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             val current = prefs[Keys.FAVORITES] ?: emptySet()
             prefs[Keys.FAVORITES] = if (date in current) current - date else current + date
         }
