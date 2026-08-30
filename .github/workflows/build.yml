@@ -25,13 +25,13 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up mise
-        uses: jdx/mise-action@v4.3.0
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c  # v4.3.0
         with:
           install: true
           cache: true
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb  # v6
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
@@ -56,7 +56,7 @@ jobs:
 
       - name: Test Report
         if: always()
-        uses: dorny/test-reporter@v3
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2  # v3
         with:
           name: Unit Tests
           path: '**/build/test-results/**/TEST-*.xml'
@@ -134,13 +134,13 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up mise
-        uses: jdx/mise-action@v4.3.0
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c  # v4.3.0
         with:
           install: true
           cache: true
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb  # v6
         with:
           cache-read-only: true
 
@@ -231,7 +231,7 @@ jobs:
         run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
       - name: Update nightly release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64  # v3
         with:
           tag_name: nightly-build
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -264,7 +264,7 @@ jobs:
         continue-on-error: true
 
       - name: Delete Artifacts
-        uses: geekyeggo/delete-artifact@v6
+        uses: geekyeggo/delete-artifact@176a747ab7e287e3ff4787bf8a148716375ca118  # v6
         with:
           name: |
             apks-${{ github.sha }}
@@ -284,7 +284,7 @@ jobs:
 
       - name: Upload to Play Store internal track
         if: ${{ env.PLAY_SERVICE_ACCOUNT_JSON != '' }}
-        uses: r0adkll/upload-google-play@v1
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5  # v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.cascadiacollections.bauhaus
