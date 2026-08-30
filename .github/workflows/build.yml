@@ -119,6 +119,71 @@ jobs:
           path: app/build/outputs/bundle/fossRelease/app-foss-release.aab
           retention-days: 1
 
+  # The full flavor adds Firebase Crashlytics and Analytics and is never
+  # released, so nothing else in this workflow compiles it — its CrashReporter
+  # and Firebase call sites could rot unnoticed until someone built it locally.
+  # This job assembles it purely as a compile check. It is not a dependency of
+  # release: foss is the shipping flavor, and a broken full build should raise a
+  # red check, not hold up a release.
+  full-flavor:
+    name: Full flavor compile check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up mise
+        uses: jdx/mise-action@v4.3.0
+        with:
+          install: true
+          cache: true
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+
+      - name: Install Android SDK platform
+        run: ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platforms;android-37.0"
+
+      # The real google-services.json is gitignored, and the Google Services
+      # plugin refuses to configure without one. None of its values are reached
+      # by a compile, so a syntactically valid placeholder is enough — and it
+      # keeps the Firebase project's identifiers out of the repository.
+      - name: Write placeholder google-services.json
+        run: |
+          cat > app/google-services.json <<'JSON'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "bauhaus-ci-placeholder",
+              "storage_bucket": "bauhaus-ci-placeholder.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+                  "android_client_info": {
+                    "package_name": "com.cascadiacollections.bauhaus"
+                  }
+                },
+                "oauth_client": [],
+                "api_key": [
+                  { "current_key": "AIzaSyAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" }
+                ],
+                "services": {
+                  "appinvite_service": { "other_platform_oauth_client": [] }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          JSON
+
+      - name: Assemble full debug
+        run: ./gradlew assembleFullDebug --no-daemon --parallel --build-cache
+
   check-nightly:
     needs: build
     runs-on: ubuntu-latest
