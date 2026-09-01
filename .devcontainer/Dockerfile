@@ -3,7 +3,7 @@
 # system toolchain under a container that is otherwise reproducible — and it does
 # so at image-rebuild time, so two developers on the same commit can end up on
 # different Debian versions.
-FROM mcr.microsoft.com/devcontainers/java:21-bookworm
+FROM mcr.microsoft.com/devcontainers/java:25-bookworm
 
 # Fail the image build on any failing command in a pipeline. Without this the
 # `yes | sdkmanager --licenses` below reports success even when sdkmanager dies,
