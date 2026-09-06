@@ -1,12 +1,15 @@
 package com.cascadiacollections.bauhaus.worker
 
+import android.Manifest
 import android.app.Application
+import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.work.ListenableWorker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
+import androidx.work.workDataOf
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApiClient
 import com.cascadiacollections.bauhaus.data.ServiceHealth
@@ -21,6 +24,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.junit.runner.RunWith
@@ -79,10 +83,49 @@ class WallpaperWorkerTest {
         assertEquals(ListenableWorker.Result.failure(), result)
     }
 
+    @Test
+    fun `a user-initiated run that gives up notifies`() = runTest {
+        // A tile tap that silently achieves nothing is worse than no tile.
+        shadowOf(RuntimeEnvironment.getApplication())
+            .grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+        val worker = buildWorker(
+            FakeSettings(lastUpdated = "2000-01-01"),
+            FakeApi(shouldThrow = true),
+            runAttemptCount = 3,
+            userInitiated = true,
+        )
+
+        worker.doWork()
+
+        assertEquals(1, postedNotifications().size)
+    }
+
+    @Test
+    fun `the daily schedule gives up silently`() = runTest {
+        // The scheduled job runs forever in the background. It has no standing
+        // to interrupt anyone over a failure they did not ask to watch.
+        val worker = buildWorker(
+            FakeSettings(lastUpdated = "2000-01-01"),
+            FakeApi(shouldThrow = true),
+            runAttemptCount = 3,
+        )
+
+        worker.doWork()
+
+        assertTrue(postedNotifications().isEmpty())
+    }
+
+    private fun postedNotifications() =
+        shadowOf(
+            RuntimeEnvironment.getApplication()
+                .getSystemService(NotificationManager::class.java),
+        ).allNotifications
+
     private fun buildWorker(
         settings: SettingsStore,
         api: BauhausApiClient,
         runAttemptCount: Int = 0,
+        userInitiated: Boolean = false,
     ): WallpaperWorker {
         val dependencies = WallpaperWorker.Dependencies(settings, api)
         val factory = object : WorkerFactory() {
@@ -103,6 +146,7 @@ class WallpaperWorkerTest {
         return TestListenableWorkerBuilder<WallpaperWorker>(testContext)
             .setWorkerFactory(factory)
             .setRunAttemptCount(runAttemptCount)
+            .setInputData(workDataOf(WallpaperWorker.KEY_USER_INITIATED to userInitiated))
             .build()
     }
 

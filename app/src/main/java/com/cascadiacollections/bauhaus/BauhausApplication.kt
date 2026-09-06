@@ -2,11 +2,6 @@ package com.cascadiacollections.bauhaus
 
 import android.app.Application
 import androidx.work.Configuration
-import androidx.work.Constraints
-import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.OutOfQuotaPolicy
-import androidx.work.WorkManager
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
@@ -136,24 +131,19 @@ class BauhausApplication : Application(), AppContainerProvider, SingletonImageLo
     }
 
     /**
-     * On the very first launch, enqueues an expedited one-time worker so the
-     * wallpaper is set immediately instead of waiting for the periodic window.
+     * On the very first launch, requests an immediate wallpaper update so the
+     * wallpaper is set right away instead of waiting for the periodic window.
      *
-     * Uses [OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST] as a fallback
-     * if the system's expedited quota is exhausted.
+     * Goes through [WallpaperScheduler.requestImmediateUpdate], which enqueues
+     * expedited unique work with a non-expedited fallback for when the system's
+     * expedited quota is exhausted.
      */
     private fun enqueueFirstRunIfNeeded() {
         val settings = container.settingsRepository
         appScope.launch {
             if (!settings.isFirstRun()) return@launch
 
-            val expedited = OneTimeWorkRequestBuilder<WallpaperWorker>()
-                .setConstraints(Constraints(requiredNetworkType = NetworkType.CONNECTED))
-                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                .addTag(WallpaperWorker.TAG)
-                .build()
-
-            WorkManager.getInstance(this@BauhausApplication).enqueue(expedited)
+            container.wallpaperScheduler.requestImmediateUpdate()
             settings.markFirstRunComplete()
         }
     }

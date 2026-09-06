@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Per-app language support (API 33+). Declaring the supported locales is what
+    puts "App language" in system settings and lets the app be set to a language
+    other than the device's.
+
+    Only `en` is listed because only `en` exists. This is deliberately not a
+    promise of translations — it is the wiring, so that adding res/values-xx/
+    later is a one-line change here rather than a platform-integration task.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+</locale-config>

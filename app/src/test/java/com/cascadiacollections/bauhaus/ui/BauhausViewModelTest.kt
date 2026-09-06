@@ -880,6 +880,7 @@ class BauhausViewModelTest {
     private class FakeWallpaperScheduler : com.cascadiacollections.bauhaus.WallpaperScheduler {
         var scheduled = false
         var cancelled = false
+        var immediateRequests = 0
 
         override fun scheduleDaily() {
             scheduled = true
@@ -887,6 +888,10 @@ class BauhausViewModelTest {
 
         override fun cancelDaily() {
             cancelled = true
+        }
+
+        override fun requestImmediateUpdate() {
+            immediateRequests++
         }
     }
 

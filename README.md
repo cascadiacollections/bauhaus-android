@@ -15,6 +15,10 @@ sets it as your wallpaper.
 - Browse, favorite, and re-apply any day from the archive
 - Save to gallery or share, with the artwork's source and licence linked
 - Background updates via WorkManager
+- Quick Settings tile for a one-tap update from the notification shade
+- Home-screen widget (Glance) showing the current artwork
+- Launcher shortcuts for "set today's" and "browse the archive"
+- Per-app language support (`localeConfig`)
 - Baseline profile for optimized startup
 
 ## Tech Stack

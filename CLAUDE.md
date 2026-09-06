@@ -55,6 +55,16 @@ the worker. Two things must hold:
 - `/api/<date>*` is `immutable` with a one-year TTL because publishing is
   write-once. Do not add cache-busting query parameters to date-keyed URLs.
 
+## Notifications
+
+Only *user-initiated* runs notify. `WallpaperScheduler.requestImmediateUpdate()`
+sets `WallpaperWorker.KEY_USER_INITIATED` in the work's input data, and the
+worker consults it before posting anything; the daily periodic run leaves it
+unset and stays silent. Progress uses plain notifications rather than
+`setForeground`, deliberately — WorkManager foreground work on API 34+ would
+oblige the app to declare a `dataSync` foreground service type for a few seconds
+of work.
+
 ## Error classification
 
 `BauhausNetworkException` is **not** an `IOException` — it lives in the sealed
@@ -81,6 +91,21 @@ code has deliberate guards worth preserving:
 - The worker skips entirely when today's wallpaper is already set, and gives up
   after 3 attempts.
 - Startup prefetch runs at most once per day.
+- The Quick Settings tile, the launcher shortcuts, and the first-run path do not
+  fetch anything themselves. All go through
+  `WallpaperScheduler.requestImmediateUpdate()`, which enqueues *unique* work
+  under `WallpaperWorker.IMMEDIATE_WORK_NAME` with `ExistingWorkPolicy.KEEP`, so
+  repeated taps collapse into one run and the worker's own "already set today"
+  guard still applies. Any new entry point that wants an immediate update belongs
+  there rather than enqueuing its own request.
+- The home-screen widget never polls and never fetches. `updatePeriodMillis="0"`
+  in `bauhaus_widget_info.xml`, and `provideGlance` only *reads*
+  `WidgetImageStore`. A launcher calls `provideGlance` on add, resize, reboot,
+  and process recycle — none of which mean new content — so a fetching widget
+  would trickle requests forever for a user who never opens the app. The store
+  is written by the two paths that already hold a fetched bitmap (the worker and
+  `setWallpaperNow()`), which then call `BauhausAppWidget.refresh()`. The cost is
+  a placeholder until the first successful update; keep it that way.
 - Archive existence is probed with a body-less `HEAD` on `/api/<date>.json`, and a
   date that exists implies every later date exists (publishing is contiguous and
   write-once), so extending the pager costs one request, not one per day.
@@ -92,7 +117,8 @@ Instrumented Compose tests under `app/src/androidTest/` are **not run by CI**.
 
 `BauhausApiClient` fakes live in the test files themselves — adding a method to
 that interface means updating the fakes in `BauhausViewModelTest` and
-`WallpaperWorkerTest`.
+`WallpaperWorkerTest`. `WallpaperScheduler` is faked the same way in
+`BauhausViewModelTest`.
 
 Avoid unit tests that reach `WallpaperManager.setBitmap`; the Robolectric shadow's
 support for combined `FLAG_SYSTEM or FLAG_LOCK` is not something to rely on.
