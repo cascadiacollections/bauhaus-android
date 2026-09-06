@@ -30,6 +30,7 @@ import com.cascadiacollections.bauhaus.data.isConnectivityFailure
 import com.cascadiacollections.bauhaus.data.serviceToday
 import com.cascadiacollections.bauhaus.data.wallpaperTargetSize
 import com.cascadiacollections.bauhaus.widget.BauhausAppWidget
+import com.cascadiacollections.bauhaus.widget.WidgetImageStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
@@ -636,6 +637,9 @@ class BauhausViewModel(
                         settings.setLastUpdated(visibleDate.toString())
                         // The widget shows the newest artwork, so only a set of
                         // the newest date can have changed what it displays.
+                        // Written from the bitmap already in hand — the widget
+                        // never fetches for itself.
+                        WidgetImageStore.write(getApplication(), bitmap)
                         BauhausAppWidget.refresh(getApplication())
                     }
                     _uiState.update { it.copy(isSettingWallpaper = false) }

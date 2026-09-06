@@ -98,10 +98,14 @@ code has deliberate guards worth preserving:
   repeated taps collapse into one run and the worker's own "already set today"
   guard still applies. Any new entry point that wants an immediate update belongs
   there rather than enqueuing its own request.
-- The home-screen widget never polls: `updatePeriodMillis="0"` in
-  `bauhaus_widget_info.xml`. It is refreshed by the code that changes what it
-  shows — the worker and `setWallpaperNow()`, both via
-  `BauhausAppWidget.refresh()`.
+- The home-screen widget never polls and never fetches. `updatePeriodMillis="0"`
+  in `bauhaus_widget_info.xml`, and `provideGlance` only *reads*
+  `WidgetImageStore`. A launcher calls `provideGlance` on add, resize, reboot,
+  and process recycle — none of which mean new content — so a fetching widget
+  would trickle requests forever for a user who never opens the app. The store
+  is written by the two paths that already hold a fetched bitmap (the worker and
+  `setWallpaperNow()`), which then call `BauhausAppWidget.refresh()`. The cost is
+  a placeholder until the first successful update; keep it that way.
 - Archive existence is probed with a body-less `HEAD` on `/api/<date>.json`, and a
   date that exists implies every later date exists (publishing is contiguous and
   write-once), so extending the pager costs one request, not one per day.

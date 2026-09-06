@@ -22,44 +22,36 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.padding
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import com.cascadiacollections.bauhaus.AppContainerProvider
 import com.cascadiacollections.bauhaus.AppLogger
 import com.cascadiacollections.bauhaus.MainActivity
 import com.cascadiacollections.bauhaus.R
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.math.roundToInt
 
 /**
  * Home-screen widget showing the current artwork.
  *
  * ## Cost
  *
- * The widget shares the app's single [OkHttpClient][okhttp3.OkHttpClient] and
- * its disk cache, so a refresh that follows an app launch, a worker run, or a
- * previous widget update is answered locally. `/api/today` carries `max-age=300`
- * and an `ETag`, so even a cold refresh is at worst one conditional request that
- * usually ends in a `304`.
+ * The widget performs **no** network I/O of its own. It draws whatever
+ * [WidgetImageStore] holds, which is written by the two paths that already
+ * fetched a bitmap for their own reasons — the daily worker and the in-app
+ * "Set Now". See [WidgetImageStore] for why it is a reader rather than a
+ * fetcher; the short version is that a launcher calls `provideGlance` for
+ * reasons unrelated to new content (add, resize, reboot, process recycle), and
+ * none of those should reach a service the maintainer pays per request for.
  *
  * Periodic self-refresh is switched **off** in `bauhaus_widget_info.xml`
- * (`updatePeriodMillis="0"`). Nothing about this content changes more than once
- * a day, and the one moment it does change is already known: the worker calls
- * [updateAll] after it sets a new wallpaper. Letting the launcher poll every
- * 30 minutes forever would be a standing cost for no new information.
+ * (`updatePeriodMillis="0"`) for the same reason. Nothing here changes more than
+ * once a day, and the one moment it does change is already known: the writers
+ * call [refresh] straight after storing a new image.
  *
- * ## Sizing
- *
- * [SizeMode.Exact] plus the decode bounds below mean the bitmap is downsampled
- * to roughly the cells it occupies. A widget bitmap crossing the process
- * boundary has a hard size limit, and a full-resolution wallpaper would blow
- * straight through it.
+ * The widget shows a placeholder until the first successful wallpaper update
+ * fills the store. That is deliberate — see [WidgetImageStore].
  */
 class BauhausAppWidget : GlanceAppWidget() {
 
     companion object {
         private const val TAG = "BauhausAppWidget"
-
-        /** Density-independent upper bound on the decoded bitmap's longest edge. */
-        private const val MAX_EDGE_DP = 480
 
         /** Refreshes every placed widget. Safe to call when none are placed. */
         suspend fun refresh(context: Context) {
@@ -78,24 +70,7 @@ class BauhausAppWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val api = (context.applicationContext as AppContainerProvider).container.bauhausApi
-        val density = context.resources.displayMetrics.density
-        val maxEdgePx = (MAX_EDGE_DP * density).roundToInt()
-
-        val bitmap = try {
-            api.fetchTodayImage(maxWidth = maxEdgePx, maxHeight = maxEdgePx)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            // A widget that cannot reach the service is not an error worth
-            // reporting — it is a phone in a lift. Show the placeholder.
-            AppLogger.warn(
-                TAG,
-                AppLogger.Event("widget_image_failure"),
-                "Could not load artwork for widget: ${e.message}",
-            )
-            null
-        }
+        val bitmap = WidgetImageStore.read(context)
 
         provideContent {
             GlanceTheme {
@@ -116,7 +91,7 @@ class BauhausAppWidget : GlanceAppWidget() {
                         )
                     } else {
                         Text(
-                            text = context.getString(R.string.widget_unavailable),
+                            text = context.getString(R.string.widget_awaiting_artwork),
                             style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant),
                             modifier = GlanceModifier.padding(12.dp),
                         )

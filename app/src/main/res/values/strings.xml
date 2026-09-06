@@ -56,5 +56,5 @@
     <string name="shortcut_update_requested">Updating wallpaper…</string>
     <string name="widget_label">Daily Bauhaus</string>
     <string name="widget_description">Today\'s bauhaus artwork on your home screen</string>
-    <string name="widget_unavailable">Artwork unavailable</string>
+    <string name="widget_awaiting_artwork">Artwork appears after the next update</string>
 </resources>

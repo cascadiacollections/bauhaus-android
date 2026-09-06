@@ -12,6 +12,7 @@ import com.cascadiacollections.bauhaus.data.serviceToday
 import com.cascadiacollections.bauhaus.data.wallpaperTargetSize
 import com.cascadiacollections.bauhaus.notification.WallpaperNotifier
 import com.cascadiacollections.bauhaus.widget.BauhausAppWidget
+import com.cascadiacollections.bauhaus.widget.WidgetImageStore
 import kotlinx.coroutines.flow.first
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -134,6 +135,9 @@ class WallpaperWorker(
                     "Wallpaper set for target: ${target.name}",
                 )
                 if (userInitiated) WallpaperNotifier.clear(applicationContext)
+                // Feeds the widget from the bitmap already in hand. The widget
+                // never fetches for itself, so this is its only source.
+                WidgetImageStore.write(applicationContext, bitmap)
                 BauhausAppWidget.refresh(applicationContext)
                 Result.success()
             } finally {
