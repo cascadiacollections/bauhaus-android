@@ -55,6 +55,16 @@ the worker. Two things must hold:
 - `/api/<date>*` is `immutable` with a one-year TTL because publishing is
   write-once. Do not add cache-busting query parameters to date-keyed URLs.
 
+## Notifications
+
+Only *user-initiated* runs notify. `WallpaperScheduler.requestImmediateUpdate()`
+sets `WallpaperWorker.KEY_USER_INITIATED` in the work's input data, and the
+worker consults it before posting anything; the daily periodic run leaves it
+unset and stays silent. Progress uses plain notifications rather than
+`setForeground`, deliberately — WorkManager foreground work on API 34+ would
+oblige the app to declare a `dataSync` foreground service type for a few seconds
+of work.
+
 ## Error classification
 
 `BauhausNetworkException` is **not** an `IOException` — it lives in the sealed
@@ -81,12 +91,17 @@ code has deliberate guards worth preserving:
 - The worker skips entirely when today's wallpaper is already set, and gives up
   after 3 attempts.
 - Startup prefetch runs at most once per day.
-- The Quick Settings tile and the first-run path do not fetch anything
-  themselves. Both go through `WallpaperScheduler.requestImmediateUpdate()`,
-  which enqueues *unique* work under `WallpaperWorker.IMMEDIATE_WORK_NAME` with
-  `ExistingWorkPolicy.KEEP`, so repeated taps collapse into one run and the
-  worker's own "already set today" guard still applies. Any new entry point that
-  wants an immediate update belongs there rather than enqueuing its own request.
+- The Quick Settings tile, the launcher shortcuts, and the first-run path do not
+  fetch anything themselves. All go through
+  `WallpaperScheduler.requestImmediateUpdate()`, which enqueues *unique* work
+  under `WallpaperWorker.IMMEDIATE_WORK_NAME` with `ExistingWorkPolicy.KEEP`, so
+  repeated taps collapse into one run and the worker's own "already set today"
+  guard still applies. Any new entry point that wants an immediate update belongs
+  there rather than enqueuing its own request.
+- The home-screen widget never polls: `updatePeriodMillis="0"` in
+  `bauhaus_widget_info.xml`. It is refreshed by the code that changes what it
+  shows — the worker and `setWallpaperNow()`, both via
+  `BauhausAppWidget.refresh()`.
 - Archive existence is probed with a body-less `HEAD` on `/api/<date>.json`, and a
   date that exists implies every later date exists (publishing is contiguous and
   write-once), so extending the pager costs one request, not one per day.

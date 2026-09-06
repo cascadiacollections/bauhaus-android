@@ -44,4 +44,17 @@
     <string name="tile_added">Tile added to Quick Settings</string>
     <string name="tile_already_added">Tile is already in Quick Settings</string>
     <string name="tile_not_added">Tile was not added</string>
+    <string name="notification_channel_updates">Wallpaper updates</string>
+    <string name="notification_channel_updates_description">Progress for updates you start yourself</string>
+    <string name="notification_updating_title">Updating wallpaper…</string>
+    <string name="notification_failed_title">Couldn\'t update wallpaper</string>
+    <string name="notification_failed_text">Check your connection and try again</string>
+    <string name="shortcut_set_wallpaper_short">Set today\'s</string>
+    <string name="shortcut_set_wallpaper_long">Set today\'s wallpaper</string>
+    <string name="shortcut_browse_archive_short">Archive</string>
+    <string name="shortcut_browse_archive_long">Browse the archive</string>
+    <string name="shortcut_update_requested">Updating wallpaper…</string>
+    <string name="widget_label">Daily Bauhaus</string>
+    <string name="widget_description">Today\'s bauhaus artwork on your home screen</string>
+    <string name="widget_unavailable">Artwork unavailable</string>
 </resources>

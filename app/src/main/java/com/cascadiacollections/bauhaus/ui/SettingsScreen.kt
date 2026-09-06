@@ -214,13 +214,24 @@ fun SettingsScreen(
     onAddQuickSettingsTile: () -> Unit = {},
     onArchivePageSelected: (Int) -> Unit,
     onRefresh: () -> Unit,
+    showDatePicker: Boolean = false,
+    onDatePickerVisibilityChange: (Boolean) -> Unit = {},
 ) {
-    var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    // Hoisted so a launcher shortcut can open the picker directly, but still
+    // owned here for the ordinary in-app path, which no caller needs to know
+    // about. The two are OR-ed rather than merged into one source of truth
+    // because a caller-driven "open" must not survive the user dismissing it.
+    var showLocalDatePicker by rememberSaveable { mutableStateOf(false) }
+    val datePickerVisible = showDatePicker || showLocalDatePicker
+    val dismissDatePicker = {
+        showLocalDatePicker = false
+        onDatePickerVisibilityChange(false)
+    }
     // Bound the picker by the newest date the service has published rather than
     // by the device clock, which can name a day the archive does not have.
     val newestDate = uiState.latestDate
     val newestUtcMillis = remember(newestDate) { localDateToUtcMillis(newestDate) }
-    if (showDatePicker) {
+    if (datePickerVisible) {
         val datePickerState = androidx.compose.material3.rememberDatePickerState(
             initialSelectedDateMillis = localDateToUtcMillis(uiState.visibleDate),
             selectableDates = remember(newestUtcMillis, newestDate.year) {
@@ -231,21 +242,21 @@ fun SettingsScreen(
             },
         )
         DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
+            onDismissRequest = dismissDatePicker,
             confirmButton = {
                 TextButton(
                     onClick = {
                         datePickerState.selectedDateMillis?.let {
                             onJumpToDate(utcMillisToLocalDate(it))
                         }
-                        showDatePicker = false
+                        dismissDatePicker()
                     },
                 ) {
                     Text(stringResource(android.R.string.ok))
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
+                TextButton(onClick = dismissDatePicker) {
                     Text(stringResource(android.R.string.cancel))
                 }
             },
@@ -411,7 +422,7 @@ fun SettingsScreen(
                 )
             }
             Button(
-                onClick = { showDatePicker = true },
+                onClick = { showLocalDatePicker = true },
                 modifier = Modifier
                     .fillMaxWidth()
                     .semantics { testTag = SettingsScreenTestTags.JUMP_TO_DATE_BUTTON },

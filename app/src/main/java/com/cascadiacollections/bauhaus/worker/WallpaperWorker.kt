@@ -10,6 +10,8 @@ import com.cascadiacollections.bauhaus.data.SettingsStore
 import com.cascadiacollections.bauhaus.data.isConnectivityFailure
 import com.cascadiacollections.bauhaus.data.serviceToday
 import com.cascadiacollections.bauhaus.data.wallpaperTargetSize
+import com.cascadiacollections.bauhaus.notification.WallpaperNotifier
+import com.cascadiacollections.bauhaus.widget.BauhausAppWidget
 import kotlinx.coroutines.flow.first
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -59,6 +61,12 @@ class WallpaperWorker(
          * never replaces or cancels the periodic schedule.
          */
         const val IMMEDIATE_WORK_NAME = "immediate_wallpaper"
+
+        /**
+         * Input-data flag marking a run the user asked for right now, as opposed
+         * to the daily schedule. Only these runs notify.
+         */
+        const val KEY_USER_INITIATED = "user_initiated"
         private const val MAX_RETRIES = 3
     }
 
@@ -68,12 +76,17 @@ class WallpaperWorker(
     )
 
     override suspend fun doWork(): Result {
+        // Only a run the user just asked for gets to interrupt them with a
+        // notification. The daily schedule stays silent.
+        val userInitiated = inputData.getBoolean(KEY_USER_INITIATED, false)
+
         if (runAttemptCount >= MAX_RETRIES) {
             AppLogger.warn(
                 TAG,
                 AppLogger.Event("worker_give_up", mapOf("attempt" to "$runAttemptCount")),
                 "Giving up after $MAX_RETRIES attempts to avoid excessive CDN requests",
             )
+            if (userInitiated) WallpaperNotifier.showFailed(applicationContext)
             return Result.failure()
         }
 
@@ -99,6 +112,10 @@ class WallpaperWorker(
 
         val api = dependencies.api
 
+        // Posted before the fetch, not after: the whole point is to show that
+        // something is happening during the slow part.
+        if (userInitiated) WallpaperNotifier.showUpdating(applicationContext)
+
         return try {
             val targetSize = wallpaperTargetSize(applicationContext)
             val bitmap = api.fetchTodayImage(
@@ -116,6 +133,8 @@ class WallpaperWorker(
                     AppLogger.Event("worker_set_success", mapOf("target" to target.name)),
                     "Wallpaper set for target: ${target.name}",
                 )
+                if (userInitiated) WallpaperNotifier.clear(applicationContext)
+                BauhausAppWidget.refresh(applicationContext)
                 Result.success()
             } finally {
                 bitmap.recycle()
@@ -123,6 +142,7 @@ class WallpaperWorker(
         } catch (e: CancellationException) {
             // WorkManager stopped us. Not a failure, and reporting it as one would
             // both retry pointlessly and file a non-bug with the crash reporter.
+            if (userInitiated) WallpaperNotifier.clear(applicationContext)
             throw e
         } catch (e: Exception) {
             val event = AppLogger.Event(

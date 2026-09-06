@@ -9,6 +9,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.cascadiacollections.bauhaus.worker.WallpaperWorker
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.toJavaDuration
@@ -57,6 +58,7 @@ class WorkManagerWallpaperScheduler(
         val workRequest = OneTimeWorkRequestBuilder<WallpaperWorker>()
             .setConstraints(Constraints(requiredNetworkType = NetworkType.CONNECTED))
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .setInputData(workDataOf(WallpaperWorker.KEY_USER_INITIATED to true))
             .addTag(WallpaperWorker.TAG)
             .build()
 
