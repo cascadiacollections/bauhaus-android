@@ -35,4 +35,13 @@
     <string name="wallpaper_target_home">Home</string>
     <string name="wallpaper_target_lock">Lock</string>
     <string name="wallpaper_target_both">Both</string>
+    <string name="tile_label">Daily Bauhaus</string>
+    <string name="tile_subtitle_up_to_date">Up to date</string>
+    <string name="tile_subtitle_tap_to_update">Tap to update</string>
+    <string name="tile_subtitle_updating">Updating…</string>
+    <string name="tile_content_description">Daily Bauhaus wallpaper, %1$s</string>
+    <string name="add_tile">Add Quick Settings tile</string>
+    <string name="tile_added">Tile added to Quick Settings</string>
+    <string name="tile_already_added">Tile is already in Quick Settings</string>
+    <string name="tile_not_added">Tile was not added</string>
 </resources>

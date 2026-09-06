@@ -52,6 +52,13 @@ class WallpaperWorker(
     companion object {
         const val TAG = "WallpaperWorker"
         const val WORK_NAME = "daily_wallpaper"
+
+        /**
+         * Unique name for user-initiated one-shot runs (Quick Settings tile,
+         * first launch). Kept distinct from [WORK_NAME] so an immediate run
+         * never replaces or cancels the periodic schedule.
+         */
+        const val IMMEDIATE_WORK_NAME = "immediate_wallpaper"
         private const val MAX_RETRIES = 3
     }
 

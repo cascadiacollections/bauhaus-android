@@ -95,6 +95,7 @@ object SettingsScreenTestTags {
     const val DAILY_UPDATES_SWITCH = "daily_updates_switch"
     const val SET_NOW_BUTTON = "set_now_button"
     const val SAVE_IMAGE_BUTTON = "save_image_button"
+    const val ADD_TILE_BUTTON = "add_tile_button"
     const val SHARE_ICON = "share_icon"
     const val DOWNLOAD_ICON = "download_icon"
     const val JUMP_TO_DATE_BUTTON = "jump_to_date_button"
@@ -210,6 +211,7 @@ fun SettingsScreen(
     onFavoriteToggle: () -> Unit = {},
     onFavoritesFilterToggle: () -> Unit = {},
     onOpenUrl: (String) -> Unit = {},
+    onAddQuickSettingsTile: () -> Unit = {},
     onArchivePageSelected: (Int) -> Unit,
     onRefresh: () -> Unit,
 ) {
@@ -666,6 +668,22 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                 }
                 Text(stringResource(R.string.save_image))
+            }
+
+            // -- Quick Settings tile --
+            //
+            // requestAddTileService (API 33+) is the only way to put the tile in
+            // front of a user who would never go looking in the QS edit screen.
+            // The system rate-limits and de-duplicates the prompt itself, so the
+            // button stays visible rather than trying to guess whether the tile
+            // is already placed — there is no API to ask.
+            TextButton(
+                onClick = onAddQuickSettingsTile,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { testTag = SettingsScreenTestTags.ADD_TILE_BUTTON },
+            ) {
+                Text(stringResource(R.string.add_tile))
             }
         }
     }

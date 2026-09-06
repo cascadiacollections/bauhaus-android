@@ -1,7 +1,10 @@
 package com.cascadiacollections.bauhaus
 
+import android.app.StatusBarManager
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -38,6 +41,7 @@ import com.cascadiacollections.bauhaus.ui.BauhausViewModel
 import com.cascadiacollections.bauhaus.ui.SettingsScreen
 import com.cascadiacollections.bauhaus.ui.SettingsScreenTestTags
 import com.cascadiacollections.bauhaus.ui.theme.BauhausTheme
+import com.cascadiacollections.bauhaus.tile.WallpaperTileService
 import kotlinx.coroutines.launch
 
 /**
@@ -161,10 +165,69 @@ class MainActivity : ComponentActivity() {
                         },
                         onArchivePageSelected = viewModel::onArchivePageSelected,
                         onRefresh = viewModel::refresh,
+                        onAddQuickSettingsTile = {
+                            requestAddQuickSettingsTile { messageRes ->
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = getString(messageRes),
+                                        duration = SnackbarDuration.Short,
+                                    )
+                                }
+                            }
+                        },
                         modifier = Modifier.padding(innerPadding),
                     )
                 }
             }
         }
+    }
+
+    /**
+     * Asks the system to offer the Quick Settings tile for placement (API 33+).
+     *
+     * There is no API to query whether a tile is already placed, so this is
+     * always offered; the platform answers with `TILE_ALREADY_ADDED` in that
+     * case and shows no dialog. A dismissed dialog is silent — the user
+     * declining does not need a message about it.
+     *
+     * @param onResult Invoked with the string resource to surface, if any.
+     */
+    private fun requestAddQuickSettingsTile(onResult: (Int) -> Unit) {
+        val statusBarManager = getSystemService(StatusBarManager::class.java)
+        if (statusBarManager == null) {
+            onResult(R.string.tile_not_added)
+            return
+        }
+        val request = runCatching {
+            statusBarManager.requestAddTileService(
+                ComponentName(this, WallpaperTileService::class.java),
+                getString(R.string.tile_label),
+                Icon.createWithResource(this, R.drawable.ic_tile_bauhaus),
+                mainExecutor,
+            ) { result ->
+                when (result) {
+                    StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED ->
+                        onResult(R.string.tile_added)
+                    StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED ->
+                        onResult(R.string.tile_already_added)
+                    // The user declining the dialog needs no confirmation of
+                    // their own choice; only genuine errors are worth a message.
+                    StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_NOT_ADDED -> Unit
+                    else -> onResult(R.string.tile_not_added)
+                }
+            }
+        }
+        request.exceptionOrNull()?.let { e ->
+            AppLogger.warn(
+                TAG,
+                AppLogger.Event("tile_add_request_failure"),
+                "Could not request tile placement: ${e.message}",
+            )
+            onResult(R.string.tile_not_added)
+        }
+    }
+
+    private companion object {
+        const val TAG = "MainActivity"
     }
 }

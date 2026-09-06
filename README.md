@@ -15,6 +15,7 @@ sets it as your wallpaper.
 - Browse, favorite, and re-apply any day from the archive
 - Save to gallery or share, with the artwork's source and licence linked
 - Background updates via WorkManager
+- Quick Settings tile for a one-tap update from the notification shade
 - Baseline profile for optimized startup
 
 ## Tech Stack

@@ -81,6 +81,12 @@ code has deliberate guards worth preserving:
 - The worker skips entirely when today's wallpaper is already set, and gives up
   after 3 attempts.
 - Startup prefetch runs at most once per day.
+- The Quick Settings tile and the first-run path do not fetch anything
+  themselves. Both go through `WallpaperScheduler.requestImmediateUpdate()`,
+  which enqueues *unique* work under `WallpaperWorker.IMMEDIATE_WORK_NAME` with
+  `ExistingWorkPolicy.KEEP`, so repeated taps collapse into one run and the
+  worker's own "already set today" guard still applies. Any new entry point that
+  wants an immediate update belongs there rather than enqueuing its own request.
 - Archive existence is probed with a body-less `HEAD` on `/api/<date>.json`, and a
   date that exists implies every later date exists (publishing is contiguous and
   write-once), so extending the pager costs one request, not one per day.
@@ -92,7 +98,8 @@ Instrumented Compose tests under `app/src/androidTest/` are **not run by CI**.
 
 `BauhausApiClient` fakes live in the test files themselves — adding a method to
 that interface means updating the fakes in `BauhausViewModelTest` and
-`WallpaperWorkerTest`.
+`WallpaperWorkerTest`. `WallpaperScheduler` is faked the same way in
+`BauhausViewModelTest`.
 
 Avoid unit tests that reach `WallpaperManager.setBitmap`; the Robolectric shadow's
 support for combined `FLAG_SYSTEM or FLAG_LOCK` is not something to rely on.

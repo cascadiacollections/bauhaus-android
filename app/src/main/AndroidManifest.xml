@@ -34,6 +34,26 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            Quick Settings tile. Only the system may bind it, which is what
+            BIND_QUICK_SETTINGS_TILE enforces; exported="true" is required for
+            SystemUI to reach it at all.
+
+            No TOGGLEABLE_TILE meta-data: this tile performs an action rather
+            than flipping a persistent setting, so it must not be offered as a
+            one-tap toggle in the "active tile" sense.
+        -->
+        <service
+            android:name=".tile.WallpaperTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_bauhaus"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>
