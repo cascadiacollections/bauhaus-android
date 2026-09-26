@@ -23,7 +23,14 @@ android {
     experimentalProperties["android.experimental.self-instrumenting"] = true
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+    }
+}
+
 dependencies {
+    implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.junit)
     implementation(libs.androidx.test.runner)
     implementation(libs.benchmark.macro.junit4)

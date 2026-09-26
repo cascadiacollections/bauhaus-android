@@ -140,6 +140,9 @@ android {
 
 kotlin {
     jvmToolchain(21)
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+    }
 }
 
 // Strip Kotlin's generated null checks from shipping builds only.
