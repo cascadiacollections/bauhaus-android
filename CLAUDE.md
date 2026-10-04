@@ -78,7 +78,7 @@ Coil keeps its own disk cache on top of OkHttp's. Coil 3's default
 `CacheStrategy` serves a disk-cache hit **forever**, ignoring `Cache-Control`,
 and it caches 404s too. So a Coil cache key must only ever name an immutable
 URL. The preview loads every confirmed day, the newest included, from
-`/api/<date>` under the key `<date>-<revision>`. `/api/today` is loaded only
+`/api/<date>` under the key `/api/<date>#<revision>`. `/api/today` is loaded only
 while the newest date is unconfirmed, with Coil's disk cache disabled
 (`archiveImageRequest` in `SettingsScreen.kt`).
 

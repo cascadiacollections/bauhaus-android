@@ -125,7 +125,7 @@ internal data class ArchiveImageRequest(val imagePath: String, val cacheKey: Str
  * idea of today — see [UiState.latestDate].
  *
  * Every day the service has confirmed loads from its own `/api/<date>` URL, which
- * is immutable, so the cache key `<date>-<revision>` always names the same bytes.
+ * is immutable, so the cache key `/api/<date>#<revision>` always names the same bytes.
  * The newest page used to load `/api/today` under that key, and `/api/today`
  * is whatever day the service is on *now* — before the day's publish, yesterday's
  * artwork. Coil kept it under today's key for good, so the day's real artwork
@@ -142,10 +142,12 @@ internal fun archiveImageRequest(
     latestDateStatus: LatestDateStatus,
     imageRevision: Int
 ): ArchiveImageRequest? = when {
-    date != latestDate || latestDateStatus == LatestDateStatus.CONFIRMED -> ArchiveImageRequest(
-        imagePath = BauhausApi.imagePath(date),
-        cacheKey = "${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}-$imageRevision"
-    )
+    date != latestDate || latestDateStatus == LatestDateStatus.CONFIRMED -> BauhausApi.imagePath(date).let { path ->
+        // Keyed by the URL itself. The old `<date>-<revision>` keys are never read
+        // again: entries written under them by earlier builds may hold the wrong
+        // day's image, and Coil would serve those forever.
+        ArchiveImageRequest(imagePath = path, cacheKey = "$path#$imageRevision")
+    }
 
     latestDateStatus == LatestDateStatus.RESOLVING -> null
 

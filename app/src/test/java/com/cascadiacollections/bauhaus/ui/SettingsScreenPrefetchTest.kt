@@ -28,8 +28,8 @@ class SettingsScreenPrefetchTest {
         )
 
         assertThat(requests).containsExactly(
-            ArchiveImageRequest("/api/2026-05-10", "2026-05-10-3"),
-            ArchiveImageRequest("/api/2026-05-08", "2026-05-08-3")
+            ArchiveImageRequest("/api/2026-05-10", "/api/2026-05-10#3"),
+            ArchiveImageRequest("/api/2026-05-08", "/api/2026-05-08#3")
         )
     }
 
@@ -45,7 +45,7 @@ class SettingsScreenPrefetchTest {
             imageRevision = 0
         )
 
-        assertThat(requests).containsExactly(ArchiveImageRequest("/api/2026-05-08", "2026-05-08-0"))
+        assertThat(requests).containsExactly(ArchiveImageRequest("/api/2026-05-08", "/api/2026-05-08#0"))
     }
 
     @Test
@@ -54,7 +54,7 @@ class SettingsScreenPrefetchTest {
         // on at the time — before the publish, yesterday's — under today's key.
         val request = archiveImageRequest(today, today, LatestDateStatus.CONFIRMED, imageRevision = 2)
 
-        assertThat(request).isEqualTo(ArchiveImageRequest("/api/2026-05-10", "2026-05-10-2"))
+        assertThat(request).isEqualTo(ArchiveImageRequest("/api/2026-05-10", "/api/2026-05-10#2"))
     }
 
     @Test
@@ -70,7 +70,7 @@ class SettingsScreenPrefetchTest {
 
         LatestDateStatus.entries.forEach { status ->
             assertThat(archiveImageRequest(older, today, status, imageRevision = 0), name = "$status")
-                .isEqualTo(ArchiveImageRequest("/api/2026-05-09", "2026-05-09-0"))
+                .isEqualTo(ArchiveImageRequest("/api/2026-05-09", "/api/2026-05-09#0"))
         }
     }
 
@@ -86,7 +86,7 @@ class SettingsScreenPrefetchTest {
             imageRevision = 1
         )
 
-        assertThat(requests).containsExactly(ArchiveImageRequest("/api/2026-05-09", "2026-05-09-1"))
+        assertThat(requests).containsExactly(ArchiveImageRequest("/api/2026-05-09", "/api/2026-05-09#1"))
     }
 
     @Test
