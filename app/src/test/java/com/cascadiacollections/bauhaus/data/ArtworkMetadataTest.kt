@@ -1,11 +1,16 @@
 package com.cascadiacollections.bauhaus.data
 
+import assertk.assertThat
+import assertk.assertions.hasSize
+import assertk.assertions.isCloseTo
+import assertk.assertions.isEmpty
+import assertk.assertions.isEqualTo
+import assertk.assertions.isFalse
+import assertk.assertions.isNotNull
+import assertk.assertions.isNull
+import assertk.assertions.isTrue
 import java.time.LocalDate
 import kotlinx.serialization.json.Json
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ArtworkMetadataTest {
@@ -26,11 +31,11 @@ class ArtworkMetadataTest {
 
         val metadata = json.decodeFromString<ArtworkMetadata>(input)
 
-        assertEquals("Sunset over Fuji", metadata.title)
-        assertEquals("Hokusai", metadata.artist)
-        assertEquals("Metropolitan Museum of Art", metadata.source)
-        assertEquals("CC0", metadata.license)
-        assertEquals("2026-03-22", metadata.date)
+        assertThat(metadata.title).isEqualTo("Sunset over Fuji")
+        assertThat(metadata.artist).isEqualTo("Hokusai")
+        assertThat(metadata.source).isEqualTo("Metropolitan Museum of Art")
+        assertThat(metadata.license).isEqualTo("CC0")
+        assertThat(metadata.date).isEqualTo("2026-03-22")
     }
 
     @Test
@@ -39,11 +44,11 @@ class ArtworkMetadataTest {
 
         val metadata = json.decodeFromString<ArtworkMetadata>(input)
 
-        assertEquals("Minimal", metadata.title)
-        assertEquals("", metadata.artist)
-        assertEquals("", metadata.source)
-        assertEquals("", metadata.license)
-        assertEquals("", metadata.date)
+        assertThat(metadata.title).isEqualTo("Minimal")
+        assertThat(metadata.artist).isEqualTo("")
+        assertThat(metadata.source).isEqualTo("")
+        assertThat(metadata.license).isEqualTo("")
+        assertThat(metadata.date).isEqualTo("")
     }
 
     @Test
@@ -58,22 +63,22 @@ class ArtworkMetadataTest {
 
         val metadata = json.decodeFromString<ArtworkMetadata>(input)
 
-        assertEquals("Test", metadata.title)
+        assertThat(metadata.title).isEqualTo("Test")
     }
 
     @Test
     fun `empty object deserializes with all defaults`() {
         val metadata = json.decodeFromString<ArtworkMetadata>("{}")
 
-        assertEquals("", metadata.title)
-        assertEquals("", metadata.artist)
-        assertEquals("", metadata.source)
-        assertEquals("", metadata.license)
-        assertEquals("", metadata.date)
-        assertNull(metadata.publishedDate)
-        assertNull(metadata.aspectRatio)
-        assertNull(metadata.licenseDetails)
-        assertTrue(metadata.variants.isEmpty())
+        assertThat(metadata.title).isEqualTo("")
+        assertThat(metadata.artist).isEqualTo("")
+        assertThat(metadata.source).isEqualTo("")
+        assertThat(metadata.license).isEqualTo("")
+        assertThat(metadata.date).isEqualTo("")
+        assertThat(metadata.publishedDate).isNull()
+        assertThat(metadata.aspectRatio).isNull()
+        assertThat(metadata.licenseDetails).isNull()
+        assertThat(metadata.variants).isEmpty()
     }
 
     /** Shaped after what the pipeline actually uploads for a scheduled Met run. */
@@ -122,21 +127,21 @@ class ArtworkMetadataTest {
     fun `deserializes the published snake_case schema`() {
         val metadata = json.decodeFromString<ArtworkMetadata>(fullPayload)
 
-        assertEquals(LocalDate.of(2026, 7, 31), metadata.publishedDate)
-        assertEquals("https://www.metmuseum.org/art/collection/search/437123", metadata.sourceUrl)
-        assertEquals("https://creativecommons.org/publicdomain/zero/1.0/", metadata.licenseUrl)
-        assertEquals("CC0-1.0", metadata.licenseDetails?.type)
-        assertEquals("The Great Wave off Kanagawa — Katsushika Hokusai", metadata.styleCredit)
-        assertEquals("2026-07-31T04:03:11.482913+00:00", metadata.generatedAt)
-        assertEquals(2, metadata.variants.size)
+        assertThat(metadata.publishedDate).isEqualTo(LocalDate.of(2026, 7, 31))
+        assertThat(metadata.sourceUrl).isEqualTo("https://www.metmuseum.org/art/collection/search/437123")
+        assertThat(metadata.licenseUrl).isEqualTo("https://creativecommons.org/publicdomain/zero/1.0/")
+        assertThat(metadata.licenseDetails?.type).isEqualTo("CC0-1.0")
+        assertThat(metadata.styleCredit).isEqualTo("The Great Wave off Kanagawa — Katsushika Hokusai")
+        assertThat(metadata.generatedAt).isEqualTo("2026-07-31T04:03:11.482913+00:00")
+        assertThat(metadata.variants).hasSize(2)
     }
 
     @Test
     fun `aspect ratio comes from the stylized variant not the original`() {
         val metadata = json.decodeFromString<ArtworkMetadata>(fullPayload)
 
-        assertEquals(1280, metadata.stylizedVariant?.width)
-        assertEquals(1280f / 853f, metadata.aspectRatio!!, 0.0001f)
+        assertThat(metadata.stylizedVariant?.width).isEqualTo(1280)
+        assertThat(metadata.aspectRatio).isNotNull().isCloseTo(1280f / 853f, 0.0001f)
     }
 
     @Test
@@ -154,9 +159,9 @@ class ArtworkMetadataTest {
 
         val metadata = json.decodeFromString<ArtworkMetadata>(input)
 
-        assertEquals("Unsplash License", metadata.licenseLabel)
-        assertEquals("https://unsplash.com/license", metadata.licenseLink)
-        assertEquals("https://unsplash.com/photos/abc123", metadata.attributionUrl)
+        assertThat(metadata.licenseLabel).isEqualTo("Unsplash License")
+        assertThat(metadata.licenseLink).isEqualTo("https://unsplash.com/license")
+        assertThat(metadata.attributionUrl).isEqualTo("https://unsplash.com/photos/abc123")
     }
 
     @Test
@@ -165,15 +170,15 @@ class ArtworkMetadataTest {
 
         val metadata = json.decodeFromString<ArtworkMetadata>(input)
 
-        assertEquals("Ansel Adams", metadata.creator)
-        assertEquals("https://unsplash.com/@ansel", metadata.attributionUrl)
+        assertThat(metadata.creator).isEqualTo("Ansel Adams")
+        assertThat(metadata.attributionUrl).isEqualTo("https://unsplash.com/@ansel")
     }
 
     @Test
     fun `malformed date does not throw`() {
         val metadata = json.decodeFromString<ArtworkMetadata>("""{"date": "not-a-date"}""")
 
-        assertNull(metadata.publishedDate)
+        assertThat(metadata.publishedDate).isNull()
     }
 
     @Test
@@ -182,7 +187,7 @@ class ArtworkMetadataTest {
 
         val metadata = json.decodeFromString<ArtworkMetadata>(input)
 
-        assertNull(metadata.aspectRatio)
+        assertThat(metadata.aspectRatio).isNull()
     }
 }
 
@@ -196,8 +201,8 @@ class ServiceHealthTest {
             """{"status":"ok","date":"2026-07-31","stale_days":0}"""
         )
 
-        assertTrue(health.isCurrent)
-        assertEquals(LocalDate.of(2026, 7, 31), health.latestDate)
+        assertThat(health.isCurrent).isTrue()
+        assertThat(health.latestDate).isEqualTo(LocalDate.of(2026, 7, 31))
     }
 
     @Test
@@ -206,9 +211,9 @@ class ServiceHealthTest {
             """{"status":"stale","date":"2026-07-28","stale_days":3}"""
         )
 
-        assertFalse(health.isCurrent)
-        assertEquals(3, health.staleDays)
-        assertEquals(LocalDate.of(2026, 7, 28), health.latestDate)
+        assertThat(health.isCurrent).isFalse()
+        assertThat(health.staleDays).isEqualTo(3)
+        assertThat(health.latestDate).isEqualTo(LocalDate.of(2026, 7, 28))
     }
 
     @Test
@@ -217,8 +222,8 @@ class ServiceHealthTest {
             """{"status":"unhealthy","error":"no artwork published"}"""
         )
 
-        assertFalse(health.isCurrent)
-        assertNull(health.latestDate)
-        assertEquals("no artwork published", health.error)
+        assertThat(health.isCurrent).isFalse()
+        assertThat(health.latestDate).isNull()
+        assertThat(health.error).isEqualTo("no artwork published")
     }
 }

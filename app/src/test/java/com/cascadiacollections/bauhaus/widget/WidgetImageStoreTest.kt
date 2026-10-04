@@ -2,14 +2,15 @@ package com.cascadiacollections.bauhaus.widget
 
 import android.app.Application
 import android.graphics.Bitmap
+import assertk.assertThat
+import assertk.assertions.isEqualTo
+import assertk.assertions.isFalse
+import assertk.assertions.isNotNull
+import assertk.assertions.isNull
+import assertk.assertions.isTrue
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -29,14 +30,14 @@ class WidgetImageStoreTest {
 
     @Test
     fun `read returns null before anything is written`() = runTest {
-        assertNull(WidgetImageStore.read(context))
+        assertThat(WidgetImageStore.read(context)).isNull()
     }
 
     @Test
     fun `a written bitmap can be read back`() = runTest {
         WidgetImageStore.write(context, bitmap(64, 64))
 
-        assertNotNull(WidgetImageStore.read(context))
+        assertThat(WidgetImageStore.read(context)).isNotNull()
     }
 
     @Test
@@ -46,8 +47,8 @@ class WidgetImageStoreTest {
         WidgetImageStore.write(context, bitmap(4096, 2048))
 
         val stored = WidgetImageStore.read(context)!!
-        assertEquals(1024, stored.width)
-        assertEquals(512, stored.height)
+        assertThat(stored.width).isEqualTo(1024)
+        assertThat(stored.height).isEqualTo(512)
     }
 
     @Test
@@ -55,8 +56,8 @@ class WidgetImageStoreTest {
         WidgetImageStore.write(context, bitmap(800, 600))
 
         val stored = WidgetImageStore.read(context)!!
-        assertEquals(800, stored.width)
-        assertEquals(600, stored.height)
+        assertThat(stored.width).isEqualTo(800)
+        assertThat(stored.height).isEqualTo(600)
     }
 
     @Test
@@ -67,7 +68,7 @@ class WidgetImageStoreTest {
 
         WidgetImageStore.write(context, source)
 
-        assertFalse(source.isRecycled)
+        assertThat(source.isRecycled).isFalse()
     }
 
     @Test
@@ -76,7 +77,7 @@ class WidgetImageStoreTest {
         WidgetImageStore.write(context, bitmap(400, 400))
 
         val stored = WidgetImageStore.read(context)!!
-        assertEquals(400, stored.width)
+        assertThat(stored.width).isEqualTo(400)
     }
 
     @Test
@@ -84,10 +85,10 @@ class WidgetImageStoreTest {
         WidgetImageStore.write(context, bitmap(64, 64))
 
         val leftovers = context.cacheDir.listFiles().orEmpty().filter(File::isFile)
-        assertTrue(
-            "unexpected leftovers: ${leftovers.map(File::getName)}",
-            leftovers.none { it.name.endsWith(".tmp") }
-        )
+        assertThat(
+            leftovers.none { it.name.endsWith(".tmp") },
+            name = "unexpected leftovers: ${leftovers.map(File::getName)}"
+        ).isTrue()
     }
 
     private fun bitmap(width: Int, height: Int): Bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)

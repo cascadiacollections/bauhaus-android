@@ -3,6 +3,13 @@ package com.cascadiacollections.bauhaus.data
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import assertk.assertThat
+import assertk.assertions.containsOnly
+import assertk.assertions.isEmpty
+import assertk.assertions.isEqualTo
+import assertk.assertions.isFalse
+import assertk.assertions.isNull
+import assertk.assertions.isTrue
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -11,10 +18,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -51,33 +54,33 @@ class SettingsRepositoryTest {
 
     @Test
     fun `wallpaper target defaults to BOTH`() = runTest {
-        assertEquals(WallpaperTarget.BOTH, repository.wallpaperTarget.first())
+        assertThat(repository.wallpaperTarget.first()).isEqualTo(WallpaperTarget.BOTH)
     }
 
     @Test
     fun `wallpaper target round-trips through the store`() = runTest {
         repository.setWallpaperTarget(WallpaperTarget.LOCK)
 
-        assertEquals(WallpaperTarget.LOCK, repository.wallpaperTarget.first())
+        assertThat(repository.wallpaperTarget.first()).isEqualTo(WallpaperTarget.LOCK)
     }
 
     @Test
     fun `scheduling defaults to enabled`() = runTest {
-        assertTrue(repository.schedulingEnabled.first())
+        assertThat(repository.schedulingEnabled.first()).isTrue()
     }
 
     @Test
     fun `scheduling can be turned off and back on`() = runTest {
         repository.setSchedulingEnabled(false)
-        assertFalse(repository.schedulingEnabled.first())
+        assertThat(repository.schedulingEnabled.first()).isFalse()
 
         repository.setSchedulingEnabled(true)
-        assertTrue(repository.schedulingEnabled.first())
+        assertThat(repository.schedulingEnabled.first()).isTrue()
     }
 
     @Test
     fun `last updated is null until a wallpaper has been set`() = runTest {
-        assertNull(repository.lastUpdated.first())
+        assertThat(repository.lastUpdated.first()).isNull()
     }
 
     @Test
@@ -86,28 +89,28 @@ class SettingsRepositoryTest {
         // string, so it must survive the round trip unmodified.
         repository.setLastUpdated("2025-03-04")
 
-        assertEquals("2025-03-04", repository.lastUpdated.first())
+        assertThat(repository.lastUpdated.first()).isEqualTo("2025-03-04")
     }
 
     @Test
     fun `last prefetched date is null until startup prefetch runs`() = runTest {
-        assertNull(repository.getLastPrefetchedDate())
+        assertThat(repository.getLastPrefetchedDate()).isNull()
     }
 
     @Test
     fun `last prefetched date round-trips through the store`() = runTest {
         repository.setLastPrefetchedDate("2025-03-04")
 
-        assertEquals("2025-03-04", repository.getLastPrefetchedDate())
+        assertThat(repository.getLastPrefetchedDate()).isEqualTo("2025-03-04")
     }
 
     @Test
     fun `first run is true until it is marked complete`() = runTest {
-        assertTrue(repository.isFirstRun())
+        assertThat(repository.isFirstRun()).isTrue()
 
         repository.markFirstRunComplete()
 
-        assertFalse(repository.isFirstRun())
+        assertThat(repository.isFirstRun()).isFalse()
     }
 
     @Test
@@ -115,21 +118,21 @@ class SettingsRepositoryTest {
         repository.markFirstRunComplete()
         repository.markFirstRunComplete()
 
-        assertFalse(repository.isFirstRun())
+        assertThat(repository.isFirstRun()).isFalse()
     }
 
     @Test
     fun `favorites start empty`() = runTest {
-        assertEquals(emptySet<String>(), repository.favorites.first())
+        assertThat(repository.favorites.first()).isEmpty()
     }
 
     @Test
     fun `toggling a favorite adds it and toggling again removes it`() = runTest {
         repository.toggleFavorite("2025-03-04")
-        assertEquals(setOf("2025-03-04"), repository.favorites.first())
+        assertThat(repository.favorites.first()).containsOnly("2025-03-04")
 
         repository.toggleFavorite("2025-03-04")
-        assertEquals(emptySet<String>(), repository.favorites.first())
+        assertThat(repository.favorites.first()).isEmpty()
     }
 
     @Test
@@ -140,7 +143,7 @@ class SettingsRepositoryTest {
 
         repository.toggleFavorite("2025-03-05")
 
-        assertEquals(setOf("2025-03-04", "2025-03-06"), repository.favorites.first())
+        assertThat(repository.favorites.first()).containsOnly("2025-03-04", "2025-03-06")
     }
 
     @Test
@@ -151,11 +154,11 @@ class SettingsRepositoryTest {
         repository.toggleFavorite("2025-03-04")
         repository.markFirstRunComplete()
 
-        assertEquals(WallpaperTarget.HOME, repository.wallpaperTarget.first())
-        assertFalse(repository.schedulingEnabled.first())
-        assertEquals("2025-03-04", repository.lastUpdated.first())
-        assertEquals(setOf("2025-03-04"), repository.favorites.first())
-        assertFalse(repository.isFirstRun())
+        assertThat(repository.wallpaperTarget.first()).isEqualTo(WallpaperTarget.HOME)
+        assertThat(repository.schedulingEnabled.first()).isFalse()
+        assertThat(repository.lastUpdated.first()).isEqualTo("2025-03-04")
+        assertThat(repository.favorites.first()).containsOnly("2025-03-04")
+        assertThat(repository.isFirstRun()).isFalse()
     }
 
     @Test
@@ -167,7 +170,7 @@ class SettingsRepositoryTest {
 
         val reopened = SettingsRepository(dataStore)
 
-        assertEquals(WallpaperTarget.LOCK, reopened.wallpaperTarget.first())
-        assertEquals(setOf("2025-03-04"), reopened.favorites.first())
+        assertThat(reopened.wallpaperTarget.first()).isEqualTo(WallpaperTarget.LOCK)
+        assertThat(reopened.favorites.first()).containsOnly("2025-03-04")
     }
 }

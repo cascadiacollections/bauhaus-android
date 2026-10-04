@@ -10,6 +10,12 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.workDataOf
+import assertk.assertThat
+import assertk.assertions.hasSize
+import assertk.assertions.isEmpty
+import assertk.assertions.isEqualTo
+import assertk.assertions.isFalse
+import assertk.assertions.isTrue
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApiClient
 import com.cascadiacollections.bauhaus.data.ServiceHealth
@@ -20,9 +26,6 @@ import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -43,8 +46,8 @@ class WallpaperWorkerTest {
 
         val result = worker.doWork()
 
-        assertEquals(ListenableWorker.Result.success(), result)
-        assertFalse(api.fetchCalled)
+        assertThat(result).isEqualTo(ListenableWorker.Result.success())
+        assertThat(api.fetchCalled).isFalse()
     }
 
     @Test
@@ -58,7 +61,7 @@ class WallpaperWorkerTest {
 
         worker.doWork()
 
-        assertTrue(api.fetchCalled)
+        assertThat(api.fetchCalled).isTrue()
     }
 
     @Test
@@ -69,7 +72,7 @@ class WallpaperWorkerTest {
 
         val result = worker.doWork()
 
-        assertEquals(ListenableWorker.Result.retry(), result)
+        assertThat(result).isEqualTo(ListenableWorker.Result.retry())
     }
 
     @Test
@@ -80,7 +83,7 @@ class WallpaperWorkerTest {
 
         val result = worker.doWork()
 
-        assertEquals(ListenableWorker.Result.failure(), result)
+        assertThat(result).isEqualTo(ListenableWorker.Result.failure())
     }
 
     @Test
@@ -97,7 +100,7 @@ class WallpaperWorkerTest {
 
         worker.doWork()
 
-        assertEquals(1, postedNotifications().size)
+        assertThat(postedNotifications()).hasSize(1)
     }
 
     @Test
@@ -112,7 +115,7 @@ class WallpaperWorkerTest {
 
         worker.doWork()
 
-        assertTrue(postedNotifications().isEmpty())
+        assertThat(postedNotifications()).isEmpty()
     }
 
     private fun postedNotifications() = shadowOf(

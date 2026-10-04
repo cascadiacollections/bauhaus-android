@@ -4,6 +4,16 @@ import android.app.Application
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.lifecycle.SavedStateHandle
+import assertk.assertThat
+import assertk.assertions.contains
+import assertk.assertions.containsExactly
+import assertk.assertions.hasSize
+import assertk.assertions.isEmpty
+import assertk.assertions.isEqualTo
+import assertk.assertions.isFalse
+import assertk.assertions.isNotNull
+import assertk.assertions.isNull
+import assertk.assertions.isTrue
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
@@ -27,11 +37,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -78,24 +83,24 @@ class BauhausViewModelTest {
 
     @Test
     fun `init loads metadata from api`() {
-        assertEquals(FakeBauhausApi.DEFAULT_METADATA, viewModel.uiState.value.metadata)
-        assertFalse(viewModel.uiState.value.isMetadataLoading)
-        assertFalse(viewModel.uiState.value.metadataLoadFailed)
+        assertThat(viewModel.uiState.value.metadata).isEqualTo(FakeBauhausApi.DEFAULT_METADATA)
+        assertThat(viewModel.uiState.value.isMetadataLoading).isFalse()
+        assertThat(viewModel.uiState.value.metadataLoadFailed).isFalse()
     }
 
     @Test
     fun `init collects wallpaperTarget from settings`() {
-        assertEquals(WallpaperTarget.BOTH, viewModel.uiState.value.wallpaperTarget)
+        assertThat(viewModel.uiState.value.wallpaperTarget).isEqualTo(WallpaperTarget.BOTH)
     }
 
     @Test
     fun `init collects schedulingEnabled from settings`() {
-        assertTrue(viewModel.uiState.value.schedulingEnabled)
+        assertThat(viewModel.uiState.value.schedulingEnabled).isTrue()
     }
 
     @Test
     fun `init collects lastUpdated from settings`() {
-        assertNull(viewModel.uiState.value.lastUpdated)
+        assertThat(viewModel.uiState.value.lastUpdated).isNull()
     }
 
     @Test
@@ -108,9 +113,9 @@ class BauhausViewModelTest {
             FakeWallpaperScheduler(),
             SavedStateHandle()
         )
-        assertNull(vm.uiState.value.metadata)
-        assertFalse(vm.uiState.value.isMetadataLoading)
-        assertTrue(vm.uiState.value.metadataLoadFailed)
+        assertThat(vm.uiState.value.metadata).isNull()
+        assertThat(vm.uiState.value.isMetadataLoading).isFalse()
+        assertThat(vm.uiState.value.metadataLoadFailed).isTrue()
     }
 
     @Test
@@ -129,16 +134,16 @@ class BauhausViewModelTest {
             SavedStateHandle()
         )
 
-        assertEquals(published, vm.uiState.value.latestDate)
-        assertEquals(published, vm.uiState.value.visibleDate)
-        assertEquals(listOf(published), vm.uiState.value.availableDates)
-        assertEquals("Yesterday", vm.uiState.value.metadata?.title)
+        assertThat(vm.uiState.value.latestDate).isEqualTo(published)
+        assertThat(vm.uiState.value.visibleDate).isEqualTo(published)
+        assertThat(vm.uiState.value.availableDates).containsExactly(published)
+        assertThat(vm.uiState.value.metadata?.title).isEqualTo("Yesterday")
     }
 
     @Test
     fun `init falls back to the utc clock when metadata omits a date`() {
-        assertEquals(serviceToday(), viewModel.uiState.value.latestDate)
-        assertEquals(serviceToday(), viewModel.uiState.value.visibleDate)
+        assertThat(viewModel.uiState.value.latestDate).isEqualTo(serviceToday())
+        assertThat(viewModel.uiState.value.visibleDate).isEqualTo(serviceToday())
     }
 
     @Test
@@ -169,8 +174,8 @@ class BauhausViewModelTest {
         vm.refresh()
 
         val expected = RuntimeEnvironment.getApplication().getString(R.string.error_service_stale)
-        assertEquals(listOf(expected), events.map { it.message })
-        assertEquals(staleDate, vm.uiState.value.latestDate)
+        assertThat(events.map { it.message }).containsExactly(expected)
+        assertThat(vm.uiState.value.latestDate).isEqualTo(staleDate)
     }
 
     @Test
@@ -185,9 +190,9 @@ class BauhausViewModelTest {
         fakeApi.throwIOException = true
         viewModel.refresh()
 
-        assertEquals(0, fakeApi.healthCalls)
+        assertThat(fakeApi.healthCalls).isEqualTo(0)
         val expected = RuntimeEnvironment.getApplication().getString(R.string.error_network)
-        assertEquals(listOf(expected), events.map { it.message })
+        assertThat(events.map { it.message }).containsExactly(expected)
     }
 
     @Test
@@ -202,9 +207,9 @@ class BauhausViewModelTest {
         fakeApi.healthError = RuntimeException("health unreachable")
         viewModel.refresh()
 
-        assertEquals(1, fakeApi.healthCalls)
+        assertThat(fakeApi.healthCalls).isEqualTo(1)
         val expected = RuntimeEnvironment.getApplication().getString(R.string.error_refresh)
-        assertEquals(listOf(expected), events.map { it.message })
+        assertThat(events.map { it.message }).containsExactly(expected)
     }
 
     @Test
@@ -218,9 +223,9 @@ class BauhausViewModelTest {
         fakeApi.healthToReturn = ServiceHealth(status = ServiceHealth.STATUS_OK)
         viewModel.refresh()
 
-        assertEquals(1, fakeApi.healthCalls)
+        assertThat(fakeApi.healthCalls).isEqualTo(1)
         val expected = RuntimeEnvironment.getApplication().getString(R.string.error_refresh)
-        assertEquals(listOf(expected), events.map { it.message })
+        assertThat(events.map { it.message }).containsExactly(expected)
     }
 
     // ── saved state restoration ──────────────────────────────────────────────
@@ -245,16 +250,13 @@ class BauhausViewModelTest {
             )
         )
 
-        assertEquals(today.minusDays(2), vm.uiState.value.visibleDate)
-        assertEquals(
-            listOf(
-                today,
-                today.minusDays(1),
-                today.minusDays(2),
-                today.minusDays(3),
-                today.minusDays(4)
-            ),
-            vm.uiState.value.availableDates
+        assertThat(vm.uiState.value.visibleDate).isEqualTo(today.minusDays(2))
+        assertThat(vm.uiState.value.availableDates).containsExactly(
+            today,
+            today.minusDays(1),
+            today.minusDays(2),
+            today.minusDays(3),
+            today.minusDays(4)
         )
     }
 
@@ -278,8 +280,8 @@ class BauhausViewModelTest {
             api
         )
 
-        assertEquals("Restored", vm.uiState.value.metadata?.title)
-        assertFalse(vm.uiState.value.isMetadataLoading)
+        assertThat(vm.uiState.value.metadata?.title).isEqualTo("Restored")
+        assertThat(vm.uiState.value.isMetadataLoading).isFalse()
     }
 
     @Test
@@ -306,24 +308,24 @@ class BauhausViewModelTest {
         )
 
         // The restored page's own fetch already completed synchronously.
-        assertEquals("Restored", vm.uiState.value.metadata?.title)
-        assertFalse(vm.uiState.value.isMetadataLoading)
-        assertFalse(vm.uiState.value.metadataLoadFailed)
+        assertThat(vm.uiState.value.metadata?.title).isEqualTo("Restored")
+        assertThat(vm.uiState.value.isMetadataLoading).isFalse()
+        assertThat(vm.uiState.value.metadataLoadFailed).isFalse()
 
         // Now let the anchor-date fetch fail. It must not wipe the restored page.
         gate.complete(Unit)
 
-        assertEquals(restoredDate, vm.uiState.value.visibleDate)
-        assertEquals("Restored", vm.uiState.value.metadata?.title)
-        assertFalse(vm.uiState.value.isMetadataLoading)
-        assertFalse(vm.uiState.value.metadataLoadFailed)
+        assertThat(vm.uiState.value.visibleDate).isEqualTo(restoredDate)
+        assertThat(vm.uiState.value.metadata?.title).isEqualTo("Restored")
+        assertThat(vm.uiState.value.isMetadataLoading).isFalse()
+        assertThat(vm.uiState.value.metadataLoadFailed).isFalse()
     }
 
     @Test
     fun `the favorites filter survives process death`() {
         val vm = viewModelWith(SavedStateHandle(mapOf("show_favorites_only" to true)))
 
-        assertTrue(vm.uiState.value.showFavoritesOnly)
+        assertThat(vm.uiState.value.showFavoritesOnly).isTrue()
     }
 
     @Test
@@ -333,8 +335,8 @@ class BauhausViewModelTest {
             SavedStateHandle(mapOf("oldest_browsed_date" to today.minusDays(5_000).toString()))
         )
 
-        assertEquals(listOf(today), vm.uiState.value.availableDates)
-        assertEquals(today, vm.uiState.value.visibleDate)
+        assertThat(vm.uiState.value.availableDates).containsExactly(today)
+        assertThat(vm.uiState.value.visibleDate).isEqualTo(today)
     }
 
     @Test
@@ -349,7 +351,7 @@ class BauhausViewModelTest {
             )
         )
 
-        assertEquals(today, vm.uiState.value.visibleDate)
+        assertThat(vm.uiState.value.visibleDate).isEqualTo(today)
     }
 
     @Test
@@ -363,8 +365,8 @@ class BauhausViewModelTest {
             )
         )
 
-        assertEquals(serviceToday(), vm.uiState.value.visibleDate)
-        assertEquals(listOf(serviceToday()), vm.uiState.value.availableDates)
+        assertThat(vm.uiState.value.visibleDate).isEqualTo(serviceToday())
+        assertThat(vm.uiState.value.availableDates).containsExactly(serviceToday())
     }
 
     // ── settings flow reactivity ─────────────────────────────────────────────
@@ -372,19 +374,19 @@ class BauhausViewModelTest {
     @Test
     fun `uiState updates when wallpaperTarget flow emits`() {
         fakeSettings.emitWallpaperTarget(WallpaperTarget.HOME)
-        assertEquals(WallpaperTarget.HOME, viewModel.uiState.value.wallpaperTarget)
+        assertThat(viewModel.uiState.value.wallpaperTarget).isEqualTo(WallpaperTarget.HOME)
     }
 
     @Test
     fun `uiState updates when schedulingEnabled flow emits`() {
         fakeSettings.emitSchedulingEnabled(false)
-        assertFalse(viewModel.uiState.value.schedulingEnabled)
+        assertThat(viewModel.uiState.value.schedulingEnabled).isFalse()
     }
 
     @Test
     fun `uiState updates when lastUpdated flow emits`() {
         fakeSettings.emitLastUpdated("2026-03-29")
-        assertEquals("2026-03-29", viewModel.uiState.value.lastUpdated)
+        assertThat(viewModel.uiState.value.lastUpdated).isEqualTo("2026-03-29")
     }
 
     // ── setWallpaperTarget ───────────────────────────────────────────────────
@@ -392,13 +394,13 @@ class BauhausViewModelTest {
     @Test
     fun `setWallpaperTarget delegates to settings`() {
         viewModel.setWallpaperTarget(WallpaperTarget.LOCK)
-        assertEquals(WallpaperTarget.LOCK, fakeSettings.lastSetTarget)
+        assertThat(fakeSettings.lastSetTarget).isEqualTo(WallpaperTarget.LOCK)
     }
 
     @Test
     fun `setWallpaperTarget updates uiState via flow`() {
         viewModel.setWallpaperTarget(WallpaperTarget.HOME)
-        assertEquals(WallpaperTarget.HOME, viewModel.uiState.value.wallpaperTarget)
+        assertThat(viewModel.uiState.value.wallpaperTarget).isEqualTo(WallpaperTarget.HOME)
     }
 
     // ── refresh ──────────────────────────────────────────────────────────────
@@ -410,9 +412,9 @@ class BauhausViewModelTest {
 
         viewModel.refresh()
 
-        assertEquals(newMetadata, viewModel.uiState.value.metadata)
-        assertEquals(1, viewModel.uiState.value.imageRevision)
-        assertFalse(viewModel.uiState.value.isRefreshing)
+        assertThat(viewModel.uiState.value.metadata).isEqualTo(newMetadata)
+        assertThat(viewModel.uiState.value.imageRevision).isEqualTo(1)
+        assertThat(viewModel.uiState.value.isRefreshing).isFalse()
     }
 
     @Test
@@ -425,10 +427,10 @@ class BauhausViewModelTest {
         fakeApi.shouldThrow = true
         viewModel.refresh()
 
-        assertEquals(1, events.size)
+        assertThat(events).hasSize(1)
         val expected = RuntimeEnvironment.getApplication().getString(R.string.error_refresh)
-        assertEquals(expected, events[0].message)
-        assertFalse(viewModel.uiState.value.isRefreshing)
+        assertThat(events[0].message).isEqualTo(expected)
+        assertThat(viewModel.uiState.value.isRefreshing).isFalse()
     }
 
     @Test
@@ -441,23 +443,23 @@ class BauhausViewModelTest {
         fakeApi.throwIOException = true
         viewModel.refresh()
 
-        assertEquals(1, events.size)
+        assertThat(events).hasSize(1)
         val expected = RuntimeEnvironment.getApplication().getString(R.string.error_network)
-        assertEquals(expected, events[0].message)
-        assertFalse(viewModel.uiState.value.isRefreshing)
+        assertThat(events[0].message).isEqualTo(expected)
+        assertThat(viewModel.uiState.value.isRefreshing).isFalse()
     }
 
     @Test
     fun `refresh is blocked by cooldown guard`() {
         viewModel.refresh()
-        assertEquals(1, viewModel.uiState.value.imageRevision)
+        assertThat(viewModel.uiState.value.imageRevision).isEqualTo(1)
 
         val newMetadata = ArtworkMetadata(title = "Different", artist = "Different Artist")
         fakeApi.metadataToReturn = newMetadata
         viewModel.refresh()
 
         // Still 1 — second call was blocked
-        assertEquals(1, viewModel.uiState.value.imageRevision)
+        assertThat(viewModel.uiState.value.imageRevision).isEqualTo(1)
     }
 
     @Test
@@ -466,29 +468,29 @@ class BauhausViewModelTest {
         // after a failure that never reached the service punishes the retry.
         fakeApi.throwIOException = true
         viewModel.refresh()
-        assertEquals(0, viewModel.uiState.value.imageRevision)
+        assertThat(viewModel.uiState.value.imageRevision).isEqualTo(0)
 
         fakeApi.throwIOException = false
         val newMetadata = ArtworkMetadata(title = "Recovered", artist = "Artist")
         fakeApi.metadataToReturn = newMetadata
         viewModel.refresh()
 
-        assertEquals(1, viewModel.uiState.value.imageRevision)
-        assertEquals(newMetadata, viewModel.uiState.value.metadata)
+        assertThat(viewModel.uiState.value.imageRevision).isEqualTo(1)
+        assertThat(viewModel.uiState.value.metadata).isEqualTo(newMetadata)
     }
 
     @Test
     fun `refresh succeeds after cooldown expires`() {
         viewModel.refresh()
-        assertEquals(1, viewModel.uiState.value.imageRevision)
+        assertThat(viewModel.uiState.value.imageRevision).isEqualTo(1)
 
         ShadowSystemClock.advanceBy(Duration.ofSeconds(31))
         val newMetadata = ArtworkMetadata(title = "Different", artist = "Different Artist")
         fakeApi.metadataToReturn = newMetadata
         viewModel.refresh()
 
-        assertEquals(2, viewModel.uiState.value.imageRevision)
-        assertEquals(newMetadata, viewModel.uiState.value.metadata)
+        assertThat(viewModel.uiState.value.imageRevision).isEqualTo(2)
+        assertThat(viewModel.uiState.value.metadata).isEqualTo(newMetadata)
     }
 
     @Test
@@ -498,7 +500,7 @@ class BauhausViewModelTest {
         val callsBefore = fakeApi.todayMetadataCalls
 
         viewModel.refresh()
-        assertTrue(viewModel.uiState.value.isRefreshing)
+        assertThat(viewModel.uiState.value.isRefreshing).isTrue()
 
         // Second pull while the first is still waiting on the service. The
         // request channel has no free slot, so it is dropped rather than queued.
@@ -507,9 +509,9 @@ class BauhausViewModelTest {
         fakeApi.todayMetadataGate = null
         gate.complete(Unit)
 
-        assertFalse(viewModel.uiState.value.isRefreshing)
-        assertEquals(1, viewModel.uiState.value.imageRevision)
-        assertEquals(1, fakeApi.todayMetadataCalls - callsBefore)
+        assertThat(viewModel.uiState.value.isRefreshing).isFalse()
+        assertThat(viewModel.uiState.value.imageRevision).isEqualTo(1)
+        assertThat(fakeApi.todayMetadataCalls - callsBefore).isEqualTo(1)
     }
 
     @Test
@@ -520,7 +522,7 @@ class BauhausViewModelTest {
 
         viewModel.onArchivePageSelected(0)
 
-        assertEquals(listOf(today, expectedOlder), viewModel.uiState.value.availableDates)
+        assertThat(viewModel.uiState.value.availableDates).containsExactly(today, expectedOlder)
     }
 
     @Test
@@ -533,8 +535,8 @@ class BauhausViewModelTest {
         viewModel.onArchivePageSelected(0)
         viewModel.onArchivePageSelected(1)
 
-        assertEquals(older, viewModel.uiState.value.visibleDate)
-        assertEquals(olderMetadata, viewModel.uiState.value.metadata)
+        assertThat(viewModel.uiState.value.visibleDate).isEqualTo(older)
+        assertThat(viewModel.uiState.value.metadata).isEqualTo(olderMetadata)
     }
 
     @Test
@@ -544,8 +546,8 @@ class BauhausViewModelTest {
 
         viewModel.onArchivePageSelected(0)
 
-        assertTrue(viewModel.uiState.value.reachedArchiveStart)
-        assertEquals(listOf(today), viewModel.uiState.value.availableDates)
+        assertThat(viewModel.uiState.value.reachedArchiveStart).isTrue()
+        assertThat(viewModel.uiState.value.availableDates).containsExactly(today)
     }
 
     @Test
@@ -557,12 +559,14 @@ class BauhausViewModelTest {
 
         viewModel.jumpToDate(targetDate)
 
-        assertEquals(targetDate, viewModel.uiState.value.visibleDate)
-        assertEquals(
-            listOf(today, today.minusDays(1), today.minusDays(2), targetDate),
-            viewModel.uiState.value.availableDates
+        assertThat(viewModel.uiState.value.visibleDate).isEqualTo(targetDate)
+        assertThat(viewModel.uiState.value.availableDates).containsExactly(
+            today,
+            today.minusDays(1),
+            today.minusDays(2),
+            targetDate
         )
-        assertEquals(targetMetadata, viewModel.uiState.value.metadata)
+        assertThat(viewModel.uiState.value.metadata).isEqualTo(targetMetadata)
     }
 
     @Test
@@ -577,21 +581,21 @@ class BauhausViewModelTest {
         val gate = CompletableDeferred<Unit>()
         fakeApi.dateMetadataGates[jumped] = gate
         viewModel.jumpToDate(jumped)
-        assertEquals(jumped, viewModel.uiState.value.visibleDate)
-        assertTrue(viewModel.uiState.value.isMetadataLoading)
+        assertThat(viewModel.uiState.value.visibleDate).isEqualTo(jumped)
+        assertThat(viewModel.uiState.value.isMetadataLoading).isTrue()
 
         // Swipe to a nearer page, whose own load settles first.
         viewModel.onArchivePageSelected(2)
-        assertEquals(settled, viewModel.uiState.value.visibleDate)
-        assertEquals("Settled", viewModel.uiState.value.metadata?.title)
+        assertThat(viewModel.uiState.value.visibleDate).isEqualTo(settled)
+        assertThat(viewModel.uiState.value.metadata?.title).isEqualTo("Settled")
 
         // The late arrival is still cached, but must not overwrite what is shown
         // or clear a spinner that now belongs to a different page.
         gate.complete(Unit)
 
-        assertEquals(settled, viewModel.uiState.value.visibleDate)
-        assertEquals("Settled", viewModel.uiState.value.metadata?.title)
-        assertFalse(viewModel.uiState.value.isMetadataLoading)
+        assertThat(viewModel.uiState.value.visibleDate).isEqualTo(settled)
+        assertThat(viewModel.uiState.value.metadata?.title).isEqualTo("Settled")
+        assertThat(viewModel.uiState.value.isMetadataLoading).isFalse()
     }
 
     @Test
@@ -605,9 +609,11 @@ class BauhausViewModelTest {
         viewModel.toggleFavoritesFilter()
         viewModel.toggleFavoritesFilter()
 
-        assertEquals(
-            listOf(today, today.minusDays(1), today.minusDays(2), targetDate),
-            viewModel.uiState.value.availableDates
+        assertThat(viewModel.uiState.value.availableDates).containsExactly(
+            today,
+            today.minusDays(1),
+            today.minusDays(2),
+            targetDate
         )
     }
 
@@ -621,12 +627,12 @@ class BauhausViewModelTest {
 
         viewModel.jumpToDate(targetDate)
 
-        assertEquals(listOf(targetDate), fakeApi.probedDates)
+        assertThat(fakeApi.probedDates).containsExactly(targetDate)
         // Only the landed-on page needs its metadata; the 399 pages skipped over
         // must not each cost a request.
-        assertEquals(listOf(targetDate), fakeApi.fetchedMetadataDates)
-        assertEquals(targetDate, viewModel.uiState.value.visibleDate)
-        assertEquals(401, viewModel.uiState.value.availableDates.size)
+        assertThat(fakeApi.fetchedMetadataDates).containsExactly(targetDate)
+        assertThat(viewModel.uiState.value.visibleDate).isEqualTo(targetDate)
+        assertThat(viewModel.uiState.value.availableDates).hasSize(401)
     }
 
     @Test
@@ -643,9 +649,9 @@ class BauhausViewModelTest {
         viewModel.jumpToDate(targetDate)
 
         val expected = RuntimeEnvironment.getApplication().getString(R.string.error_no_artwork_for_date)
-        assertEquals(listOf(expected), events.map { it.message })
-        assertEquals(today, viewModel.uiState.value.visibleDate)
-        assertEquals(listOf(today), viewModel.uiState.value.availableDates)
+        assertThat(events.map { it.message }).containsExactly(expected)
+        assertThat(viewModel.uiState.value.visibleDate).isEqualTo(today)
+        assertThat(viewModel.uiState.value.availableDates).containsExactly(today)
     }
 
     @Test
@@ -661,8 +667,8 @@ class BauhausViewModelTest {
         viewModel.jumpToDate(today.minusDays(1000))
 
         val expected = RuntimeEnvironment.getApplication().getString(R.string.error_archive_jump_too_far)
-        assertEquals(listOf(expected), events.map { it.message })
-        assertTrue(fakeApi.probedDates.isEmpty())
+        assertThat(events.map { it.message }).containsExactly(expected)
+        assertThat(fakeApi.probedDates).isEmpty()
     }
 
     @Test
@@ -672,8 +678,8 @@ class BauhausViewModelTest {
 
         viewModel.jumpToDate(futureDate)
 
-        assertEquals(initialState.visibleDate, viewModel.uiState.value.visibleDate)
-        assertEquals(initialState.availableDates, viewModel.uiState.value.availableDates)
+        assertThat(viewModel.uiState.value.visibleDate).isEqualTo(initialState.visibleDate)
+        assertThat(viewModel.uiState.value.availableDates).isEqualTo(initialState.availableDates)
     }
 
     @Test
@@ -685,9 +691,9 @@ class BauhausViewModelTest {
 
         viewModel.shareCurrentArtwork()
 
-        assertEquals(1, events.size)
-        assertEquals("${BauhausApi.BASE_URL}/api/today", events[0].uri.toString())
-        assertEquals("Test — Test Artist\n${BauhausApi.BASE_URL}/api/today", events[0].text)
+        assertThat(events).hasSize(1)
+        assertThat(events[0].uri.toString()).isEqualTo("${BauhausApi.BASE_URL}/api/today")
+        assertThat(events[0].text).isEqualTo("Test — Test Artist\n${BauhausApi.BASE_URL}/api/today")
     }
 
     @Test
@@ -705,9 +711,9 @@ class BauhausViewModelTest {
 
         viewModel.shareCurrentArtwork()
 
-        assertEquals(1, events.size)
-        assertEquals("${BauhausApi.BASE_URL}/api/$older", events[0].uri.toString())
-        assertEquals("Older — Archive\n${BauhausApi.BASE_URL}/api/$older", events[0].text)
+        assertThat(events).hasSize(1)
+        assertThat(events[0].uri.toString()).isEqualTo("${BauhausApi.BASE_URL}/api/$older")
+        assertThat(events[0].text).isEqualTo("Older — Archive\n${BauhausApi.BASE_URL}/api/$older")
     }
 
     @Test
@@ -726,10 +732,10 @@ class BauhausViewModelTest {
         }
 
         vm.shareCurrentArtwork()
-        assertEquals(1, events.size)
-        assertNotNull(events[0].uri)
-        assertEquals("${BauhausApi.BASE_URL}/api/today", events[0].text)
-        assertEquals("${BauhausApi.BASE_URL}/api/today", events[0].text)
+        assertThat(events).hasSize(1)
+        assertThat(events[0].uri).isNotNull()
+        assertThat(events[0].text).isEqualTo("${BauhausApi.BASE_URL}/api/today")
+        assertThat(events[0].text).isEqualTo("${BauhausApi.BASE_URL}/api/today")
     }
 
     // ── toggleFavorite ───────────────────────────────────────────────────────
@@ -737,22 +743,22 @@ class BauhausViewModelTest {
     @Test
     fun `toggleFavorite adds date to favorites`() {
         val date = viewModel.uiState.value.visibleDate
-        assertFalse(viewModel.uiState.value.isFavorite)
+        assertThat(viewModel.uiState.value.isFavorite).isFalse()
 
         viewModel.toggleFavorite()
 
-        assertTrue(viewModel.uiState.value.isFavorite)
-        assertTrue(fakeSettings.favoriteDatesSet.contains(date.toString()))
+        assertThat(viewModel.uiState.value.isFavorite).isTrue()
+        assertThat(fakeSettings.favoriteDatesSet).contains(date.toString())
     }
 
     @Test
     fun `toggleFavorite removes date when already favorited`() {
         viewModel.toggleFavorite()
-        assertTrue(viewModel.uiState.value.isFavorite)
+        assertThat(viewModel.uiState.value.isFavorite).isTrue()
 
         viewModel.toggleFavorite()
 
-        assertFalse(viewModel.uiState.value.isFavorite)
+        assertThat(viewModel.uiState.value.isFavorite).isFalse()
     }
 
     // ── toggleFavoritesFilter ────────────────────────────────────────────────
@@ -767,8 +773,8 @@ class BauhausViewModelTest {
         viewModel.toggleFavorite()
         viewModel.toggleFavoritesFilter()
 
-        assertTrue(viewModel.uiState.value.showFavoritesOnly)
-        assertEquals(listOf(today), viewModel.uiState.value.availableDates)
+        assertThat(viewModel.uiState.value.showFavoritesOnly).isTrue()
+        assertThat(viewModel.uiState.value.availableDates).containsExactly(today)
     }
 
     @Test
@@ -782,8 +788,8 @@ class BauhausViewModelTest {
 
         viewModel.toggleFavoritesFilter()
 
-        assertFalse(viewModel.uiState.value.showFavoritesOnly)
-        assertEquals(listOf(today, older), viewModel.uiState.value.availableDates)
+        assertThat(viewModel.uiState.value.showFavoritesOnly).isFalse()
+        assertThat(viewModel.uiState.value.availableDates).containsExactly(today, older)
     }
 
     // ── Fakes ────────────────────────────────────────────────────────────────

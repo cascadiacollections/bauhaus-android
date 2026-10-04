@@ -1,5 +1,13 @@
 package com.cascadiacollections.bauhaus.data
 
+import assertk.assertFailure
+import assertk.assertThat
+import assertk.assertions.isEqualTo
+import assertk.assertions.isFalse
+import assertk.assertions.isGreaterThanOrEqualTo
+import assertk.assertions.isInstanceOf
+import assertk.assertions.isTrue
+import assertk.assertions.prop
 import java.io.IOException
 import java.time.LocalDate
 import kotlinx.coroutines.test.runTest
@@ -9,10 +17,6 @@ import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.Test
 
 class BauhausApiTest {
@@ -23,36 +27,36 @@ class BauhausApiTest {
     fun `scaleToFit fits a landscape source into a portrait target`() {
         // The old power-of-two path left this case at full size, because it
         // required both axes to still exceed the target before halving.
-        assertEquals(1080 to 720, scaleToFit(3000, 2000, 1080, 2400))
+        assertThat(scaleToFit(3000, 2000, 1080, 2400)).isEqualTo(1080 to 720)
     }
 
     @Test
     fun `scaleToFit fits a portrait source into a portrait target`() {
-        assertEquals(1080 to 1920, scaleToFit(2160, 3840, 1080, 2400))
+        assertThat(scaleToFit(2160, 3840, 1080, 2400)).isEqualTo(1080 to 1920)
     }
 
     @Test
     fun `scaleToFit preserves aspect ratio`() {
         val (width, height) = scaleToFit(4000, 3000, 1000, 1000)
-        assertEquals(1000, width)
-        assertEquals(750, height)
+        assertThat(width).isEqualTo(1000)
+        assertThat(height).isEqualTo(750)
     }
 
     @Test
     fun `scaleToFit never upscales a source smaller than the target`() {
-        assertEquals(800 to 600, scaleToFit(800, 600, 1080, 2400))
+        assertThat(scaleToFit(800, 600, 1080, 2400)).isEqualTo(800 to 600)
     }
 
     @Test
     fun `scaleToFit does not collapse an extreme ratio to zero`() {
         val (width, height) = scaleToFit(10_000, 5, 100, 100)
-        assertTrue(width >= 1)
-        assertTrue(height >= 1)
+        assertThat(width).isGreaterThanOrEqualTo(1)
+        assertThat(height).isGreaterThanOrEqualTo(1)
     }
 
     @Test
     fun `scaleToFit falls back to the target for a degenerate source`() {
-        assertEquals(1080 to 2400, scaleToFit(0, 0, 1080, 2400))
+        assertThat(scaleToFit(0, 0, 1080, 2400)).isEqualTo(1080 to 2400)
     }
 
     @Test
@@ -61,28 +65,25 @@ class BauhausApiTest {
 
         val metadata = api.fetchTodayMetadata()
 
-        assertEquals("Composition VIII", metadata.title)
-        assertEquals("Kandinsky", metadata.artist)
+        assertThat(metadata.title).isEqualTo("Composition VIII")
+        assertThat(metadata.artist).isEqualTo("Kandinsky")
     }
 
     @Test
     fun `fetchTodayMetadata throws typed http exception`() = runTest {
         val api = BauhausApi(clientResponding(503, """{"error":"unavailable"}"""))
 
-        val error = expectThrows<BauhausHttpException> {
-            api.fetchTodayMetadata()
-        }
-
-        assertEquals(503, error.code)
+        assertFailure { api.fetchTodayMetadata() }
+            .isInstanceOf<BauhausHttpException>()
+            .prop(BauhausHttpException::code)
+            .isEqualTo(503)
     }
 
     @Test
     fun `fetchTodayMetadata throws decode exception for invalid json`() = runTest {
         val api = BauhausApi(clientResponding(200, """{"title":123}"""))
 
-        expectThrows<BauhausDecodeException> {
-            api.fetchTodayMetadata()
-        }
+        assertFailure { api.fetchTodayMetadata() }.isInstanceOf<BauhausDecodeException>()
     }
 
     @Test
@@ -93,9 +94,7 @@ class BauhausApiTest {
                 .build()
         )
 
-        expectThrows<BauhausNetworkException> {
-            api.fetchTodayImage()
-        }
+        assertFailure { api.fetchTodayImage() }.isInstanceOf<BauhausNetworkException>()
     }
 
     @Test
@@ -108,11 +107,12 @@ class BauhausApiTest {
                 .build()
         )
 
-        val error = expectThrows<BauhausNetworkException> { api.fetchTodayMetadata() }
-
-        assertTrue(error.isConnectivityFailure)
-        assertFalse(BauhausHttpException(404, "/api/today.json").isConnectivityFailure)
-        assertFalse(BauhausDecodeException("/api/today.json", RuntimeException()).isConnectivityFailure)
+        assertFailure { api.fetchTodayMetadata() }
+            .isInstanceOf<BauhausNetworkException>()
+            .prop(Throwable::isConnectivityFailure)
+            .isTrue()
+        assertThat(BauhausHttpException(404, "/api/today.json").isConnectivityFailure).isFalse()
+        assertThat(BauhausDecodeException("/api/today.json", RuntimeException()).isConnectivityFailure).isFalse()
     }
 
     @Test
@@ -125,26 +125,25 @@ class BauhausApiTest {
             }
             .build()
 
-        assertTrue(BauhausApi(client).hasArtworkForDate(LocalDate.of(2026, 7, 31)))
-        assertEquals("HEAD", observedMethod)
+        assertThat(BauhausApi(client).hasArtworkForDate(LocalDate.of(2026, 7, 31))).isTrue()
+        assertThat(observedMethod).isEqualTo("HEAD")
     }
 
     @Test
     fun `hasArtworkForDate is false for 404 rather than throwing`() = runTest {
         val api = BauhausApi(clientResponding(404, ""))
 
-        assertFalse(api.hasArtworkForDate(LocalDate.of(2001, 1, 1)))
+        assertThat(api.hasArtworkForDate(LocalDate.of(2001, 1, 1))).isFalse()
     }
 
     @Test
     fun `hasArtworkForDate throws for statuses that are not a clean yes or no`() = runTest {
         val api = BauhausApi(clientResponding(500, ""))
 
-        val error = expectThrows<BauhausHttpException> {
-            api.hasArtworkForDate(LocalDate.of(2026, 7, 31))
-        }
-
-        assertEquals(500, error.code)
+        assertFailure { api.hasArtworkForDate(LocalDate.of(2026, 7, 31)) }
+            .isInstanceOf<BauhausHttpException>()
+            .prop(BauhausHttpException::code)
+            .isEqualTo(500)
     }
 
     @Test
@@ -159,7 +158,7 @@ class BauhausApiTest {
 
         BauhausApi(client).hasArtworkForDate(LocalDate.of(2026, 7, 31))
 
-        assertEquals("/api/2026-07-31.json", observedPath)
+        assertThat(observedPath).isEqualTo("/api/2026-07-31.json")
     }
 
     @Test
@@ -170,23 +169,23 @@ class BauhausApiTest {
 
         val health = api.fetchHealth()
 
-        assertEquals(ServiceHealth.STATUS_STALE, health.status)
-        assertEquals(LocalDate.of(2026, 7, 28), health.latestDate)
-        assertFalse(health.isCurrent)
+        assertThat(health.status).isEqualTo(ServiceHealth.STATUS_STALE)
+        assertThat(health.latestDate).isEqualTo(LocalDate.of(2026, 7, 28))
+        assertThat(health.isCurrent).isFalse()
     }
 
     @Test
     fun `fetchHealth parses a healthy report`() = runTest {
         val api = BauhausApi(clientResponding(200, """{"status":"ok","date":"2026-07-31","stale_days":0}"""))
 
-        assertTrue(api.fetchHealth().isCurrent)
+        assertThat(api.fetchHealth().isCurrent).isTrue()
     }
 
     @Test
     fun `fetchHealth throws for statuses it cannot interpret`() = runTest {
         val api = BauhausApi(clientResponding(418, ""))
 
-        expectThrows<BauhausHttpException> { api.fetchHealth() }
+        assertFailure { api.fetchHealth() }.isInstanceOf<BauhausHttpException>()
     }
 
     private fun clientResponding(code: Int, body: String): OkHttpClient = OkHttpClient.Builder()
@@ -204,16 +203,4 @@ class BauhausApiTest {
         .message("mock")
         .body(body.toResponseBody())
         .build()
-
-    private suspend inline fun <reified T : Throwable> expectThrows(crossinline block: suspend () -> Unit): T = try {
-        block()
-        fail("Expected ${T::class.java.simpleName} to be thrown")
-        throw AssertionError("Unreachable")
-    } catch (error: Throwable) {
-        if (error is T) {
-            error
-        } else {
-            throw error
-        }
-    }
 }

@@ -1,10 +1,13 @@
 package com.cascadiacollections.bauhaus.data
 
+import assertk.assertThat
+import assertk.assertions.isFalse
+import assertk.assertions.isNotInstanceOf
+import assertk.assertions.isTrue
+import assertk.assertions.messageContains
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -24,7 +27,7 @@ class BauhausDataExceptionTest {
     fun `wrapped network failure is a connectivity failure`() {
         val exception = BauhausNetworkException("/api/today.json", UnknownHostException("no dns"))
 
-        assertTrue(exception.isConnectivityFailure)
+        assertThat(exception.isConnectivityFailure).isTrue()
     }
 
     @Test
@@ -33,43 +36,43 @@ class BauhausDataExceptionTest {
         // ladder silently skips this branch.
         val exception: Throwable = BauhausNetworkException("/api/today.json", SocketTimeoutException())
 
-        assertFalse(exception is IOException)
+        assertThat(exception).isNotInstanceOf<IOException>()
     }
 
     @Test
     fun `raw IOException is a connectivity failure`() {
-        assertTrue(IOException("socket closed").isConnectivityFailure)
+        assertThat(IOException("socket closed").isConnectivityFailure).isTrue()
     }
 
     @Test
     fun `http error is not a connectivity failure`() {
         val exception = BauhausHttpException(code = 404, endpoint = "/api/2025-01-01.json")
 
-        assertFalse(exception.isConnectivityFailure)
+        assertThat(exception.isConnectivityFailure).isFalse()
     }
 
     @Test
     fun `empty body is not a connectivity failure`() {
-        assertFalse(BauhausEmptyBodyException("/api/today.json").isConnectivityFailure)
+        assertThat(BauhausEmptyBodyException("/api/today.json").isConnectivityFailure).isFalse()
     }
 
     @Test
     fun `decode failure is not a connectivity failure`() {
         val exception = BauhausDecodeException("/api/today.json", IllegalArgumentException("bad json"))
 
-        assertFalse(exception.isConnectivityFailure)
+        assertThat(exception.isConnectivityFailure).isFalse()
     }
 
     @Test
     fun `unrelated runtime failure is not a connectivity failure`() {
-        assertFalse(IllegalStateException("bug").isConnectivityFailure)
+        assertThat(IllegalStateException("bug").isConnectivityFailure).isFalse()
     }
 
     @Test
     fun `http exception message names the code and endpoint`() {
         val exception = BauhausHttpException(code = 503, endpoint = "/api/health")
 
-        assertTrue(exception.message!!.contains("503"))
-        assertTrue(exception.message!!.contains("/api/health"))
+        assertThat(exception).messageContains("503")
+        assertThat(exception).messageContains("/api/health")
     }
 }

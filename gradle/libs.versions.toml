@@ -29,6 +29,7 @@ googleServices = "4.5.0"
 firebaseCrashlyticsPlugin = "3.0.8"
 mockk = "1.14.11"
 turbine = "1.2.1"
+assertk = "0.28.1"
 versionCatalogUpdate = "1.1.1"
 
 detekt = "2.0.0-alpha.6"
@@ -77,6 +78,7 @@ firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashly
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+assertk = { group = "com.willowtreeapps.assertk", name = "assertk", version.ref = "assertk" }
 
 detekt-rules-ktlint-wrapper = { group = "dev.detekt", name = "detekt-rules-ktlint-wrapper", version.ref = "detekt" }
 compose-rules-detekt = { group = "io.nlopez.compose.rules", name = "detekt", version.ref = "composeRules" }

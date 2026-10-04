@@ -107,6 +107,24 @@ style:
     active: true
   ExplicitCollectionElementAccessMethod:
     active: true
+  # Tests assert with AssertK's fluent API; keep the JUnit/kotlin.test assert styles out.
+  ForbiddenImport:
+    active: true
+    forbiddenImports:
+      - value: 'org.junit.Assert'
+        reason: 'Use AssertK (assertk.assertThat) fluent assertions.'
+      - value: 'org.junit.Assert.*'
+        reason: 'Use AssertK (assertk.assertThat) fluent assertions; assertFailure { } for expected exceptions.'
+      - value: 'junit.framework.*'
+        reason: 'Use AssertK (assertk.assertThat) fluent assertions.'
+      - value: 'org.junit.jupiter.api.Assertions*'
+        reason: 'Use AssertK (assertk.assertThat) fluent assertions.'
+      - value: 'kotlin.test.assert*'
+        reason: 'Use AssertK (assertk.assertThat) fluent assertions; assertFailure { } for expected exceptions.'
+      - value: 'kotlin.test.expect'
+        reason: 'Use AssertK (assertk.assertThat) fluent assertions.'
+      - value: 'kotlin.test.fail'
+        reason: 'Use assertk.fail, or a fluent assertion that states what was expected.'
   ForbiddenMethodCall:
     active: true
   # dp/sp values and colors are self-describing in UI code.

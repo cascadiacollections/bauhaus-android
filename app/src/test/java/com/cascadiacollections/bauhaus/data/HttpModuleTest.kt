@@ -1,7 +1,8 @@
 package com.cascadiacollections.bauhaus.data
 
 import android.app.Application
-import org.junit.Assert.assertSame
+import assertk.assertThat
+import assertk.assertions.isSameInstanceAs
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -23,6 +24,6 @@ class HttpModuleTest {
         val first = HttpModule.create(context)
         val second = HttpModule.create(context)
 
-        assertSame(first, second)
+        assertThat(second).isSameInstanceAs(first)
     }
 }

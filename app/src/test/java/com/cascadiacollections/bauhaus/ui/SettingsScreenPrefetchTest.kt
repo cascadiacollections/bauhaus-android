@@ -1,10 +1,14 @@
 package com.cascadiacollections.bauhaus.ui
 
 import androidx.compose.ui.unit.IntSize
+import assertk.assertThat
+import assertk.assertions.containsExactly
+import assertk.assertions.isCloseTo
+import assertk.assertions.isEmpty
+import assertk.assertions.isEqualTo
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.ArtworkVariant
 import java.time.LocalDate
-import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SettingsScreenPrefetchTest {
@@ -22,12 +26,9 @@ class SettingsScreenPrefetchTest {
             imageRevision = 3
         )
 
-        assertEquals(
-            listOf(
-                ArchiveImageRequest("/api/today", "2026-05-10-3"),
-                ArchiveImageRequest("/api/2026-05-08", "2026-05-08-3")
-            ),
-            requests
+        assertThat(requests).containsExactly(
+            ArchiveImageRequest("/api/today", "2026-05-10-3"),
+            ArchiveImageRequest("/api/2026-05-08", "2026-05-08-3")
         )
     }
 
@@ -42,7 +43,7 @@ class SettingsScreenPrefetchTest {
             imageRevision = 1
         )
 
-        assertEquals(listOf(ArchiveImageRequest("/api/2026-05-09", "2026-05-09-1")), requests)
+        assertThat(requests).containsExactly(ArchiveImageRequest("/api/2026-05-09", "2026-05-09-1"))
     }
 
     @Test
@@ -56,13 +57,13 @@ class SettingsScreenPrefetchTest {
             imageRevision = 1
         )
 
-        assertEquals(emptyList<ArchiveImageRequest>(), requests)
+        assertThat(requests).isEmpty()
     }
 
     @Test
     fun `previewImageSizePx clamps oversize artwork cards to a safe request size`() {
-        assertEquals(IntSize(1600, 1600), previewImageSizePx(IntSize(4000, 3000)))
-        assertEquals(IntSize(1080, 810), previewImageSizePx(IntSize(1080, 810)))
+        assertThat(previewImageSizePx(IntSize(4000, 3000))).isEqualTo(IntSize(1600, 1600))
+        assertThat(previewImageSizePx(IntSize(1080, 810))).isEqualTo(IntSize(1080, 810))
     }
 
     @Test
@@ -71,13 +72,13 @@ class SettingsScreenPrefetchTest {
             variants = listOf(ArtworkVariant(type = "stylized", width = 1280, height = 853))
         )
 
-        assertEquals(1280f / 853f, resolvePreviewAspectRatio(metadata), 0.0001f)
+        assertThat(resolvePreviewAspectRatio(metadata)).isCloseTo(1280f / 853f, 0.0001f)
     }
 
     @Test
     fun `previewAspectRatio falls back when the service published no dimensions`() {
-        assertEquals(FALLBACK_ASPECT_RATIO, resolvePreviewAspectRatio(null), 0.0001f)
-        assertEquals(FALLBACK_ASPECT_RATIO, resolvePreviewAspectRatio(ArtworkMetadata()), 0.0001f)
+        assertThat(resolvePreviewAspectRatio(null)).isCloseTo(FALLBACK_ASPECT_RATIO, 0.0001f)
+        assertThat(resolvePreviewAspectRatio(ArtworkMetadata())).isCloseTo(FALLBACK_ASPECT_RATIO, 0.0001f)
     }
 
     @Test
@@ -86,6 +87,6 @@ class SettingsScreenPrefetchTest {
             variants = listOf(ArtworkVariant(type = "stylized", width = 10_000, height = 100))
         )
 
-        assertEquals(FALLBACK_ASPECT_RATIO, resolvePreviewAspectRatio(panorama), 0.0001f)
+        assertThat(resolvePreviewAspectRatio(panorama)).isCloseTo(FALLBACK_ASPECT_RATIO, 0.0001f)
     }
 }
