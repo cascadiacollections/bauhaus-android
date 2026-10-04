@@ -99,7 +99,7 @@ android {
                     "--add-opens=java.base/java.text=ALL-UNNAMED",
                     "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
                     "--add-opens=java.desktop/java.awt.font=ALL-UNNAMED",
-                    "--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
+                    "--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED"
                 )
             }
         }
@@ -124,8 +124,13 @@ android {
             "NewerVersionAvailable",
             "ObsoleteSdkInt",
             "GradleDependency",
-            "AndroidGradlePluginVersion",
+            "AndroidGradlePluginVersion"
         )
+        // Off-by-default checks worth having.
+        enable += setOf("StopShip", "WrongThreadInterprocedural", "UnusedIds", "ComposeM2Api")
+        checkReleaseBuilds = true
+        // SARIF feeds GitHub code scanning (see .github/workflows/build.yml).
+        sarifReport = true
     }
 
     packaging {
@@ -172,7 +177,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
         compilerOptions.freeCompilerArgs.addAll(
             "-Xno-call-assertions",
             "-Xno-param-assertions",
-            "-Xno-receiver-assertions",
+            "-Xno-receiver-assertions"
         )
     }
 }
@@ -183,6 +188,7 @@ composeCompiler {
 }
 
 dependencies {
+    lintChecks(libs.compose.lint.checks)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
@@ -256,17 +262,20 @@ tasks.register<JacocoReport>("jacocoTestReport") {
         csv.required.set(false)
     }
 
-    val kotlinClasses = fileTree("${layout.buildDirectory.get()}/intermediates/built_in_kotlinc/fossDebug/compileFossDebugKotlin/classes") {
+    val kotlinClasses = fileTree(
+        "${layout.buildDirectory.get()}/intermediates/built_in_kotlinc/fossDebug/compileFossDebugKotlin/classes"
+    ) {
         exclude(
-            "**/R.class", "**/R$*.class",
+            "**/R.class",
+            "**/R$*.class",
             "**/BuildConfig.class",
             "**/ui/theme/**",
-            "**/*Preview*.class",
+            "**/*Preview*.class"
         )
     }
 
     classDirectories.setFrom(kotlinClasses)
-    sourceDirectories.setFrom("${projectDir}/src/main/java")
+    sourceDirectories.setFrom("$projectDir/src/main/java")
     executionData.setFrom(
         fileTree(layout.buildDirectory) { include("jacoco/testFossDebugUnitTest.exec") }
     )
