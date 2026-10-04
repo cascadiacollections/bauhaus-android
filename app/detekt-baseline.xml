@@ -1,0 +1,39 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CognitiveComplexMethod:BauhausViewModel.kt:BauhausViewModel$fun jumpToDate</ID>
+    <ID>CognitiveComplexMethod:BauhausViewModel.kt:BauhausViewModel$private fun loadMetadataForDate</ID>
+    <ID>CognitiveComplexMethod:MainActivity.kt:MainActivity$@OptIn(ExperimentalMaterial3Api::class) override fun onCreate</ID>
+    <ID>CognitiveComplexMethod:SettingsScreen.kt:@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class) @Composable fun SettingsScreen</ID>
+    <ID>ComplexCondition:build.gradle.kts:alias != null &amp;&amp; keyPwd != null &amp;&amp; storePath != null &amp;&amp; storePwd != null</ID>
+    <ID>ComposableNestingDepth:SettingsScreen.kt:@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class) @Composable fun SettingsScreen</ID>
+    <ID>ComposableParamOrder:SettingsScreen.kt:@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class) @Composable fun SettingsScreen</ID>
+    <ID>CyclomaticComplexMethod:SettingsScreen.kt:@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class) @Composable fun SettingsScreen</ID>
+    <ID>LargeClass:BauhausViewModel.kt:BauhausViewModel : AndroidViewModel</ID>
+    <ID>LongMethod:MainActivity.kt:MainActivity$@OptIn(ExperimentalMaterial3Api::class) override fun onCreate</ID>
+    <ID>LongMethod:WallpaperWorker.kt:WallpaperWorker$override suspend fun doWork: Result</ID>
+    <ID>OutdatedDocumentation:BauhausViewModel.kt:UiState</ID>
+    <ID>ParameterNaming:SettingsScreen.kt:onArchivePageSelected: (Int) -&gt; Unit</ID>
+    <ID>ReturnCount:BauhausApi.kt:internal fun scaleToFit: Pair&lt;Int, Int&gt;</ID>
+    <ID>ReturnCount:BauhausViewModel.kt:BauhausViewModel$fun jumpToDate</ID>
+    <ID>ReturnCount:BauhausViewModel.kt:BauhausViewModel$private suspend fun handledAsStaleService: Boolean</ID>
+    <ID>ReturnCount:WallpaperSizing.kt:fun wallpaperTargetSize: Size</ID>
+    <ID>ReturnCount:WallpaperWorker.kt:WallpaperWorker$override suspend fun doWork: Result</ID>
+    <ID>ThrowsCount:BauhausApi.kt:BauhausApi$private fun fetchImageRawForPath: Pair&lt;ByteArray, String&gt;</ID>
+    <ID>ThrowsCount:BauhausViewModelTest.kt:BauhausViewModelTest.FakeBauhausApi$override suspend fun fetchImageForDate: Bitmap</ID>
+    <ID>ThrowsCount:BauhausViewModelTest.kt:BauhausViewModelTest.FakeBauhausApi$override suspend fun fetchImageRawForDate: Pair&lt;ByteArray, String&gt;</ID>
+    <ID>ThrowsCount:BauhausViewModelTest.kt:BauhausViewModelTest.FakeBauhausApi$override suspend fun fetchMetadataForDate: ArtworkMetadata</ID>
+    <ID>ThrowsCount:BauhausViewModelTest.kt:BauhausViewModelTest.FakeBauhausApi$override suspend fun fetchTodayMetadata: ArtworkMetadata</ID>
+    <ID>TooGenericExceptionCaught:BauhausApi.kt:BauhausApi$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:BauhausApplication.kt:BauhausApplication$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:BauhausViewModel.kt:BauhausViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:WallpaperWorker.kt:WallpaperWorker$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:WidgetImageStore.kt:WidgetImageStore$e: Exception</ID>
+    <ID>TooGenericExceptionThrown:BauhausViewModelTest.kt:BauhausViewModelTest.FakeBauhausApi$throw RuntimeException("Unexpected error")</ID>
+    <ID>TooGenericExceptionThrown:WallpaperWorkerTest.kt:WallpaperWorkerTest.FakeApi$throw RuntimeException("boom")</ID>
+    <ID>UnusedParameter:CrashReporter.kt:CrashReporter$id: String</ID>
+    <ID>UnusedParameter:CrashReporter.kt:CrashReporter$message: String</ID>
+    <ID>UnusedParameter:CrashReporter.kt:CrashReporter$throwable: Throwable</ID>
+  </CurrentIssues>
+</SmellBaseline>

@@ -1,0 +1,7 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>MagicNumber:BaselineProfileGenerator.kt:BaselineProfileGenerator$5_000L</ID>
+  </CurrentIssues>
+</SmellBaseline>
