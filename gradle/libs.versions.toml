@@ -31,6 +31,9 @@ mockk = "1.14.11"
 turbine = "1.2.1"
 versionCatalogUpdate = "1.1.1"
 
+detekt = "2.0.0-alpha.6"
+composeRules = "0.6.7"
+composeLintChecks = "1.6.0"
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -75,6 +78,10 @@ firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 
+detekt-rules-ktlint-wrapper = { group = "dev.detekt", name = "detekt-rules-ktlint-wrapper", version.ref = "detekt" }
+compose-rules-detekt = { group = "io.nlopez.compose.rules", name = "detekt", version.ref = "composeRules" }
+compose-lint-checks = { group = "com.slack.lint.compose", name = "compose-lint-checks", version.ref = "composeLintChecks" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-test = { id = "com.android.test", version.ref = "agp" }
@@ -85,3 +92,4 @@ aboutlibraries = { id = "com.mikepenz.aboutlibraries.plugin", version.ref = "abo
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
 firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebaseCrashlyticsPlugin" }
 version-catalog-update = { id = "nl.littlerobots.version-catalog-update", version.ref = "versionCatalogUpdate" }
+detekt = { id = "dev.detekt", version.ref = "detekt" }

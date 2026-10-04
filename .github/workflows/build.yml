@@ -19,6 +19,7 @@ jobs:
     permissions:
       contents: read
       checks: write
+      security-events: write
 
     steps:
       - name: Checkout code
@@ -46,6 +47,9 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
+      - name: Static analysis (detekt + ktlint + Compose rules)
+        run: ./gradlew detekt --no-daemon --continue
+
       - name: Build, Lint, and Test
         run: ./gradlew assembleFossRelease assembleFossDebug bundleFossRelease lintFossDebug testFossDebugUnitTest jacocoTestReport --no-daemon --parallel --build-cache
         env:
@@ -53,6 +57,21 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      # Findings show up as PR annotations and under Security > Code scanning.
+      - name: Upload detekt SARIF
+        if: ${{ !cancelled() && hashFiles('build/reports/detekt/detekt.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: build/reports/detekt/detekt.sarif
+          category: detekt
+
+      - name: Upload Android Lint SARIF
+        if: ${{ !cancelled() && hashFiles('app/build/reports/lint-results-fossDebug.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: app/build/reports/lint-results-fossDebug.sarif
+          category: lint
 
       - name: Test Report
         if: always()

@@ -23,6 +23,18 @@ test:
 lint:
     ./gradlew lint{{capitalize(flavor)}}Debug --no-daemon
 
+# Static analysis: detekt (+ ktlint, Compose rules) and Android Lint
+analyze:
+    ./gradlew detekt lint{{capitalize(flavor)}}Debug --no-daemon --continue
+
+# Apply ktlint formatting fixes
+format:
+    ./gradlew detekt --auto-correct --no-daemon --continue
+
+# Regenerate detekt and Android Lint baselines (only after triaging the findings!)
+baseline:
+    ./gradlew detektBaseline updateLintBaseline --no-daemon --continue
+
 # Generate the JaCoCo coverage report (app/build/reports/jacoco/)
 coverage:
     ./gradlew jacocoTestReport --no-daemon
@@ -30,7 +42,7 @@ coverage:
 # Everything CI gates on, in one invocation
 check:
     ./gradlew assemble{{capitalize(flavor)}}Release assemble{{capitalize(flavor)}}Debug \
-        lint{{capitalize(flavor)}}Debug test{{capitalize(flavor)}}DebugUnitTest jacocoTestReport \
+        detekt lint{{capitalize(flavor)}}Debug test{{capitalize(flavor)}}DebugUnitTest jacocoTestReport \
         --no-daemon --parallel --build-cache
 
 # Install debug build on connected device
