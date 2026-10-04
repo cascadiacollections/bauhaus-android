@@ -88,16 +88,17 @@ data class ArtworkMetadata(
      * Resolved in order of reliability:
      * 1. `published_date`, which the pipeline always writes as the publish day.
      *    Entries published before the field existed do not carry it.
-     * 2. [date], but only when it is an ISO `yyyy-MM-dd`. For most artworks it is
-     *    the artwork's own date (`"ca. 1750"`), which says nothing about publishing.
-     * 3. The UTC calendar day of [generatedAt], the upload timestamp. The pipeline
+     * 2. The UTC calendar day of [generatedAt], the upload timestamp. The pipeline
      *    takes the archive key and this timestamp from the UTC clock in the same
      *    run, so its day is the publish day.
+     * 3. [date], but only when it is an ISO `yyyy-MM-dd`, and only as a last
+     *    resort: for most artworks it is the artwork's own date, and an artwork
+     *    dated `"2019-05-03"` would otherwise read as published that day.
      */
     val publishedDate: LocalDate?
         get() = publishedDateRaw.toIsoDateOrNull()
-            ?: date.toIsoDateOrNull()
             ?: generatedAt.toUtcDateOrNull()
+            ?: date.toIsoDateOrNull()
 
     /** The stylized rendition — the one `/api/<date>` serves. */
     val stylizedVariant: ArtworkVariant?

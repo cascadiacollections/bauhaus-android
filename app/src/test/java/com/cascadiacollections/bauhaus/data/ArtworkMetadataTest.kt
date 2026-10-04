@@ -214,12 +214,21 @@ class ArtworkMetadataTest {
     }
 
     @Test
-    fun `an ISO date is used when published_date is absent`() {
-        val input = """{"date": "2026-07-31", "generated_at": "2026-08-01T00:00:01+00:00"}"""
+    fun `an ISO date is the last resort when published_date and generated_at are absent`() {
+        val input = """{"date": "2026-07-31"}"""
 
         val metadata = json.decodeFromString<ArtworkMetadata>(input)
 
         assertThat(metadata.publishedDate).isEqualTo(LocalDate.of(2026, 7, 31))
+    }
+
+    @Test
+    fun `an artwork's own ISO date does not override generated_at`() {
+        val input = """{"date": "2019-05-03", "generated_at": "2026-10-04T05:27:00Z"}"""
+
+        val metadata = json.decodeFromString<ArtworkMetadata>(input)
+
+        assertThat(metadata.publishedDate).isEqualTo(LocalDate.of(2026, 10, 4))
     }
 
     @Test

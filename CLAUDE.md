@@ -45,10 +45,11 @@ The service keys every artwork by **UTC** date and publishes at 04:00 UTC.
 - The metadata's `date` field is **not** the publish day. For most artworks it is
   the artwork's own date (`"ca. 1750"`). `publishedDate` resolves, in order:
   `published_date` (written by the pipeline since bauhaus#152, missing from older
-  archive entries); then `date`, but only when it is an ISO `yyyy-MM-dd`; then
-  the UTC calendar day of `generated_at`; then `null`. The pipeline takes the
-  archive key and `generated_at` from the same UTC clock, so for every entry they
-  name the same day.
+  archive entries); then the UTC calendar day of `generated_at`; then `date`,
+  but only when it is an ISO `yyyy-MM-dd`; then `null`. The pipeline takes the
+  archive key and `generated_at` from the same UTC clock, so for every entry
+  they name the same day. `date` comes last because an artwork whose own date
+  is ISO-formatted (`"2019-05-03"`) would otherwise read as published that day.
 - Between 00:00 and ~04:00 UTC the current UTC day is genuinely not published
   yet. That is what `/api/health` is for — it reports `stale`/`unhealthy` with the
   newest date the service does have. It is consulted only after a metadata fetch
