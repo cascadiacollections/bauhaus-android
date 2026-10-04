@@ -1,5 +1,4 @@
 #!/bin/sh
-unset ANDROID_PREFS_ROOT
 
 #
 # Copyright © 2015 the original authors.
