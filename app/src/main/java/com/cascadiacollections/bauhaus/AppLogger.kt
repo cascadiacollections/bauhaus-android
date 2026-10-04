@@ -6,10 +6,7 @@ import android.util.Log
  * Shared logging facade that mirrors to logcat and crash reporting.
  */
 object AppLogger {
-    data class Event(
-        val name: String,
-        val attributes: Map<String, String> = emptyMap(),
-    )
+    data class Event(val name: String, val attributes: Map<String, String> = emptyMap())
 
     fun info(tag: String, message: String) {
         Log.i(tag, message)

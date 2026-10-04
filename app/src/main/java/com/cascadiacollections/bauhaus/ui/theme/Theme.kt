@@ -24,10 +24,7 @@ import androidx.compose.ui.platform.LocalContext
  * cast that throws in any non-Activity ComposeView host.
  */
 @Composable
-fun BauhausTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit,
-) {
+fun BauhausTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val context = LocalContext.current
     val colorScheme = if (darkTheme) {
         dynamicDarkColorScheme(context)
@@ -37,6 +34,6 @@ fun BauhausTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
-        content = content,
+        content = content
     )
 }

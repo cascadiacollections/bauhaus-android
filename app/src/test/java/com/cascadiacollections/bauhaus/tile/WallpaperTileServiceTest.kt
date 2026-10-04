@@ -3,6 +3,7 @@ package com.cascadiacollections.bauhaus.tile
 import android.app.Application
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.serviceToday
+import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -10,7 +11,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.time.LocalDate
 
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, sdk = [36])

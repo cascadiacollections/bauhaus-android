@@ -13,8 +13,8 @@ import com.cascadiacollections.bauhaus.data.wallpaperTargetSize
 import com.cascadiacollections.bauhaus.notification.WallpaperNotifier
 import com.cascadiacollections.bauhaus.widget.BauhausAppWidget
 import com.cascadiacollections.bauhaus.widget.WidgetImageStore
-import kotlinx.coroutines.flow.first
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.flow.first
 
 /**
  * Background worker that fetches today's bauhaus artwork from the CDN and
@@ -46,11 +46,8 @@ import kotlin.coroutines.cancellation.CancellationException
  * screen resolution and explicitly recycled after [WallpaperManager.setBitmap]
  * to free native heap immediately.
  */
-class WallpaperWorker(
-    context: Context,
-    params: WorkerParameters,
-    private val dependencies: Dependencies,
-) : CoroutineWorker(context, params) {
+class WallpaperWorker(context: Context, params: WorkerParameters, private val dependencies: Dependencies) :
+    CoroutineWorker(context, params) {
 
     companion object {
         const val TAG = "WallpaperWorker"
@@ -71,10 +68,7 @@ class WallpaperWorker(
         private const val MAX_RETRIES = 3
     }
 
-    data class Dependencies(
-        val settings: SettingsStore,
-        val api: BauhausApiClient,
-    )
+    data class Dependencies(val settings: SettingsStore, val api: BauhausApiClient)
 
     override suspend fun doWork(): Result {
         // Only a run the user just asked for gets to interrupt them with a
@@ -85,7 +79,7 @@ class WallpaperWorker(
             AppLogger.warn(
                 TAG,
                 AppLogger.Event("worker_give_up", mapOf("attempt" to "$runAttemptCount")),
-                "Giving up after $MAX_RETRIES attempts to avoid excessive CDN requests",
+                "Giving up after $MAX_RETRIES attempts to avoid excessive CDN requests"
             )
             if (userInitiated) WallpaperNotifier.showFailed(applicationContext)
             return Result.failure()
@@ -106,7 +100,7 @@ class WallpaperWorker(
             AppLogger.info(
                 TAG,
                 AppLogger.Event("worker_skip_today", mapOf("date" to today)),
-                "Wallpaper already set for $today, skipping CDN fetch",
+                "Wallpaper already set for $today, skipping CDN fetch"
             )
             return Result.success()
         }
@@ -121,7 +115,7 @@ class WallpaperWorker(
             val targetSize = wallpaperTargetSize(applicationContext)
             val bitmap = api.fetchTodayImage(
                 maxWidth = targetSize.width,
-                maxHeight = targetSize.height,
+                maxHeight = targetSize.height
             )
 
             try {
@@ -132,7 +126,7 @@ class WallpaperWorker(
                 AppLogger.info(
                     TAG,
                     AppLogger.Event("worker_set_success", mapOf("target" to target.name)),
-                    "Wallpaper set for target: ${target.name}",
+                    "Wallpaper set for target: ${target.name}"
                 )
                 if (userInitiated) WallpaperNotifier.clear(applicationContext)
                 // Feeds the widget from the bitmap already in hand. The widget
@@ -151,7 +145,7 @@ class WallpaperWorker(
         } catch (e: Exception) {
             val event = AppLogger.Event(
                 "worker_set_failure",
-                mapOf("attempt" to "${runAttemptCount + 1}", "maxRetries" to "$MAX_RETRIES"),
+                mapOf("attempt" to "${runAttemptCount + 1}", "maxRetries" to "$MAX_RETRIES")
             )
             val message = "Failed to set wallpaper (attempt ${runAttemptCount + 1}/$MAX_RETRIES)"
             // A background job finding the device offline is routine. Logging it as

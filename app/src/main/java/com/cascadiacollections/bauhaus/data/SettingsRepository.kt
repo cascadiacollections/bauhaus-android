@@ -53,9 +53,7 @@ interface SettingsStore {
  *                  `backup_rules.xml`. Tests pass a store over a temporary file so
  *                  each case starts from an empty set of preferences.
  */
-open class SettingsRepository(
-    private val dataStore: DataStore<Preferences>,
-) : SettingsStore {
+open class SettingsRepository(private val dataStore: DataStore<Preferences>) : SettingsStore {
 
     constructor(context: Context) : this(context.dataStore)
 
@@ -89,8 +87,7 @@ open class SettingsRepository(
     }
 
     /** `true` on the very first app launch; `false` after the expedited worker runs. */
-    override suspend fun isFirstRun(): Boolean =
-        dataStore.data.first()[Keys.FIRST_RUN] ?: true
+    override suspend fun isFirstRun(): Boolean = dataStore.data.first()[Keys.FIRST_RUN] ?: true
 
     override suspend fun setWallpaperTarget(target: WallpaperTarget) {
         dataStore.edit { it[Keys.WALLPAPER_TARGET] = target.name }
@@ -104,8 +101,7 @@ open class SettingsRepository(
         dataStore.edit { it[Keys.LAST_UPDATED] = date }
     }
 
-    override suspend fun getLastPrefetchedDate(): String? =
-        dataStore.data.first()[Keys.LAST_PREFETCHED_DATE]
+    override suspend fun getLastPrefetchedDate(): String? = dataStore.data.first()[Keys.LAST_PREFETCHED_DATE]
 
     override suspend fun setLastPrefetchedDate(date: String) {
         dataStore.edit { it[Keys.LAST_PREFETCHED_DATE] = date }

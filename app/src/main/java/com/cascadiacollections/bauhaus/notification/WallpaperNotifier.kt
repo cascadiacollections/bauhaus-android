@@ -112,7 +112,7 @@ object WallpaperNotifier {
             0,
             Intent(context, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         return Notification.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_tile_bauhaus)
@@ -129,7 +129,7 @@ object WallpaperNotifier {
             AppLogger.warn(
                 TAG,
                 AppLogger.Event("notification_post_failure"),
-                "Could not post wallpaper notification: ${e.message}",
+                "Could not post wallpaper notification: ${e.message}"
             )
         }
     }
@@ -146,7 +146,7 @@ object WallpaperNotifier {
             context.getString(R.string.notification_channel_updates),
             // LOW, not DEFAULT: this reports on work the user just asked for.
             // It should be visible, never audible.
-            NotificationManager.IMPORTANCE_LOW,
+            NotificationManager.IMPORTANCE_LOW
         ).apply {
             description = context.getString(R.string.notification_channel_updates_description)
             setShowBadge(false)

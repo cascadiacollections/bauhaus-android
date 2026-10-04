@@ -8,12 +8,12 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.CachePolicy
 import com.cascadiacollections.bauhaus.data.serviceToday
 import com.cascadiacollections.bauhaus.worker.WallpaperWorker
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Application entry point. Responsible for:
@@ -30,7 +30,11 @@ import kotlin.coroutines.cancellation.CancellationException
  * 4. **Startup prefetch** — opportunistically fetches today's image once per day
  *    to warm HTTP cache before UI render.
  */
-class BauhausApplication : Application(), AppContainerProvider, SingletonImageLoader.Factory, Configuration.Provider {
+class BauhausApplication :
+    Application(),
+    AppContainerProvider,
+    SingletonImageLoader.Factory,
+    Configuration.Provider {
 
     companion object {
         private const val TAG = "BauhausApplication"
@@ -53,7 +57,7 @@ class BauhausApplication : Application(), AppContainerProvider, SingletonImageLo
                     Boolean::class.javaPrimitiveType,
                     Boolean::class.javaPrimitiveType,
                     Long::class.javaPrimitiveType,
-                    Boolean::class.javaPrimitiveType,
+                    Boolean::class.javaPrimitiveType
                 )
                 val customConfig = copyMethod.invoke(
                     config,
@@ -62,7 +66,7 @@ class BauhausApplication : Application(), AppContainerProvider, SingletonImageLo
                     false,
                     true,
                     5_000L,
-                    true,
+                    true
                 )
                 watcherClass.getMethod("setConfig", configClass).invoke(null, customConfig)
             }
@@ -89,24 +93,23 @@ class BauhausApplication : Application(), AppContainerProvider, SingletonImageLo
      * - AVIF/WebP format negotiation works via the `Accept` header interceptor
      * - OkHttp disk cache is shared (5-min TTL for `/api/today`)
      * - Memory cache uses Coil's default (25 % of heap — plenty for one image)
- *
- * Hardware bitmaps are left enabled: nothing reads pixels back out of a Coil
- * result. The wallpaper path decodes its own software bitmap in
- * [BauhausApi][com.cascadiacollections.bauhaus.data.BauhausApi], and saving to
- * the gallery writes the original bytes without decoding at all.
+     *
+     * Hardware bitmaps are left enabled: nothing reads pixels back out of a Coil
+     * result. The wallpaper path decodes its own software bitmap in
+     * [BauhausApi][com.cascadiacollections.bauhaus.data.BauhausApi], and saving to
+     * the gallery writes the original bytes without decoding at all.
      */
-    override fun newImageLoader(context: coil3.PlatformContext): ImageLoader =
-        ImageLoader.Builder(context)
-            .components {
-                add(
-                    OkHttpNetworkFetcherFactory(
-                        callFactory = { container.okHttpClient },
-                    ),
+    override fun newImageLoader(context: coil3.PlatformContext): ImageLoader = ImageLoader.Builder(context)
+        .components {
+            add(
+                OkHttpNetworkFetcherFactory(
+                    callFactory = { container.okHttpClient }
                 )
-            }
-            .diskCachePolicy(CachePolicy.ENABLED)
-            .memoryCachePolicy(CachePolicy.ENABLED)
-            .build()
+            )
+        }
+        .diskCachePolicy(CachePolicy.ENABLED)
+        .memoryCachePolicy(CachePolicy.ENABLED)
+        .build()
 
     // -- WorkManager --
 
@@ -169,7 +172,7 @@ class BauhausApplication : Application(), AppContainerProvider, SingletonImageLo
                 AppLogger.info(
                     TAG,
                     AppLogger.Event("startup_prefetch_success", mapOf("date" to today)),
-                    "Prefetched today's image into cache",
+                    "Prefetched today's image into cache"
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -179,7 +182,7 @@ class BauhausApplication : Application(), AppContainerProvider, SingletonImageLo
                 AppLogger.warn(
                     TAG,
                     AppLogger.Event("startup_prefetch_failure", mapOf("date" to today)),
-                    "Failed to prefetch today's image: ${e.message}",
+                    "Failed to prefetch today's image: ${e.message}"
                 )
             }
         }

@@ -13,6 +13,8 @@ import com.cascadiacollections.bauhaus.data.ServiceHealth
 import com.cascadiacollections.bauhaus.data.SettingsRepository
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 import com.cascadiacollections.bauhaus.data.serviceToday
+import java.time.Duration
+import java.time.LocalDate
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -37,8 +39,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowSystemClock
-import java.time.Duration
-import java.time.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -65,7 +65,7 @@ class BauhausViewModelTest {
             fakeSettings,
             fakeApi,
             fakeScheduler,
-            SavedStateHandle(),
+            SavedStateHandle()
         )
     }
 
@@ -106,7 +106,7 @@ class BauhausViewModelTest {
             FakeSettingsRepository(RuntimeEnvironment.getApplication()),
             failingApi,
             FakeWallpaperScheduler(),
-            SavedStateHandle(),
+            SavedStateHandle()
         )
         assertNull(vm.uiState.value.metadata)
         assertFalse(vm.uiState.value.isMetadataLoading)
@@ -126,7 +126,7 @@ class BauhausViewModelTest {
             FakeSettingsRepository(RuntimeEnvironment.getApplication()),
             api,
             FakeWallpaperScheduler(),
-            SavedStateHandle(),
+            SavedStateHandle()
         )
 
         assertEquals(published, vm.uiState.value.latestDate)
@@ -149,7 +149,7 @@ class BauhausViewModelTest {
             healthToReturn = ServiceHealth(
                 status = ServiceHealth.STATUS_STALE,
                 date = staleDate.toString(),
-                staleDays = 3,
+                staleDays = 3
             )
         }
         val vm = BauhausViewModel(
@@ -157,7 +157,7 @@ class BauhausViewModelTest {
             FakeSettingsRepository(RuntimeEnvironment.getApplication()),
             api,
             FakeWallpaperScheduler(),
-            SavedStateHandle(),
+            SavedStateHandle()
         )
         val events = mutableListOf<SnackbarEvent>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -225,14 +225,13 @@ class BauhausViewModelTest {
 
     // ── saved state restoration ──────────────────────────────────────────────
 
-    private fun viewModelWith(savedState: SavedStateHandle, api: FakeBauhausApi = FakeBauhausApi()) =
-        BauhausViewModel(
-            RuntimeEnvironment.getApplication(),
-            FakeSettingsRepository(RuntimeEnvironment.getApplication()),
-            api,
-            FakeWallpaperScheduler(),
-            savedState,
-        )
+    private fun viewModelWith(savedState: SavedStateHandle, api: FakeBauhausApi = FakeBauhausApi()) = BauhausViewModel(
+        RuntimeEnvironment.getApplication(),
+        FakeSettingsRepository(RuntimeEnvironment.getApplication()),
+        api,
+        FakeWallpaperScheduler(),
+        savedState
+    )
 
     @Test
     fun `browsing position is restored after process death`() {
@@ -241,9 +240,9 @@ class BauhausViewModelTest {
             SavedStateHandle(
                 mapOf(
                     "visible_date" to today.minusDays(2).toString(),
-                    "oldest_browsed_date" to today.minusDays(4).toString(),
-                ),
-            ),
+                    "oldest_browsed_date" to today.minusDays(4).toString()
+                )
+            )
         )
 
         assertEquals(today.minusDays(2), vm.uiState.value.visibleDate)
@@ -253,9 +252,9 @@ class BauhausViewModelTest {
                 today.minusDays(1),
                 today.minusDays(2),
                 today.minusDays(3),
-                today.minusDays(4),
+                today.minusDays(4)
             ),
-            vm.uiState.value.availableDates,
+            vm.uiState.value.availableDates
         )
     }
 
@@ -273,10 +272,10 @@ class BauhausViewModelTest {
             SavedStateHandle(
                 mapOf(
                     "visible_date" to restoredDate.toString(),
-                    "oldest_browsed_date" to restoredDate.toString(),
-                ),
+                    "oldest_browsed_date" to restoredDate.toString()
+                )
             ),
-            api,
+            api
         )
 
         assertEquals("Restored", vm.uiState.value.metadata?.title)
@@ -300,10 +299,10 @@ class BauhausViewModelTest {
             SavedStateHandle(
                 mapOf(
                     "visible_date" to restoredDate.toString(),
-                    "oldest_browsed_date" to restoredDate.toString(),
-                ),
+                    "oldest_browsed_date" to restoredDate.toString()
+                )
             ),
-            api,
+            api
         )
 
         // The restored page's own fetch already completed synchronously.
@@ -331,7 +330,7 @@ class BauhausViewModelTest {
     fun `a restored span beyond the expansion limit is discarded`() {
         val today = serviceToday()
         val vm = viewModelWith(
-            SavedStateHandle(mapOf("oldest_browsed_date" to today.minusDays(5_000).toString())),
+            SavedStateHandle(mapOf("oldest_browsed_date" to today.minusDays(5_000).toString()))
         )
 
         assertEquals(listOf(today), vm.uiState.value.availableDates)
@@ -345,9 +344,9 @@ class BauhausViewModelTest {
             SavedStateHandle(
                 mapOf(
                     "visible_date" to today.minusDays(30).toString(),
-                    "oldest_browsed_date" to today.minusDays(2).toString(),
-                ),
-            ),
+                    "oldest_browsed_date" to today.minusDays(2).toString()
+                )
+            )
         )
 
         assertEquals(today, vm.uiState.value.visibleDate)
@@ -359,9 +358,9 @@ class BauhausViewModelTest {
             SavedStateHandle(
                 mapOf(
                     "visible_date" to "not-a-date",
-                    "oldest_browsed_date" to "also-not-a-date",
-                ),
-            ),
+                    "oldest_browsed_date" to "also-not-a-date"
+                )
+            )
         )
 
         assertEquals(serviceToday(), vm.uiState.value.visibleDate)
@@ -559,7 +558,10 @@ class BauhausViewModelTest {
         viewModel.jumpToDate(targetDate)
 
         assertEquals(targetDate, viewModel.uiState.value.visibleDate)
-        assertEquals(listOf(today, today.minusDays(1), today.minusDays(2), targetDate), viewModel.uiState.value.availableDates)
+        assertEquals(
+            listOf(today, today.minusDays(1), today.minusDays(2), targetDate),
+            viewModel.uiState.value.availableDates
+        )
         assertEquals(targetMetadata, viewModel.uiState.value.metadata)
     }
 
@@ -603,7 +605,10 @@ class BauhausViewModelTest {
         viewModel.toggleFavoritesFilter()
         viewModel.toggleFavoritesFilter()
 
-        assertEquals(listOf(today, today.minusDays(1), today.minusDays(2), targetDate), viewModel.uiState.value.availableDates)
+        assertEquals(
+            listOf(today, today.minusDays(1), today.minusDays(2), targetDate),
+            viewModel.uiState.value.availableDates
+        )
     }
 
     @Test
@@ -713,7 +718,7 @@ class BauhausViewModelTest {
             FakeSettingsRepository(RuntimeEnvironment.getApplication()),
             failingApi,
             FakeWallpaperScheduler(),
-            SavedStateHandle(),
+            SavedStateHandle()
         )
         val events = mutableListOf<ShareArtworkEvent>()
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -895,9 +900,7 @@ class BauhausViewModelTest {
         }
     }
 
-    private class FakeSettingsRepository(
-        context: Context,
-    ) : SettingsRepository(context) {
+    private class FakeSettingsRepository(context: Context) : SettingsRepository(context) {
         private val _wallpaperTarget = MutableStateFlow(WallpaperTarget.BOTH)
         override val wallpaperTarget: Flow<WallpaperTarget> = _wallpaperTarget
 
@@ -914,9 +917,15 @@ class BauhausViewModelTest {
 
         var lastSetTarget: WallpaperTarget? = null
 
-        fun emitWallpaperTarget(target: WallpaperTarget) { _wallpaperTarget.value = target }
-        fun emitSchedulingEnabled(enabled: Boolean) { _schedulingEnabled.value = enabled }
-        fun emitLastUpdated(date: String?) { _lastUpdated.value = date }
+        fun emitWallpaperTarget(target: WallpaperTarget) {
+            _wallpaperTarget.value = target
+        }
+        fun emitSchedulingEnabled(enabled: Boolean) {
+            _schedulingEnabled.value = enabled
+        }
+        fun emitLastUpdated(date: String?) {
+            _lastUpdated.value = date
+        }
 
         override suspend fun setWallpaperTarget(target: WallpaperTarget) {
             lastSetTarget = target

@@ -54,7 +54,7 @@ class ServiceCalendarTest {
 
         assertTrue(
             "serviceToday() returned $actual, outside the UTC window [$before, $after]",
-            actual == before || actual == after,
+            actual == before || actual == after
         )
     }
 }

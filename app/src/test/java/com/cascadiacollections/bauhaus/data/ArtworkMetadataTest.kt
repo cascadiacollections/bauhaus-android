@@ -1,12 +1,12 @@
 package com.cascadiacollections.bauhaus.data
 
+import java.time.LocalDate
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.LocalDate
 
 class ArtworkMetadataTest {
 
@@ -193,7 +193,7 @@ class ServiceHealthTest {
     @Test
     fun `parses a healthy report`() {
         val health = json.decodeFromString<ServiceHealth>(
-            """{"status":"ok","date":"2026-07-31","stale_days":0}""",
+            """{"status":"ok","date":"2026-07-31","stale_days":0}"""
         )
 
         assertTrue(health.isCurrent)
@@ -203,7 +203,7 @@ class ServiceHealthTest {
     @Test
     fun `parses the stale 503 body`() {
         val health = json.decodeFromString<ServiceHealth>(
-            """{"status":"stale","date":"2026-07-28","stale_days":3}""",
+            """{"status":"stale","date":"2026-07-28","stale_days":3}"""
         )
 
         assertFalse(health.isCurrent)
@@ -214,7 +214,7 @@ class ServiceHealthTest {
     @Test
     fun `parses the unhealthy 503 body which carries no date`() {
         val health = json.decodeFromString<ServiceHealth>(
-            """{"status":"unhealthy","error":"no artwork published"}""",
+            """{"status":"unhealthy","error":"no artwork published"}"""
         )
 
         assertFalse(health.isCurrent)

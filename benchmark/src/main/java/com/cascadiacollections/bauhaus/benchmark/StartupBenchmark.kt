@@ -28,7 +28,7 @@ class StartupBenchmark {
         setupBlock = {
             pressHome()
             startActivityAndWait()
-        },
+        }
     ) {
         // The benchmark runner already launches the app for us; keep this block empty.
     }

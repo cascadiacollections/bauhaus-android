@@ -19,6 +19,9 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -30,9 +33,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -47,26 +50,23 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -105,10 +105,7 @@ object SettingsScreenTestTags {
     const val VIEW_LICENSE_BUTTON = "view_license_button"
 }
 
-internal data class ArchiveImageRequest(
-    val imagePath: String,
-    val cacheKey: String,
-)
+internal data class ArchiveImageRequest(val imagePath: String, val cacheKey: String)
 
 /**
  * Route for [date]'s image.
@@ -118,25 +115,20 @@ internal data class ArchiveImageRequest(
  * `/api/today`, which resolves server-side and shares a cache entry with the
  * startup prefetch and the daily worker.
  */
-internal fun imagePathForDate(
-    date: LocalDate,
-    latestDate: LocalDate,
-): String = if (date == latestDate) {
+internal fun imagePathForDate(date: LocalDate, latestDate: LocalDate): String = if (date == latestDate) {
     "/api/today"
 } else {
     BauhausApi.imagePath(date)
 }
 
-internal fun imageCacheKeyForDate(
-    date: LocalDate,
-    imageRevision: Int,
-): String = "${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}-$imageRevision"
+internal fun imageCacheKeyForDate(date: LocalDate, imageRevision: Int): String =
+    "${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}-$imageRevision"
 
 internal fun neighborPrefetchRequests(
     dates: List<LocalDate>,
     settledPage: Int,
     latestDate: LocalDate,
-    imageRevision: Int,
+    imageRevision: Int
 ): List<ArchiveImageRequest> {
     if (dates.isEmpty()) return emptyList()
     val neighbors = listOf(settledPage - 1, settledPage + 1)
@@ -146,7 +138,7 @@ internal fun neighborPrefetchRequests(
     return neighbors.map { date ->
         ArchiveImageRequest(
             imagePath = imagePathForDate(date, latestDate),
-            cacheKey = imageCacheKeyForDate(date, imageRevision),
+            cacheKey = imageCacheKeyForDate(date, imageRevision)
         )
     }
 }
@@ -156,7 +148,7 @@ internal fun previewImageSizePx(size: IntSize): IntSize {
     val maxHeight = 1600
     return IntSize(
         width = size.width.coerceAtLeast(1).coerceAtMost(maxWidth),
-        height = size.height.coerceAtLeast(1).coerceAtMost(maxHeight),
+        height = size.height.coerceAtLeast(1).coerceAtMost(maxHeight)
     )
 }
 
@@ -215,7 +207,7 @@ fun SettingsScreen(
     onArchivePageSelected: (Int) -> Unit,
     onRefresh: () -> Unit,
     showDatePicker: Boolean = false,
-    onDatePickerVisibilityChange: (Boolean) -> Unit = {},
+    onDatePickerVisibilityChange: (Boolean) -> Unit = {}
 ) {
     // Hoisted so a launcher shortcut can open the picker directly, but still
     // owned here for the ordinary in-app path, which no caller needs to know
@@ -239,7 +231,7 @@ fun SettingsScreen(
                     override fun isSelectableDate(utcTimeMillis: Long): Boolean = utcTimeMillis <= newestUtcMillis
                     override fun isSelectableYear(year: Int): Boolean = year <= newestDate.year
                 }
-            },
+            }
         )
         DatePickerDialog(
             onDismissRequest = dismissDatePicker,
@@ -250,7 +242,7 @@ fun SettingsScreen(
                             onJumpToDate(utcMillisToLocalDate(it))
                         }
                         dismissDatePicker()
-                    },
+                    }
                 ) {
                     Text(stringResource(android.R.string.ok))
                 }
@@ -259,7 +251,7 @@ fun SettingsScreen(
                 TextButton(onClick = dismissDatePicker) {
                     Text(stringResource(android.R.string.cancel))
                 }
-            },
+            }
         ) {
             DatePicker(state = datePickerState)
         }
@@ -268,7 +260,7 @@ fun SettingsScreen(
     PullToRefreshBox(
         isRefreshing = uiState.isRefreshing,
         onRefresh = onRefresh,
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize()
     ) {
         Column(
             modifier = Modifier
@@ -285,7 +277,7 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // -- Artwork preview --
             val haptics = LocalHapticFeedback.current
@@ -305,7 +297,7 @@ fun SettingsScreen(
                             onLongPress = {
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 onSaveImage()
-                            },
+                            }
                         )
                     }
                     .semantics {
@@ -313,12 +305,12 @@ fun SettingsScreen(
                             onSaveImage()
                             true
                         }
-                    },
+                    }
             ) {
                 val visiblePage = uiState.availableDates.indexOf(uiState.visibleDate).coerceAtLeast(0)
                 val pagerState = rememberPagerState(
                     initialPage = visiblePage,
-                    pageCount = { uiState.availableDates.size },
+                    pageCount = { uiState.availableDates.size }
                 )
                 val latestDate = uiState.latestDate
                 val aspectRatio = uiState.previewAspectRatio
@@ -331,9 +323,8 @@ fun SettingsScreen(
                 // wherever they are now.
                 val prefetchedNeighborKeys = remember(uiState.imageRevision) {
                     object : LinkedHashMap<String, Unit>(16, 0.75f, true) {
-                        override fun removeEldestEntry(
-                            eldest: MutableMap.MutableEntry<String, Unit>,
-                        ): Boolean = size > MAX_TRACKED_PREFETCH_KEYS
+                        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Unit>): Boolean =
+                            size > MAX_TRACKED_PREFETCH_KEYS
                     }
                 }
                 // Keyed on pagerState alone. Keying on availableDates restarted this
@@ -352,7 +343,7 @@ fun SettingsScreen(
                                 dates = currentState.availableDates,
                                 settledPage = pageIndex,
                                 latestDate = currentState.latestDate,
-                                imageRevision = currentState.imageRevision,
+                                imageRevision = currentState.imageRevision
                             ).forEach { request ->
                                 if (prefetchedNeighborKeys.put(request.cacheKey, Unit) == null) {
                                     imageLoader.enqueue(
@@ -361,7 +352,7 @@ fun SettingsScreen(
                                             .size(artworkPreviewSize.width, artworkPreviewSize.height)
                                             .memoryCacheKey(request.cacheKey)
                                             .diskCacheKey(request.cacheKey)
-                                            .build(),
+                                            .build()
                                     )
                                 }
                             }
@@ -378,7 +369,7 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(aspectRatio)
-                        .semantics { testTag = SettingsScreenTestTags.ARTWORK_PAGER },
+                        .semantics { testTag = SettingsScreenTestTags.ARTWORK_PAGER }
                 ) { page ->
                     val date = uiState.availableDates[page]
                     val cacheKey = imageCacheKeyForDate(date, uiState.imageRevision)
@@ -410,7 +401,7 @@ fun SettingsScreen(
                                 if (date == uiState.visibleDate) {
                                     testTag = SettingsScreenTestTags.ARTWORK_PREVIEW
                                 }
-                            },
+                            }
                     )
                 }
 
@@ -418,14 +409,14 @@ fun SettingsScreen(
                     text = stringResource(R.string.viewing_date, rememberDisplayDate(uiState.visibleDate)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
                 )
             }
             Button(
                 onClick = { showLocalDatePicker = true },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .semantics { testTag = SettingsScreenTestTags.JUMP_TO_DATE_BUTTON },
+                    .semantics { testTag = SettingsScreenTestTags.JUMP_TO_DATE_BUTTON }
             ) {
                 Text(stringResource(R.string.jump_to_date))
             }
@@ -433,7 +424,7 @@ fun SettingsScreen(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Start,
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 FilterChip(
                     selected = uiState.showFavoritesOnly,
@@ -444,26 +435,26 @@ fun SettingsScreen(
                         Icon(
                             imageVector = Icons.Filled.Favorite,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(18.dp)
                         )
                     },
-                    modifier = Modifier.semantics { testTag = SettingsScreenTestTags.FAVORITES_FILTER_CHIP },
+                    modifier = Modifier.semantics { testTag = SettingsScreenTestTags.FAVORITES_FILTER_CHIP }
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 IconButton(
                     onClick = onFavoriteToggle,
-                    modifier = Modifier.semantics { testTag = SettingsScreenTestTags.FAVORITE_BUTTON },
+                    modifier = Modifier.semantics { testTag = SettingsScreenTestTags.FAVORITE_BUTTON }
                 ) {
                     Icon(
                         imageVector = if (uiState.isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = stringResource(
-                            if (uiState.isFavorite) R.string.unfavorite_artwork else R.string.favorite_artwork,
+                            if (uiState.isFavorite) R.string.unfavorite_artwork else R.string.favorite_artwork
                         ),
                         tint = if (uiState.isFavorite) {
                             MaterialTheme.colorScheme.error
                         } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
-                        },
+                        }
                     )
                 }
             }
@@ -483,25 +474,25 @@ fun SettingsScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (uiState.isMetadataLoading) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp))
                             Text(
                                 text = stringResource(R.string.metadata_loading),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         } else {
                             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(
                                     text = stringResource(R.string.metadata_unavailable),
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = MaterialTheme.typography.bodyMedium
                                 )
                                 Text(
                                     text = stringResource(R.string.metadata_pull_to_retry),
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -514,40 +505,40 @@ fun SettingsScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         val title = metadata.title.trim().ifBlank { stringResource(R.string.daily_bauhaus) }
                         Text(
                             text = title,
                             style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.semantics { heading() },
+                            modifier = Modifier.semantics { heading() }
                         )
                         if (metadata.creator.isNotBlank()) {
                             Text(
                                 text = metadata.creator,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         if (metadata.date.isNotBlank()) {
                             Text(
                                 text = rememberDisplayDate(metadata.date),
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         if (metadata.source.isNotBlank()) {
                             Text(
                                 text = metadata.source,
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         if (metadata.styleCredit.isNotBlank()) {
                             Text(
                                 text = stringResource(R.string.style_credit, metadata.styleCredit),
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
@@ -564,14 +555,14 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .padding(top = 4.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 if (attributionUrl.isNotBlank()) {
                                     TextButton(
                                         onClick = { onOpenUrl(attributionUrl) },
                                         modifier = Modifier.semantics {
                                             testTag = SettingsScreenTestTags.VIEW_SOURCE_BUTTON
-                                        },
+                                        }
                                     ) {
                                         Text(stringResource(R.string.view_source))
                                     }
@@ -581,7 +572,7 @@ fun SettingsScreen(
                                         onClick = { onOpenUrl(licenseLink) },
                                         modifier = Modifier.semantics {
                                             testTag = SettingsScreenTestTags.VIEW_LICENSE_BUTTON
-                                        },
+                                        }
                                     ) {
                                         Text(licenseLabel.ifBlank { stringResource(R.string.view_license) })
                                     }
@@ -591,7 +582,7 @@ fun SettingsScreen(
                             Text(
                                 text = licenseLabel,
                                 style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -601,7 +592,7 @@ fun SettingsScreen(
             // -- Wallpaper target selector --
             Text(
                 text = stringResource(R.string.wallpaper_target),
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelLarge
             )
 
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -611,8 +602,8 @@ fun SettingsScreen(
                         onClick = { onWallpaperTargetChange(target) },
                         shape = SegmentedButtonDefaults.itemShape(
                             index = index,
-                            count = WallpaperTarget.entries.size,
-                        ),
+                            count = WallpaperTarget.entries.size
+                        )
                     ) {
                         val labelRes = when (target) {
                             WallpaperTarget.HOME -> R.string.wallpaper_target_home
@@ -630,23 +621,23 @@ fun SettingsScreen(
                 trailingContent = {
                     Switch(
                         checked = uiState.schedulingEnabled,
-                        onCheckedChange = null,
+                        onCheckedChange = null
                     )
                 },
                 modifier = Modifier
                     .toggleable(
                         value = uiState.schedulingEnabled,
                         onValueChange = onSchedulingToggle,
-                        role = Role.Switch,
+                        role = Role.Switch
                     )
-                    .semantics { testTag = SettingsScreenTestTags.DAILY_UPDATES_SWITCH },
+                    .semantics { testTag = SettingsScreenTestTags.DAILY_UPDATES_SWITCH }
             )
 
             uiState.lastUpdated?.let { date ->
                 Text(
                     text = stringResource(R.string.last_updated, rememberDisplayDate(date)),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -658,7 +649,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .semantics { testTag = SettingsScreenTestTags.SET_NOW_BUTTON },
-                enabled = !uiState.isSettingWallpaper,
+                enabled = !uiState.isSettingWallpaper
             ) {
                 if (uiState.isSettingWallpaper) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
@@ -672,7 +663,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .semantics { testTag = SettingsScreenTestTags.SAVE_IMAGE_BUTTON },
-                enabled = !uiState.isSavingImage,
+                enabled = !uiState.isSavingImage
             ) {
                 if (uiState.isSavingImage) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
@@ -692,14 +683,13 @@ fun SettingsScreen(
                 onClick = onAddQuickSettingsTile,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .semantics { testTag = SettingsScreenTestTags.ADD_TILE_BUTTON },
+                    .semantics { testTag = SettingsScreenTestTags.ADD_TILE_BUTTON }
             ) {
                 Text(stringResource(R.string.add_tile))
             }
         }
     }
 }
-
 
 /**
  * Formats [date] the way the reader's locale writes dates.
@@ -714,7 +704,7 @@ internal fun rememberDisplayDate(date: LocalDate): String {
     return remember(date, configuration) {
         date.format(
             DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
-                .withLocale(configuration.locales[0]),
+                .withLocale(configuration.locales[0])
         )
     }
 }
@@ -733,7 +723,7 @@ internal fun rememberDisplayDate(isoDate: String): String {
         runCatching {
             LocalDate.parse(isoDate).format(
                 DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
-                    .withLocale(configuration.locales[0]),
+                    .withLocale(configuration.locales[0])
             )
         }.getOrDefault(isoDate)
     }

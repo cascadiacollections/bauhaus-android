@@ -7,13 +7,13 @@ import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
+import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.updateAll
-import androidx.glance.action.actionStartActivity
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -61,7 +61,7 @@ class BauhausAppWidget : GlanceAppWidget() {
                     AppLogger.warn(
                         TAG,
                         AppLogger.Event("widget_refresh_failure"),
-                        "Could not refresh widgets: ${e.message}",
+                        "Could not refresh widgets: ${e.message}"
                     )
                 }
         }
@@ -80,20 +80,20 @@ class BauhausAppWidget : GlanceAppWidget() {
                         .background(GlanceTheme.colors.widgetBackground)
                         .cornerRadius(16.dp)
                         .clickable(actionStartActivity<MainActivity>()),
-                    contentAlignment = Alignment.Center,
+                    contentAlignment = Alignment.Center
                 ) {
                     if (bitmap != null) {
                         Image(
                             provider = ImageProvider(bitmap),
                             contentDescription = context.getString(R.string.todays_artwork),
                             contentScale = ContentScale.Crop,
-                            modifier = GlanceModifier.fillMaxSize().cornerRadius(16.dp),
+                            modifier = GlanceModifier.fillMaxSize().cornerRadius(16.dp)
                         )
                     } else {
                         Text(
                             text = context.getString(R.string.widget_awaiting_artwork),
                             style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant),
-                            modifier = GlanceModifier.padding(12.dp),
+                            modifier = GlanceModifier.padding(12.dp)
                         )
                     }
                 }

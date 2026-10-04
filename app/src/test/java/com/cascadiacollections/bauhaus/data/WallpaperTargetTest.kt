@@ -20,7 +20,7 @@ class WallpaperTargetTest {
     fun `BOTH flag is bitwise OR of SYSTEM and LOCK`() {
         assertEquals(
             WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK,
-            WallpaperTarget.BOTH.flag,
+            WallpaperTarget.BOTH.flag
         )
     }
 

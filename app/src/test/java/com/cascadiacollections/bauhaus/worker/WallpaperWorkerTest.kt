@@ -16,6 +16,7 @@ import com.cascadiacollections.bauhaus.data.ServiceHealth
 import com.cascadiacollections.bauhaus.data.SettingsStore
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 import com.cascadiacollections.bauhaus.data.serviceToday
+import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -23,12 +24,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
-import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import org.junit.runner.RunWith
-import java.time.LocalDate
 
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, sdk = [36])
@@ -92,7 +92,7 @@ class WallpaperWorkerTest {
             FakeSettings(lastUpdated = "2000-01-01"),
             FakeApi(shouldThrow = true),
             runAttemptCount = 3,
-            userInitiated = true,
+            userInitiated = true
         )
 
         worker.doWork()
@@ -107,7 +107,7 @@ class WallpaperWorkerTest {
         val worker = buildWorker(
             FakeSettings(lastUpdated = "2000-01-01"),
             FakeApi(shouldThrow = true),
-            runAttemptCount = 3,
+            runAttemptCount = 3
         )
 
         worker.doWork()
@@ -115,31 +115,28 @@ class WallpaperWorkerTest {
         assertTrue(postedNotifications().isEmpty())
     }
 
-    private fun postedNotifications() =
-        shadowOf(
-            RuntimeEnvironment.getApplication()
-                .getSystemService(NotificationManager::class.java),
-        ).allNotifications
+    private fun postedNotifications() = shadowOf(
+        RuntimeEnvironment.getApplication()
+            .getSystemService(NotificationManager::class.java)
+    ).allNotifications
 
     private fun buildWorker(
         settings: SettingsStore,
         api: BauhausApiClient,
         runAttemptCount: Int = 0,
-        userInitiated: Boolean = false,
+        userInitiated: Boolean = false
     ): WallpaperWorker {
         val dependencies = WallpaperWorker.Dependencies(settings, api)
         val factory = object : WorkerFactory() {
             override fun createWorker(
                 appContext: Context,
                 workerClassName: String,
-                workerParameters: WorkerParameters,
-            ): ListenableWorker? {
-                return WallpaperWorker(
-                    context = appContext,
-                    params = workerParameters,
-                    dependencies = dependencies,
-                )
-            }
+                workerParameters: WorkerParameters
+            ): ListenableWorker? = WallpaperWorker(
+                context = appContext,
+                params = workerParameters,
+                dependencies = dependencies
+            )
         }
 
         val testContext: Context = RuntimeEnvironment.getApplication()
@@ -166,9 +163,7 @@ class WallpaperWorkerTest {
         override suspend fun toggleFavorite(date: String) = Unit
     }
 
-    private class FakeApi(
-        private val shouldThrow: Boolean = false,
-    ) : BauhausApiClient {
+    private class FakeApi(private val shouldThrow: Boolean = false) : BauhausApiClient {
         var fetchCalled = false
 
         override suspend fun fetchTodayImage(maxWidth: Int, maxHeight: Int): Bitmap {
