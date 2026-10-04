@@ -169,6 +169,28 @@ data class ServiceHealth(
     }
 }
 
+/**
+ * One page of `GET /api/archive` — the dates that have published artwork.
+ *
+ * Publishing is daily but not gap-free: a failed pipeline run leaves a day with
+ * no artwork at all (2026-10-02 is one; 2026-07-20 to 07-30 is another), so the
+ * only way to know which days exist is to ask.
+ *
+ * @property dates ISO dates, newest first.
+ * @property next Service-relative URL of the following (older) page, absent on
+ *   the last one.
+ */
+@Serializable
+data class ArchiveIndexPage(val dates: List<String> = emptyList(), val next: String? = null) {
+    /** [dates] parsed, newest first; entries that are not ISO dates are dropped. */
+    val publishedDates: List<LocalDate>
+        get() = dates.mapNotNull { it.toIsoDateOrNull() }
+
+    /** `true` when older dates exist beyond this page. */
+    val hasMore: Boolean
+        get() = !next.isNullOrBlank()
+}
+
 /** This string as an ISO `yyyy-MM-dd` date, or `null` when it is not one. */
 private fun String.toIsoDateOrNull(): LocalDate? =
     trim().takeIf { it.isNotEmpty() }?.let { runCatching { LocalDate.parse(it) }.getOrNull() }

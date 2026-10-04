@@ -23,13 +23,55 @@ class SettingsScreenPrefetchTest {
             dates = dates,
             settledPage = 1,
             latestDate = today,
+            latestDateStatus = LatestDateStatus.CONFIRMED,
             imageRevision = 3
         )
 
         assertThat(requests).containsExactly(
-            ArchiveImageRequest("/api/today", "2026-05-10-3"),
+            ArchiveImageRequest("/api/2026-05-10", "2026-05-10-3"),
             ArchiveImageRequest("/api/2026-05-08", "2026-05-08-3")
         )
+    }
+
+    @Test
+    fun `neighborPrefetchRequests skips the newest page while its date is resolving`() {
+        val dates = listOf(today, today.minusDays(1), today.minusDays(2))
+
+        val requests = neighborPrefetchRequests(
+            dates = dates,
+            settledPage = 1,
+            latestDate = today,
+            latestDateStatus = LatestDateStatus.RESOLVING,
+            imageRevision = 0
+        )
+
+        assertThat(requests).containsExactly(ArchiveImageRequest("/api/2026-05-08", "2026-05-08-0"))
+    }
+
+    @Test
+    fun `the newest page loads its own immutable URL once the service confirms the date`() {
+        // Loading /api/today under a date key cached whatever day /api/today was
+        // on at the time — before the publish, yesterday's — under today's key.
+        val request = archiveImageRequest(today, today, LatestDateStatus.CONFIRMED, imageRevision = 2)
+
+        assertThat(request).isEqualTo(ArchiveImageRequest("/api/2026-05-10", "2026-05-10-2"))
+    }
+
+    @Test
+    fun `an unconfirmed newest page uses today's route and stays out of Coil's disk cache`() {
+        val request = archiveImageRequest(today, today, LatestDateStatus.UNCONFIRMED, imageRevision = 2)
+
+        assertThat(request).isEqualTo(ArchiveImageRequest("/api/today", "today-2", diskCacheable = false))
+    }
+
+    @Test
+    fun `older pages load their own URL whatever the newest date's status`() {
+        val older = today.minusDays(1)
+
+        LatestDateStatus.entries.forEach { status ->
+            assertThat(archiveImageRequest(older, today, status, imageRevision = 0), name = "$status")
+                .isEqualTo(ArchiveImageRequest("/api/2026-05-09", "2026-05-09-0"))
+        }
     }
 
     @Test
@@ -40,6 +82,7 @@ class SettingsScreenPrefetchTest {
             dates = dates,
             settledPage = 0,
             latestDate = today,
+            latestDateStatus = LatestDateStatus.CONFIRMED,
             imageRevision = 1
         )
 
@@ -54,6 +97,7 @@ class SettingsScreenPrefetchTest {
             dates = dates,
             settledPage = 10,
             latestDate = today,
+            latestDateStatus = LatestDateStatus.CONFIRMED,
             imageRevision = 1
         )
 

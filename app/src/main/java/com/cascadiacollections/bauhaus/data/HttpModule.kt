@@ -55,8 +55,12 @@ object HttpModule {
      */
     private val NON_IMAGE_SUFFIXES = listOf(".json", ".sig")
 
-    private fun HttpUrl.isServiceImageRequest(): Boolean =
-        host == CDN_HOST && NON_IMAGE_SUFFIXES.none { encodedPath.endsWith(it) }
+    /** JSON routes whose paths carry no suffix at all. */
+    private val NON_IMAGE_PATHS = setOf("/api/archive", "/api/health")
+
+    private fun HttpUrl.isServiceImageRequest(): Boolean = host == CDN_HOST &&
+        encodedPath !in NON_IMAGE_PATHS &&
+        NON_IMAGE_SUFFIXES.none { encodedPath.endsWith(it) }
 
     /**
      * Interceptor that injects the `Accept` header for image format negotiation

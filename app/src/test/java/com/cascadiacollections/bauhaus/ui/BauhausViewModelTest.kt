@@ -1,8 +1,6 @@
 package com.cascadiacollections.bauhaus.ui
 
 import android.app.Application
-import android.content.Context
-import android.graphics.Bitmap
 import androidx.lifecycle.SavedStateHandle
 import assertk.assertThat
 import assertk.assertions.contains
@@ -17,19 +15,14 @@ import assertk.assertions.isTrue
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
-import com.cascadiacollections.bauhaus.data.BauhausApiClient
 import com.cascadiacollections.bauhaus.data.BauhausHttpException
 import com.cascadiacollections.bauhaus.data.ServiceHealth
-import com.cascadiacollections.bauhaus.data.SettingsRepository
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 import com.cascadiacollections.bauhaus.data.serviceToday
 import java.time.Duration
-import java.time.LocalDate
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -540,9 +533,9 @@ class BauhausViewModelTest {
     }
 
     @Test
-    fun `archive is marked complete when older date returns 404`() {
+    fun `archive is marked complete when the index has nothing older`() {
         val today = viewModel.uiState.value.visibleDate
-        fakeApi.missingDates += today.minusDays(1)
+        fakeApi.archiveStart = today
 
         viewModel.onArchivePageSelected(0)
 
@@ -618,16 +611,16 @@ class BauhausViewModelTest {
     }
 
     @Test
-    fun `jumpToDate probes only the target date instead of every day in the span`() {
+    fun `jumpToDate reads the archive index once instead of every day in the span`() {
         val today = viewModel.uiState.value.visibleDate
         val targetDate = today.minusDays(400)
         fakeApi.dateMetadata[targetDate] = ArtworkMetadata(title = "Jumped", artist = "Archive")
-        fakeApi.probedDates.clear()
+        fakeApi.archiveRequests.clear()
         fakeApi.fetchedMetadataDates.clear()
 
         viewModel.jumpToDate(targetDate)
 
-        assertThat(fakeApi.probedDates).containsExactly(targetDate)
+        assertThat(fakeApi.archiveRequests).containsExactly(today)
         // Only the landed-on page needs its metadata; the 399 pages skipped over
         // must not each cost a request.
         assertThat(fakeApi.fetchedMetadataDates).containsExactly(targetDate)
@@ -662,13 +655,13 @@ class BauhausViewModelTest {
         }
 
         val today = viewModel.uiState.value.visibleDate
-        fakeApi.probedDates.clear()
+        fakeApi.archiveRequests.clear()
 
         viewModel.jumpToDate(today.minusDays(1000))
 
         val expected = RuntimeEnvironment.getApplication().getString(R.string.error_archive_jump_too_far)
         assertThat(events.map { it.message }).containsExactly(expected)
-        assertThat(fakeApi.probedDates).isEmpty()
+        assertThat(fakeApi.archiveRequests).isEmpty()
     }
 
     @Test
@@ -790,168 +783,5 @@ class BauhausViewModelTest {
 
         assertThat(viewModel.uiState.value.showFavoritesOnly).isFalse()
         assertThat(viewModel.uiState.value.availableDates).containsExactly(today, older)
-    }
-
-    // ── Fakes ────────────────────────────────────────────────────────────────
-
-    private class FakeBauhausApi : BauhausApiClient {
-        companion object {
-            val DEFAULT_METADATA = ArtworkMetadata(title = "Test", artist = "Test Artist")
-        }
-
-        var metadataToReturn: ArtworkMetadata = DEFAULT_METADATA
-        var shouldThrow = false
-        var throwIOException = false
-        var healthToReturn: ServiceHealth = ServiceHealth(status = ServiceHealth.STATUS_OK)
-        val dateMetadata: MutableMap<LocalDate, ArtworkMetadata> = mutableMapOf()
-        val missingDates: MutableSet<LocalDate> = mutableSetOf()
-
-        /** Dates probed via [hasArtworkForDate], in call order. */
-        val probedDates: MutableList<LocalDate> = mutableListOf()
-
-        /** Dates whose metadata was actually fetched, in call order. */
-        val fetchedMetadataDates: MutableList<LocalDate> = mutableListOf()
-
-        override suspend fun hasArtworkForDate(date: LocalDate): Boolean {
-            probedDates += date
-            if (throwIOException) throw java.io.IOException("Unable to resolve host")
-            if (shouldThrow) throw RuntimeException("Unexpected error")
-            return date !in missingDates
-        }
-
-        /** Number of times [fetchHealth] has been called. */
-        var healthCalls = 0
-
-        /** Thrown from [fetchHealth] when set, simulating an unreachable probe. */
-        var healthError: Throwable? = null
-
-        override suspend fun fetchHealth(): ServiceHealth {
-            healthCalls++
-            healthError?.let { throw it }
-            return healthToReturn
-        }
-
-        /** Thrown from [fetchTodayMetadata] when set, in preference to the flags above. */
-        var todayMetadataError: Throwable? = null
-
-        /** Number of times [fetchTodayMetadata] has been entered. */
-        var todayMetadataCalls = 0
-
-        /** When set, [fetchTodayMetadata] parks until it completes, simulating a slow service. */
-        var todayMetadataGate: CompletableDeferred<Unit>? = null
-
-        override suspend fun fetchTodayMetadata(): ArtworkMetadata {
-            todayMetadataCalls++
-            todayMetadataGate?.await()
-            todayMetadataError?.let { throw it }
-            if (throwIOException) throw java.io.IOException("Unable to resolve host")
-            if (shouldThrow) throw RuntimeException("Unexpected error")
-            return metadataToReturn
-        }
-
-        /** Dates whose [fetchMetadataForDate] parks until the deferred completes. */
-        val dateMetadataGates: MutableMap<LocalDate, CompletableDeferred<Unit>> = mutableMapOf()
-
-        override suspend fun fetchMetadataForDate(date: LocalDate): ArtworkMetadata {
-            fetchedMetadataDates += date
-            dateMetadataGates[date]?.await()
-            if (throwIOException) throw java.io.IOException("Unable to resolve host")
-            if (shouldThrow) throw RuntimeException("Unexpected error")
-            if (missingDates.contains(date)) throw BauhausHttpException(404, "/api/$date.json")
-            return dateMetadata[date] ?: ArtworkMetadata(title = "Date $date", artist = "Archive")
-        }
-
-        override suspend fun fetchTodayImage(maxWidth: Int, maxHeight: Int): Bitmap {
-            if (throwIOException) throw java.io.IOException("Unable to resolve host")
-            if (shouldThrow) throw RuntimeException("Unexpected error")
-            return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
-        }
-
-        override suspend fun fetchImageForDate(date: LocalDate, maxWidth: Int, maxHeight: Int): Bitmap {
-            if (throwIOException) throw java.io.IOException("Unable to resolve host")
-            if (shouldThrow) throw RuntimeException("Unexpected error")
-            if (missingDates.contains(date)) throw BauhausHttpException(404, "/api/$date")
-            return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
-        }
-
-        override suspend fun fetchTodayImageRaw(): Pair<ByteArray, String> {
-            if (throwIOException) throw java.io.IOException("Unable to resolve host")
-            if (shouldThrow) throw RuntimeException("Unexpected error")
-            return byteArrayOf(0) to "image/jpeg"
-        }
-
-        override suspend fun fetchImageRawForDate(date: LocalDate): Pair<ByteArray, String> {
-            if (throwIOException) throw java.io.IOException("Unable to resolve host")
-            if (shouldThrow) throw RuntimeException("Unexpected error")
-            if (missingDates.contains(date)) throw BauhausHttpException(404, "/api/$date")
-            return byteArrayOf(0) to "image/jpeg"
-        }
-    }
-
-    private class FakeWallpaperScheduler : com.cascadiacollections.bauhaus.WallpaperScheduler {
-        var scheduled = false
-        var cancelled = false
-        var immediateRequests = 0
-
-        override fun scheduleDaily() {
-            scheduled = true
-        }
-
-        override fun cancelDaily() {
-            cancelled = true
-        }
-
-        override fun requestImmediateUpdate() {
-            immediateRequests++
-        }
-    }
-
-    private class FakeSettingsRepository(context: Context) : SettingsRepository(context) {
-        private val _wallpaperTarget = MutableStateFlow(WallpaperTarget.BOTH)
-        override val wallpaperTarget: Flow<WallpaperTarget> = _wallpaperTarget
-
-        private val _schedulingEnabled = MutableStateFlow(true)
-        override val schedulingEnabled: Flow<Boolean> = _schedulingEnabled
-
-        private val _lastUpdated = MutableStateFlow<String?>(null)
-        override val lastUpdated: Flow<String?> = _lastUpdated
-
-        private val _favorites = MutableStateFlow<Set<String>>(emptySet())
-        override val favorites: Flow<Set<String>> = _favorites
-
-        val favoriteDatesSet: Set<String> get() = _favorites.value
-
-        var lastSetTarget: WallpaperTarget? = null
-
-        fun emitWallpaperTarget(target: WallpaperTarget) {
-            _wallpaperTarget.value = target
-        }
-        fun emitSchedulingEnabled(enabled: Boolean) {
-            _schedulingEnabled.value = enabled
-        }
-        fun emitLastUpdated(date: String?) {
-            _lastUpdated.value = date
-        }
-
-        override suspend fun setWallpaperTarget(target: WallpaperTarget) {
-            lastSetTarget = target
-            _wallpaperTarget.value = target
-        }
-
-        override suspend fun setSchedulingEnabled(enabled: Boolean) {
-            _schedulingEnabled.value = enabled
-        }
-
-        override suspend fun setLastUpdated(date: String) {
-            _lastUpdated.value = date
-        }
-
-        override suspend fun toggleFavorite(date: String) {
-            _favorites.value = if (date in _favorites.value) {
-                _favorites.value - date
-            } else {
-                _favorites.value + date
-            }
-        }
     }
 }

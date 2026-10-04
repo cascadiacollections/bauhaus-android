@@ -2,6 +2,7 @@ package com.cascadiacollections.bauhaus.data
 
 import assertk.assertFailure
 import assertk.assertThat
+import assertk.assertions.containsExactly
 import assertk.assertions.isEqualTo
 import assertk.assertions.isFalse
 import assertk.assertions.isGreaterThanOrEqualTo
@@ -11,6 +12,7 @@ import assertk.assertions.prop
 import java.io.IOException
 import java.time.LocalDate
 import kotlinx.coroutines.test.runTest
+import okhttp3.HttpUrl
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -116,49 +118,60 @@ class BauhausApiTest {
     }
 
     @Test
-    fun `hasArtworkForDate is true for 200 and issues a HEAD`() = runTest {
-        var observedMethod: String? = null
+    fun `fetchArchivePage parses the live archive shape, gaps included`() = runTest {
+        // Shaped after /api/archive on 2026-10-04: 2026-10-02 was never published.
+        val api = BauhausApi(
+            clientResponding(
+                200,
+                """
+                {"dates":["2026-10-03","2026-10-01","2026-09-30"],"count":3,"total":183,
+                 "next":"/api/archive?limit=3&before=2026-09-30"}
+                """.trimIndent()
+            )
+        )
+
+        val page = api.fetchArchivePage(LocalDate.of(2026, 10, 4))
+
+        assertThat(page.publishedDates).containsExactly(
+            LocalDate.of(2026, 10, 3),
+            LocalDate.of(2026, 10, 1),
+            LocalDate.of(2026, 9, 30)
+        )
+        assertThat(page.hasMore).isTrue()
+    }
+
+    @Test
+    fun `the archive's last page has no more`() = runTest {
+        val api = BauhausApi(clientResponding(200, """{"dates":["2026-01-02"],"count":1,"total":1}"""))
+
+        assertThat(api.fetchArchivePage(LocalDate.of(2026, 1, 3)).hasMore).isFalse()
+    }
+
+    @Test
+    fun `fetchArchivePage asks for the largest page of dates before the given day`() = runTest {
+        var observedUrl: HttpUrl? = null
         val client = OkHttpClient.Builder()
             .addInterceptor { chain ->
-                observedMethod = chain.request().method
-                respond(chain.request(), 200, "")
+                observedUrl = chain.request().url
+                respond(chain.request(), 200, """{"dates":[]}""")
             }
             .build()
 
-        assertThat(BauhausApi(client).hasArtworkForDate(LocalDate.of(2026, 7, 31))).isTrue()
-        assertThat(observedMethod).isEqualTo("HEAD")
+        BauhausApi(client).fetchArchivePage(LocalDate.of(2026, 7, 31))
+
+        assertThat(observedUrl?.encodedPath).isEqualTo("/api/archive")
+        assertThat(observedUrl?.queryParameter("before")).isEqualTo("2026-07-31")
+        assertThat(observedUrl?.queryParameter("limit")).isEqualTo("1000")
     }
 
     @Test
-    fun `hasArtworkForDate is false for 404 rather than throwing`() = runTest {
-        val api = BauhausApi(clientResponding(404, ""))
+    fun `fetchArchivePage throws typed http exception`() = runTest {
+        val api = BauhausApi(clientResponding(400, """{"error":"limit must be between 1 and 1000"}"""))
 
-        assertThat(api.hasArtworkForDate(LocalDate.of(2001, 1, 1))).isFalse()
-    }
-
-    @Test
-    fun `hasArtworkForDate throws for statuses that are not a clean yes or no`() = runTest {
-        val api = BauhausApi(clientResponding(500, ""))
-
-        assertFailure { api.hasArtworkForDate(LocalDate.of(2026, 7, 31)) }
+        assertFailure { api.fetchArchivePage(LocalDate.of(2026, 7, 31)) }
             .isInstanceOf<BauhausHttpException>()
             .prop(BauhausHttpException::code)
-            .isEqualTo(500)
-    }
-
-    @Test
-    fun `hasArtworkForDate probes the metadata document for the date`() = runTest {
-        var observedPath: String? = null
-        val client = OkHttpClient.Builder()
-            .addInterceptor { chain ->
-                observedPath = chain.request().url.encodedPath
-                respond(chain.request(), 200, "")
-            }
-            .build()
-
-        BauhausApi(client).hasArtworkForDate(LocalDate.of(2026, 7, 31))
-
-        assertThat(observedPath).isEqualTo("/api/2026-07-31.json")
+            .isEqualTo(400)
     }
 
     @Test
