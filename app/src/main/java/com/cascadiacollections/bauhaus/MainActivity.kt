@@ -32,21 +32,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.core.net.toUri
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.cascadiacollections.bauhaus.tile.WallpaperTileService
 import com.cascadiacollections.bauhaus.ui.BauhausViewModel
 import com.cascadiacollections.bauhaus.ui.SettingsScreen
 import com.cascadiacollections.bauhaus.ui.SettingsScreenTestTags
 import com.cascadiacollections.bauhaus.ui.theme.BauhausTheme
-import com.cascadiacollections.bauhaus.tile.WallpaperTileService
 import kotlinx.coroutines.launch
 
 /**
@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
     private var pendingShortcutAction by mutableStateOf<String?>(null)
 
     private val notificationPermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission(),
+        ActivityResultContracts.RequestPermission()
     ) { /* Denied is fine — updates just happen without a progress notification. */ }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -97,7 +97,7 @@ class MainActivity : ComponentActivity() {
                             val result = snackbarHostState.showSnackbar(
                                 message = event.message,
                                 actionLabel = event.uri?.let { getString(R.string.action_open) },
-                                duration = SnackbarDuration.Short,
+                                duration = SnackbarDuration.Short
                             )
                             if (result == SnackbarResult.ActionPerformed) {
                                 event.uri?.let { uri ->
@@ -120,7 +120,7 @@ class MainActivity : ComponentActivity() {
                             } catch (_: ActivityNotFoundException) {
                                 snackbarHostState.showSnackbar(
                                     message = getString(R.string.error_share_unavailable),
-                                    duration = SnackbarDuration.Short,
+                                    duration = SnackbarDuration.Short
                                 )
                             }
                         }
@@ -139,9 +139,10 @@ class MainActivity : ComponentActivity() {
                                 .wallpaperScheduler.requestImmediateUpdate()
                             snackbarHostState.showSnackbar(
                                 message = getString(R.string.shortcut_update_requested),
-                                duration = SnackbarDuration.Short,
+                                duration = SnackbarDuration.Short
                             )
                         }
+
                         ACTION_BROWSE_ARCHIVE -> showArchivePicker = true
                     }
                     pendingShortcutAction = null
@@ -157,11 +158,11 @@ class MainActivity : ComponentActivity() {
                                     enabled = !uiState.isSavingImage,
                                     modifier = Modifier.semantics {
                                         testTag = SettingsScreenTestTags.SHARE_ICON
-                                    },
+                                    }
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Share,
-                                        contentDescription = stringResource(R.string.share_artwork),
+                                        contentDescription = stringResource(R.string.share_artwork)
                                     )
                                 }
                                 IconButton(
@@ -169,17 +170,17 @@ class MainActivity : ComponentActivity() {
                                     enabled = !uiState.isSavingImage,
                                     modifier = Modifier.semantics {
                                         testTag = SettingsScreenTestTags.DOWNLOAD_ICON
-                                    },
+                                    }
                                 ) {
                                     Icon(
                                         painter = painterResource(R.drawable.ic_download),
-                                        contentDescription = stringResource(R.string.save_image),
+                                        contentDescription = stringResource(R.string.save_image)
                                     )
                                 }
-                            },
+                            }
                         )
                     },
-                    snackbarHost = { SnackbarHost(snackbarHostState) },
+                    snackbarHost = { SnackbarHost(snackbarHostState) }
                 ) { innerPadding ->
                     SettingsScreen(
                         uiState = uiState,
@@ -197,7 +198,7 @@ class MainActivity : ComponentActivity() {
                                 scope.launch {
                                     snackbarHostState.showSnackbar(
                                         message = getString(R.string.error_open_link_unavailable),
-                                        duration = SnackbarDuration.Short,
+                                        duration = SnackbarDuration.Short
                                     )
                                 }
                             }
@@ -217,12 +218,12 @@ class MainActivity : ComponentActivity() {
                                 scope.launch {
                                     snackbarHostState.showSnackbar(
                                         message = getString(messageRes),
-                                        duration = SnackbarDuration.Short,
+                                        duration = SnackbarDuration.Short
                                     )
                                 }
                             }
                         },
-                        modifier = Modifier.padding(innerPadding),
+                        modifier = Modifier.padding(innerPadding)
                     )
                 }
             }
@@ -257,16 +258,19 @@ class MainActivity : ComponentActivity() {
                 ComponentName(this, WallpaperTileService::class.java),
                 getString(R.string.tile_label),
                 Icon.createWithResource(this, R.drawable.ic_tile_bauhaus),
-                mainExecutor,
+                mainExecutor
             ) { result ->
                 when (result) {
                     StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED ->
                         onResult(R.string.tile_added)
+
                     StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED ->
                         onResult(R.string.tile_already_added)
+
                     // The user declining the dialog needs no confirmation of
                     // their own choice; only genuine errors are worth a message.
                     StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_NOT_ADDED -> Unit
+
                     else -> onResult(R.string.tile_not_added)
                 }
             }
@@ -275,7 +279,7 @@ class MainActivity : ComponentActivity() {
             AppLogger.warn(
                 TAG,
                 AppLogger.Event("tile_add_request_failure"),
-                "Could not request tile placement: ${e.message}",
+                "Could not request tile placement: ${e.message}"
             )
             onResult(R.string.tile_not_added)
         }

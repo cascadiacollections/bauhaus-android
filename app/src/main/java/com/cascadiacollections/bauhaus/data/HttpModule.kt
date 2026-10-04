@@ -1,13 +1,13 @@
 package com.cascadiacollections.bauhaus.data
 
 import android.content.Context
+import java.io.File
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.toJavaDuration
 import okhttp3.Cache
 import okhttp3.HttpUrl
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
-import java.io.File
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.toJavaDuration
 
 /**
  * Singleton HTTP client shared across the app: [BauhausApi], Coil image loader,

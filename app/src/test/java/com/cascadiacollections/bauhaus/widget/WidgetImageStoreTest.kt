@@ -2,6 +2,7 @@ package com.cascadiacollections.bauhaus.widget
 
 import android.app.Application
 import android.graphics.Bitmap
+import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -14,7 +15,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
-import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, sdk = [36])
@@ -86,10 +86,9 @@ class WidgetImageStoreTest {
         val leftovers = context.cacheDir.listFiles().orEmpty().filter(File::isFile)
         assertTrue(
             "unexpected leftovers: ${leftovers.map(File::getName)}",
-            leftovers.none { it.name.endsWith(".tmp") },
+            leftovers.none { it.name.endsWith(".tmp") }
         )
     }
 
-    private fun bitmap(width: Int, height: Int): Bitmap =
-        Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    private fun bitmap(width: Int, height: Int): Bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
 }

@@ -2,15 +2,15 @@ package com.cascadiacollections.bauhaus.data
 
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
+import java.io.IOException
+import java.nio.ByteBuffer
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.IOException
-import java.nio.ByteBuffer
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 private val json = Json { ignoreUnknownKeys = true }
 
@@ -81,49 +81,39 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
      * @return Decoded bitmap, sized to fit within the requested bounds.
      * @throws IllegalStateException if the response cannot be decoded.
      */
-    override suspend fun fetchTodayImage(
-        maxWidth: Int,
-        maxHeight: Int,
-    ): Bitmap = fetchImageForPath(
+    override suspend fun fetchTodayImage(maxWidth: Int, maxHeight: Int): Bitmap = fetchImageForPath(
         imagePath = "/api/today",
         maxWidth = maxWidth,
-        maxHeight = maxHeight,
+        maxHeight = maxHeight
     )
 
-    override suspend fun fetchImageForDate(
-        date: LocalDate,
-        maxWidth: Int,
-        maxHeight: Int,
-    ): Bitmap = fetchImageForPath(
+    override suspend fun fetchImageForDate(date: LocalDate, maxWidth: Int, maxHeight: Int): Bitmap = fetchImageForPath(
         imagePath = imagePath(date),
         maxWidth = maxWidth,
-        maxHeight = maxHeight,
+        maxHeight = maxHeight
     )
 
-    private suspend fun fetchImageForPath(
-        imagePath: String,
-        maxWidth: Int,
-        maxHeight: Int,
-    ): Bitmap = withContext(Dispatchers.IO) {
-        val request = Request.Builder()
-            .url("$BASE_URL$imagePath")
-            .header("Accept", IMAGE_ACCEPT_HEADER)
-            .build()
+    private suspend fun fetchImageForPath(imagePath: String, maxWidth: Int, maxHeight: Int): Bitmap =
+        withContext(Dispatchers.IO) {
+            val request = Request.Builder()
+                .url("$BASE_URL$imagePath")
+                .header("Accept", IMAGE_ACCEPT_HEADER)
+                .build()
 
-        val bytes = try {
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) throw BauhausHttpException(response.code, imagePath)
-                val body = response.body
-                body.bytes()
+            val bytes = try {
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) throw BauhausHttpException(response.code, imagePath)
+                    val body = response.body
+                    body.bytes()
+                }
+            } catch (e: BauhausDataException) {
+                throw e
+            } catch (e: IOException) {
+                throw BauhausNetworkException(imagePath, e)
             }
-        } catch (e: BauhausDataException) {
-            throw e
-        } catch (e: IOException) {
-            throw BauhausNetworkException(imagePath, e)
-        }
 
-        decodeSampled(bytes, maxWidth, maxHeight)
-    }
+            decodeSampled(bytes, maxWidth, maxHeight)
+        }
 
     /**
      * Fetches today's artwork as raw bytes, preserving the original format
@@ -303,7 +293,7 @@ private fun decodeSampled(bytes: ByteArray, maxWidth: Int, maxHeight: Int): Bitm
                     sourceWidth = info.size.width,
                     sourceHeight = info.size.height,
                     maxWidth = maxWidth,
-                    maxHeight = maxHeight,
+                    maxHeight = maxHeight
                 )
                 decoder.setTargetSize(targetWidth, targetHeight)
             }
@@ -318,16 +308,11 @@ private fun decodeSampled(bytes: ByteArray, maxWidth: Int, maxHeight: Int): Bitm
  * source aspect ratio. Never upscales — a source smaller than the target is
  * returned at its own size, because inventing pixels only costs memory.
  */
-internal fun scaleToFit(
-    sourceWidth: Int,
-    sourceHeight: Int,
-    maxWidth: Int,
-    maxHeight: Int,
-): Pair<Int, Int> {
+internal fun scaleToFit(sourceWidth: Int, sourceHeight: Int, maxWidth: Int, maxHeight: Int): Pair<Int, Int> {
     if (sourceWidth <= 0 || sourceHeight <= 0) return maxWidth to maxHeight
     val scale = minOf(
         maxWidth.toDouble() / sourceWidth,
-        maxHeight.toDouble() / sourceHeight,
+        maxHeight.toDouble() / sourceHeight
     )
     if (scale >= 1.0) return sourceWidth to sourceHeight
     return maxOf(1, Math.round(sourceWidth * scale).toInt()) to

@@ -17,7 +17,7 @@ class AppContainer(app: Application) {
     val workerFactory = BauhausWorkerFactory(
         WallpaperWorker.Dependencies(
             settings = settingsRepository,
-            api = bauhausApi,
-        ),
+            api = bauhausApi
+        )
     )
 }

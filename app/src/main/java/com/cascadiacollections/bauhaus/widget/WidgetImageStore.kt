@@ -5,12 +5,12 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.core.graphics.scale
 import com.cascadiacollections.bauhaus.AppLogger
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * The single artwork bitmap the home-screen widget draws.
@@ -96,7 +96,7 @@ internal object WidgetImageStore {
                 AppLogger.warn(
                     TAG,
                     AppLogger.Event("widget_image_write_failure"),
-                    "Could not store widget artwork: ${e.message}",
+                    "Could not store widget artwork: ${e.message}"
                 )
             }
         }
@@ -114,7 +114,7 @@ internal object WidgetImageStore {
             AppLogger.warn(
                 TAG,
                 AppLogger.Event("widget_image_read_failure"),
-                "Could not read widget artwork: ${e.message}",
+                "Could not read widget artwork: ${e.message}"
             )
             null
         }
@@ -131,7 +131,7 @@ internal object WidgetImageStore {
         val scale = MAX_EDGE_PX.toFloat() / longestEdge
         return scale(
             (width * scale).roundToInt().coerceAtLeast(1),
-            (height * scale).roundToInt().coerceAtLeast(1),
+            (height * scale).roundToInt().coerceAtLeast(1)
         )
     }
 }

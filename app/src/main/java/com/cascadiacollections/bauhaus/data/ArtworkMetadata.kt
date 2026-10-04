@@ -1,8 +1,8 @@
 package com.cascadiacollections.bauhaus.data
 
+import java.time.LocalDate
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import java.time.LocalDate
 
 /**
  * Structured license block published at `license_details` in the metadata JSON.
@@ -16,7 +16,7 @@ data class LicenseDetails(
     val type: String = "",
     val url: String = "",
     val source: String = "",
-    @SerialName("source_url") val sourceUrl: String = "",
+    @SerialName("source_url") val sourceUrl: String = ""
 )
 
 /**
@@ -35,7 +35,7 @@ data class ArtworkVariant(
     val width: Int = 0,
     val height: Int = 0,
     val url: String = "",
-    @SerialName("size_bytes") val sizeBytes: Long = 0L,
+    @SerialName("size_bytes") val sizeBytes: Long = 0L
 )
 
 /**
@@ -72,7 +72,7 @@ data class ArtworkMetadata(
     @SerialName("style_artist") val styleArtist: String = "",
     @SerialName("license_details") val licenseDetails: LicenseDetails? = null,
     val variants: List<ArtworkVariant> = emptyList(),
-    @SerialName("generated_at") val generatedAt: String = "",
+    @SerialName("generated_at") val generatedAt: String = ""
 ) {
     /** [date] parsed, or `null` when absent or malformed. */
     val publishedDate: LocalDate?
@@ -131,7 +131,7 @@ data class ServiceHealth(
     val status: String = "",
     val date: String = "",
     @SerialName("stale_days") val staleDays: Int? = null,
-    val error: String = "",
+    val error: String = ""
 ) {
     /** Latest date the service reports as published, or `null` when it has none. */
     val latestDate: LocalDate?

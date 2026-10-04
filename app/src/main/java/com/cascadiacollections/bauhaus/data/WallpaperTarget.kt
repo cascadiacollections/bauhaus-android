@@ -19,5 +19,5 @@ enum class WallpaperTarget(val flag: Int) {
     LOCK(WallpaperManager.FLAG_LOCK),
 
     /** Both home and lock screens. */
-    BOTH(WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK);
+    BOTH(WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK)
 }

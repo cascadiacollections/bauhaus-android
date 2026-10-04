@@ -30,14 +30,12 @@ interface WallpaperScheduler {
     fun requestImmediateUpdate()
 }
 
-class WorkManagerWallpaperScheduler(
-    private val context: Context,
-) : WallpaperScheduler {
+class WorkManagerWallpaperScheduler(private val context: Context) : WallpaperScheduler {
     override fun scheduleDaily() {
         val constraints = Constraints(requiredNetworkType = NetworkType.CONNECTED)
         val workRequest = PeriodicWorkRequestBuilder<WallpaperWorker>(
             repeatInterval = 24.hours.toJavaDuration(),
-            flexTimeInterval = 1.hours.toJavaDuration(),
+            flexTimeInterval = 1.hours.toJavaDuration()
         )
             .setConstraints(constraints)
             .addTag(WallpaperWorker.TAG)
@@ -46,7 +44,7 @@ class WorkManagerWallpaperScheduler(
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             WallpaperWorker.WORK_NAME,
             ExistingPeriodicWorkPolicy.KEEP,
-            workRequest,
+            workRequest
         )
     }
 
@@ -65,7 +63,7 @@ class WorkManagerWallpaperScheduler(
         WorkManager.getInstance(context).enqueueUniqueWork(
             WallpaperWorker.IMMEDIATE_WORK_NAME,
             ExistingWorkPolicy.KEEP,
-            workRequest,
+            workRequest
         )
     }
 }

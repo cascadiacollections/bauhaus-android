@@ -7,13 +7,13 @@ import com.cascadiacollections.bauhaus.AppContainerProvider
 import com.cascadiacollections.bauhaus.AppLogger
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.serviceToday
+import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 
 /**
  * Quick Settings tile that updates the wallpaper without opening the app.
@@ -51,7 +51,7 @@ class WallpaperTileService : TileService() {
                 AppLogger.warn(
                     TAG,
                     AppLogger.Event("tile_state_read_failure"),
-                    "Could not read lastUpdated for tile: ${e.message}",
+                    "Could not read lastUpdated for tile: ${e.message}"
                 )
                 null
             }
@@ -87,10 +87,7 @@ class WallpaperTileService : TileService() {
 }
 
 /** Presentation state of the Quick Settings tile. */
-internal data class TileState(
-    val active: Boolean,
-    @param:StringRes val subtitleRes: Int,
-)
+internal data class TileState(val active: Boolean, @param:StringRes val subtitleRes: Int)
 
 /**
  * Maps the persisted `lastUpdated` stamp onto tile state.

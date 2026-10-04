@@ -46,7 +46,7 @@ class UiStateTest {
             isSettingWallpaper = true,
             isRefreshing = true,
             isSavingImage = true,
-            imageRevision = 5,
+            imageRevision = 5
         )
         val updated = state.copy(imageRevision = state.imageRevision + 1)
 
@@ -67,7 +67,7 @@ class UiStateTest {
         val afterRefresh = state.copy(
             metadata = metadata,
             isRefreshing = false,
-            imageRevision = state.imageRevision + 1,
+            imageRevision = state.imageRevision + 1
         )
 
         assertEquals(4, afterRefresh.imageRevision)

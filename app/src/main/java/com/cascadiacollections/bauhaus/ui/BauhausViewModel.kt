@@ -18,8 +18,8 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.cascadiacollections.bauhaus.AppContainerProvider
 import com.cascadiacollections.bauhaus.CrashReporter
-import com.cascadiacollections.bauhaus.WallpaperScheduler
 import com.cascadiacollections.bauhaus.R
+import com.cascadiacollections.bauhaus.WallpaperScheduler
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
 import com.cascadiacollections.bauhaus.data.BauhausApiClient
@@ -31,6 +31,10 @@ import com.cascadiacollections.bauhaus.data.serviceToday
 import com.cascadiacollections.bauhaus.data.wallpaperTargetSize
 import com.cascadiacollections.bauhaus.widget.BauhausAppWidget
 import com.cascadiacollections.bauhaus.widget.WidgetImageStore
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
+import java.util.LinkedHashMap
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
@@ -46,13 +50,9 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.coroutines.cancellation.CancellationException
-import java.time.LocalDate
-import java.time.temporal.ChronoUnit
-import java.util.LinkedHashMap
+import kotlinx.coroutines.withContext
 
 /** Aspect ratio the preview card uses until the service tells us the artwork's real shape. */
 const val FALLBACK_ASPECT_RATIO = 4f / 3f
@@ -93,7 +93,7 @@ data class UiState(
     val imageRevision: Int = 0,
     val isFavorite: Boolean = false,
     val showFavoritesOnly: Boolean = false,
-    val favoriteDates: Set<LocalDate> = emptySet(),
+    val favoriteDates: Set<LocalDate> = emptySet()
 )
 
 /**
@@ -132,7 +132,7 @@ class BauhausViewModel(
     private val settings: SettingsStore,
     private val api: BauhausApiClient,
     private val scheduler: WallpaperScheduler,
-    private val savedState: SavedStateHandle,
+    private val savedState: SavedStateHandle
 ) : AndroidViewModel(application) {
     private val maxJumpExpansionDays: Long = 730
 
@@ -147,9 +147,8 @@ class BauhausViewModel(
 
     private val archiveMutex = Mutex()
     private val metadataByDate = object : LinkedHashMap<LocalDate, ArtworkMetadata>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<LocalDate, ArtworkMetadata>): Boolean {
-            return size > MAX_METADATA_CACHE_SIZE
-        }
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<LocalDate, ArtworkMetadata>): Boolean =
+            size > MAX_METADATA_CACHE_SIZE
     }
 
     /**
@@ -175,15 +174,14 @@ class BauhausViewModel(
     /** Pager-reached-the-end signals, served one at a time by the collector in [init]. */
     private val archiveAppendRequests = requestChannel()
 
-    private fun getString(@StringRes resId: Int): String =
-        getApplication<Application>().getString(resId)
+    private fun getString(@StringRes resId: Int): String = getApplication<Application>().getString(resId)
 
     private val _uiState = MutableStateFlow(
         UiState(
             latestDate = anchorDate,
             visibleDate = anchorDate,
-            availableDates = listOf(anchorDate),
-        ),
+            availableDates = listOf(anchorDate)
+        )
     )
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
@@ -241,7 +239,7 @@ class BauhausViewModel(
                         metadata = cached,
                         isFavorite = newVisibleDate in favDates,
                         favoriteDates = favDates,
-                        availableDates = newAvailableDates,
+                        availableDates = newAvailableDates
                     )
                 }
                 metadataDateToLoad?.let { loadMetadataForDate(it, force = false) }
@@ -320,12 +318,12 @@ class BauhausViewModel(
     private fun UiState.showingMetadataFor(
         date: LocalDate,
         metadata: ArtworkMetadata,
-        bumpImageRevision: Boolean = false,
+        bumpImageRevision: Boolean = false
     ): UiState {
         val next = if (visibleDate == date) {
             copy(
                 metadata = metadata,
-                imageRevision = if (bumpImageRevision) imageRevision + 1 else imageRevision,
+                imageRevision = if (bumpImageRevision) imageRevision + 1 else imageRevision
             )
         } else {
             this
@@ -380,7 +378,7 @@ class BauhausViewModel(
             it.copy(
                 availableDates = allBrowsableDates,
                 visibleDate = restoredVisible,
-                showFavoritesOnly = restoredFavoritesOnly,
+                showFavoritesOnly = restoredFavoritesOnly
             )
         }
 
@@ -417,7 +415,7 @@ class BauhausViewModel(
                     latestDate = latest,
                     availableDates = listOf(latest),
                     visibleDate = latest,
-                    isFavorite = latest in state.favoriteDates,
+                    isFavorite = latest in state.favoriteDates
                 )
             } else {
                 state.copy(latestDate = latest)
@@ -433,7 +431,9 @@ class BauhausViewModel(
             selectDate(selectedDate)
         }
 
-        if (!snapshot.showFavoritesOnly && !snapshot.reachedArchiveStart && pageIndex == snapshot.availableDates.lastIndex) {
+        if (!snapshot.showFavoritesOnly && !snapshot.reachedArchiveStart &&
+            pageIndex == snapshot.availableDates.lastIndex
+        ) {
             archiveAppendRequests.trySend(Unit)
         }
     }
@@ -450,7 +450,7 @@ class BauhausViewModel(
                 metadata = cached,
                 isMetadataLoading = cached == null,
                 metadataLoadFailed = false,
-                isFavorite = date in it.favoriteDates,
+                isFavorite = date in it.favoriteDates
             )
         }
         if (cached == null) {
@@ -517,7 +517,7 @@ class BauhausViewModel(
                         metadata = cached,
                         isMetadataLoading = cached == null,
                         metadataLoadFailed = false,
-                        isFavorite = date in it.favoriteDates,
+                        isFavorite = date in it.favoriteDates
                     )
                 }
                 if (cached == null) {
@@ -577,7 +577,7 @@ class BauhausViewModel(
                 availableDates = newAvailableDates,
                 visibleDate = newVisibleDate,
                 metadata = cached,
-                isFavorite = newVisibleDate in state.favoriteDates,
+                isFavorite = newVisibleDate in state.favoriteDates
             )
         }
         metadataDateToLoad?.let { loadMetadataForDate(it, force = false) }
@@ -618,13 +618,13 @@ class BauhausViewModel(
                 val bitmap = if (isLatest) {
                     api.fetchTodayImage(
                         maxWidth = targetSize.width,
-                        maxHeight = targetSize.height,
+                        maxHeight = targetSize.height
                     )
                 } else {
                     api.fetchImageForDate(
                         date = visibleDate,
                         maxWidth = targetSize.width,
-                        maxHeight = targetSize.height,
+                        maxHeight = targetSize.height
                     )
                 }
                 try {
@@ -666,7 +666,7 @@ class BauhausViewModel(
         val artist = snapshot.metadata?.creator.orEmpty()
         val metadataText = listOfNotNull(
             title.takeIf(String::isNotBlank),
-            artist.takeIf(String::isNotBlank),
+            artist.takeIf(String::isNotBlank)
         ).joinToString(" — ")
             .takeIf(String::isNotBlank)
         val shareText = listOfNotNull(metadataText, artworkUri.toString()).joinToString("\n")
@@ -699,7 +699,7 @@ class BauhausViewModel(
                     "image/webp" -> "webp"
                     else -> "jpg"
                 }
-                val displayName = "bauhaus_${visibleDate}.$extension"
+                val displayName = "bauhaus_$visibleDate.$extension"
 
                 val contentValues = ContentValues().apply {
                     put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
@@ -775,7 +775,7 @@ class BauhausViewModel(
             it.copy(
                 isRefreshing = true,
                 isMetadataLoading = it.metadata == null,
-                metadataLoadFailed = false,
+                metadataLoadFailed = false
             )
         }
         try {
@@ -787,7 +787,7 @@ class BauhausViewModel(
                 it.copy(
                     isRefreshing = false,
                     isMetadataLoading = false,
-                    metadataLoadFailed = false,
+                    metadataLoadFailed = false
                 ).showingMetadataFor(visibleDate, metadata, bumpImageRevision = true)
             }
         } catch (e: Exception) {
@@ -795,7 +795,7 @@ class BauhausViewModel(
                 it.copy(
                     isRefreshing = false,
                     isMetadataLoading = false,
-                    metadataLoadFailed = true,
+                    metadataLoadFailed = true
                 )
             }
             reportMetadataFailure(e)
@@ -974,7 +974,7 @@ class BauhausViewModel(
                     container.settingsRepository,
                     container.bauhausApi,
                     container.wallpaperScheduler,
-                    createSavedStateHandle(),
+                    createSavedStateHandle()
                 )
             }
         }
@@ -1007,8 +1007,7 @@ class BauhausViewModel(
 private fun requestChannel(): Channel<Unit> = Channel(Channel.RENDEZVOUS)
 
 /** Parses an ISO date, or null if the stored value is not one. */
-private fun String.toLocalDateOrNull(): LocalDate? =
-    runCatching { LocalDate.parse(this) }.getOrNull()
+private fun String.toLocalDateOrNull(): LocalDate? = runCatching { LocalDate.parse(this) }.getOrNull()
 
 /**
  * Serves requests from a [requestChannel] one at a time, forever.

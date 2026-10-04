@@ -1,19 +1,19 @@
 package com.cascadiacollections.bauhaus.ui
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.longClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.cascadiacollections.bauhaus.R
@@ -31,7 +31,7 @@ private val TEST_METADATA = ArtworkMetadata(
     title = "Composition VIII",
     artist = "Wassily Kandinsky",
     source = "Guggenheim Museum",
-    date = "1923-07-01",
+    date = "1923-07-01"
 )
 
 @RunWith(AndroidJUnit4::class)
@@ -50,7 +50,7 @@ class SettingsScreenTest {
             WallpaperTarget.HOME -> R.string.wallpaper_target_home
             WallpaperTarget.LOCK -> R.string.wallpaper_target_lock
             WallpaperTarget.BOTH -> R.string.wallpaper_target_both
-        },
+        }
     )
 
     @Test
@@ -63,7 +63,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = {},
                 onSaveImage = {},
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -82,7 +82,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = {},
                 onSaveImage = {},
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -103,7 +103,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = {},
                 onSaveImage = {},
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -122,7 +122,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = {},
                 onSaveImage = {},
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -141,7 +141,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = {},
                 onSaveImage = {},
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -162,7 +162,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = {},
                 onSaveImage = {},
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -182,7 +182,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = { callbackInvoked = true },
                 onSaveImage = {},
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -204,7 +204,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = {},
                 onSaveImage = { callbackInvoked = true },
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -223,7 +223,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = {},
                 onSaveImage = {},
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -241,7 +241,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = {},
                 onSaveImage = {},
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -261,7 +261,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = {},
                 onSaveImage = {},
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -281,7 +281,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = {},
                 onSaveImage = {},
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -303,7 +303,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = {},
                 onSaveImage = {},
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -324,7 +324,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = {},
                 onSaveImage = { callbackInvoked = true },
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -348,7 +348,7 @@ class SettingsScreenTest {
                 onSaveImage = {},
                 onFavoriteToggle = { callbackInvoked = true },
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -367,7 +367,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = {},
                 onSaveImage = {},
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -384,7 +384,7 @@ class SettingsScreenTest {
         var callbackInvoked = false
         val stateWithFavorites = defaultState.copy(
             isFavorite = true,
-            favoriteDates = setOf(defaultState.visibleDate),
+            favoriteDates = setOf(defaultState.visibleDate)
         )
 
         composeTestRule.setContent {
@@ -396,7 +396,7 @@ class SettingsScreenTest {
                 onSaveImage = {},
                 onFavoritesFilterToggle = { callbackInvoked = true },
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -415,7 +415,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = {},
                 onSaveImage = {},
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
@@ -434,7 +434,7 @@ class SettingsScreenTest {
                 onSetWallpaperNow = {},
                 onSaveImage = {},
                 onArchivePageSelected = {},
-                onRefresh = {},
+                onRefresh = {}
             )
         }
 
