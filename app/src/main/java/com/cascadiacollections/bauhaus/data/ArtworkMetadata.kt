@@ -1,6 +1,8 @@
 package com.cascadiacollections.bauhaus.data
 
 import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -48,14 +50,18 @@ data class ArtworkVariant(
  * archive entries predate several of them, and the service adds keys without
  * versioning the endpoint.
  *
- * ## The `date` field is authoritative
+ * ## Which day this artwork was published for
  *
  * The service keys artwork by **UTC** date and publishes at 04:00 UTC. A device
  * clock therefore disagrees with the service for part of every day — ahead of it
- * east of UTC, behind it west of UTC, and always during the four-hour window
- * before a day's run completes. [publishedDate] is the service's own answer for
- * which day `/api/today` just resolved to, so the app anchors browsing to that
- * rather than to `LocalDate.now()`.
+ * east of UTC, behind it west of UTC, and always during the window before a
+ * day's run completes. [publishedDate] is the service's own answer for which day
+ * `/api/today` just resolved to, so the app anchors browsing to that rather than
+ * to `LocalDate.now()`.
+ *
+ * [date] is **not** that answer. For most artworks it is the artwork's own date
+ * (`"ca. 1750"`, `"1868–78"`); the pipeline writes the publish day there only
+ * when the source has no date of its own. See [publishedDate].
  */
 @Serializable
 data class ArtworkMetadata(
@@ -72,11 +78,26 @@ data class ArtworkMetadata(
     @SerialName("style_artist") val styleArtist: String = "",
     @SerialName("license_details") val licenseDetails: LicenseDetails? = null,
     val variants: List<ArtworkVariant> = emptyList(),
-    @SerialName("generated_at") val generatedAt: String = ""
+    @SerialName("generated_at") val generatedAt: String = "",
+    @SerialName("published_date") val publishedDateRaw: String = ""
 ) {
-    /** [date] parsed, or `null` when absent or malformed. */
+    /**
+     * The UTC day the service published this artwork for — the same key the
+     * archive uses — or `null` when the document gives no way to tell.
+     *
+     * Resolved in order of reliability:
+     * 1. `published_date`, which the pipeline always writes as the publish day.
+     *    Entries published before the field existed do not carry it.
+     * 2. [date], but only when it is an ISO `yyyy-MM-dd`. For most artworks it is
+     *    the artwork's own date (`"ca. 1750"`), which says nothing about publishing.
+     * 3. The UTC calendar day of [generatedAt], the upload timestamp. The pipeline
+     *    takes the archive key and this timestamp from the UTC clock in the same
+     *    run, so its day is the publish day.
+     */
     val publishedDate: LocalDate?
-        get() = date.takeIf { it.isNotBlank() }?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        get() = publishedDateRaw.toIsoDateOrNull()
+            ?: date.toIsoDateOrNull()
+            ?: generatedAt.toUtcDateOrNull()
 
     /** The stylized rendition — the one `/api/<date>` serves. */
     val stylizedVariant: ArtworkVariant?
@@ -146,4 +167,13 @@ data class ServiceHealth(
         const val STATUS_STALE = "stale"
         const val STATUS_UNHEALTHY = "unhealthy"
     }
+}
+
+/** This string as an ISO `yyyy-MM-dd` date, or `null` when it is not one. */
+private fun String.toIsoDateOrNull(): LocalDate? =
+    trim().takeIf { it.isNotEmpty() }?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+
+/** The UTC calendar day of this ISO-8601 timestamp with offset, or `null` when it is not one. */
+private fun String.toUtcDateOrNull(): LocalDate? = trim().takeIf { it.isNotEmpty() }?.let {
+    runCatching { OffsetDateTime.parse(it).withOffsetSameInstant(ZoneOffset.UTC).toLocalDate() }.getOrNull()
 }

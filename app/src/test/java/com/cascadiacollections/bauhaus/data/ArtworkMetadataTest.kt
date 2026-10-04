@@ -182,6 +182,75 @@ class ArtworkMetadataTest {
     }
 
     @Test
+    fun `an artwork's own date is not mistaken for the publish date`() {
+        // Shaped after the live /api/today.json for 2026-10-04: `date` is the Met
+        // object date, and the entry predates `published_date`.
+        val input = """
+            {
+              "artist": "Ishikawa Toyonobu",
+              "date": "ca. 1750",
+              "generated_at": "2026-10-04T05:27:53.363896+00:00"
+            }
+        """.trimIndent()
+
+        val metadata = json.decodeFromString<ArtworkMetadata>(input)
+
+        assertThat(metadata.publishedDate).isEqualTo(LocalDate.of(2026, 10, 4))
+    }
+
+    @Test
+    fun `published_date wins over every other field`() {
+        val input = """
+            {
+              "date": "1868-07-01",
+              "published_date": "2026-10-05",
+              "generated_at": "2026-10-04T23:59:59+00:00"
+            }
+        """.trimIndent()
+
+        val metadata = json.decodeFromString<ArtworkMetadata>(input)
+
+        assertThat(metadata.publishedDate).isEqualTo(LocalDate.of(2026, 10, 5))
+    }
+
+    @Test
+    fun `an ISO date is used when published_date is absent`() {
+        val input = """{"date": "2026-07-31", "generated_at": "2026-08-01T00:00:01+00:00"}"""
+
+        val metadata = json.decodeFromString<ArtworkMetadata>(input)
+
+        assertThat(metadata.publishedDate).isEqualTo(LocalDate.of(2026, 7, 31))
+    }
+
+    @Test
+    fun `an unparseable published_date falls through to the other fields`() {
+        val input = """{"published_date": "soon", "date": "1868–78", "generated_at": "2026-10-03T17:30:48+00:00"}"""
+
+        val metadata = json.decodeFromString<ArtworkMetadata>(input)
+
+        assertThat(metadata.publishedDate).isEqualTo(LocalDate.of(2026, 10, 3))
+    }
+
+    @Test
+    fun `generated_at is read as a UTC calendar day whatever its offset`() {
+        // 21:30 on the 3rd in UTC-7 is 04:30 on the 4th in UTC.
+        val input = """{"date": "", "generated_at": "2026-10-03T21:30:00-07:00"}"""
+
+        val metadata = json.decodeFromString<ArtworkMetadata>(input)
+
+        assertThat(metadata.publishedDate).isEqualTo(LocalDate.of(2026, 10, 4))
+    }
+
+    @Test
+    fun `no usable field yields no publish date`() {
+        val input = """{"date": "ca. 1750", "generated_at": "yesterday", "published_date": ""}"""
+
+        val metadata = json.decodeFromString<ArtworkMetadata>(input)
+
+        assertThat(metadata.publishedDate).isNull()
+    }
+
+    @Test
     fun `variant without dimensions yields no aspect ratio`() {
         val input = """{"variants":[{"type":"stylized","width":0,"height":0}]}"""
 
