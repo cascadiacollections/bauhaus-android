@@ -1,6 +1,7 @@
 package com.cascadiacollections.bauhaus
 
 import android.app.Application
+import android.os.StrictMode
 import androidx.work.Configuration
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
@@ -70,6 +71,28 @@ class BauhausApplication :
                 )
                 watcherClass.getMethod("setConfig", configClass).invoke(null, customConfig)
             }
+            StrictMode.setThreadPolicy(
+                StrictMode.ThreadPolicy.Builder()
+                    .detectAll()
+                    .penaltyLog()
+                    .build()
+            )
+            StrictMode.setVmPolicy(
+                StrictMode.VmPolicy.Builder()
+                    .detectLeakedSqlLiteObjects()
+                    .detectLeakedClosableObjects()
+                    .detectLeakedRegistrationObjects()
+                    .detectActivityLeaks()
+                    .detectFileUriExposure()
+                    .detectCleartextNetwork()
+                    .detectContentUriWithoutPermission()
+                    .detectImplicitDirectBoot()
+                    .detectIncorrectContextUse()
+                    .detectUnsafeIntentLaunch()
+                    // Not detectAll(): untagged sockets fire on every OkHttp request.
+                    .penaltyLog()
+                    .build()
+            )
         }
         container = AppContainer(this)
         CrashReporter.init(this)
