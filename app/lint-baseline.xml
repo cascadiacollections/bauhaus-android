@@ -1,4 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<issues format="6" by="lint 8.9.0">
+<issues format="6" by="lint 9.5.0-alpha07" type="baseline" client="gradle" dependencies="false" name="AGP (9.5.0-alpha07)" variant="all" version="9.5.0-alpha07">
+
+    <issue
+        id="ComposeParameterOrder"
+        message="Parameters in a composable function should be ordered following this pattern: params without defaults, modifiers, params with defaults and optionally, a trailing function that might not have a default param.&#xA;Current params are: `[uiState: UiState, onWallpaperTargetChange: (WallpaperTarget) -> Unit, onSchedulingToggle: (Boolean) -> Unit, onSetWallpaperNow: () -> Unit, onSaveImage: () -> Unit, modifier: Modifier = Modifier, onJumpToDate: (LocalDate) -> Unit = {}, onFavoriteToggle: () -> Unit = {}, onFavoritesFilterToggle: () -> Unit = {}, onOpenUrl: (String) -> Unit = {}, onAddQuickSettingsTile: () -> Unit = {}, onArchivePageSelected: (Int) -> Unit, onRefresh: () -> Unit, showDatePicker: Boolean = false, onDatePickerVisibilityChange: (Boolean) -> Unit = {}]` but should be `[uiState: UiState, onWallpaperTargetChange: (WallpaperTarget) -> Unit, onSchedulingToggle: (Boolean) -> Unit, onSetWallpaperNow: () -> Unit, onSaveImage: () -> Unit, onArchivePageSelected: (Int) -> Unit, onRefresh: () -> Unit, modifier: Modifier = Modifier, onJumpToDate: (LocalDate) -> Unit = {}, onFavoriteToggle: () -> Unit = {}, onFavoritesFilterToggle: () -> Unit = {}, onOpenUrl: (String) -> Unit = {}, onAddQuickSettingsTile: () -> Unit = {}, showDatePicker: Boolean = false, onDatePickerVisibilityChange: (Boolean) -> Unit = {}]`.&#xA;See https://slackhq.github.io/compose-lints/rules/#ordering-composable-parameters-properly for more information."
+        errorLine1="fun SettingsScreen("
+        errorLine2="                  ^">
+        <location
+            file="src/main/java/com/cascadiacollections/bauhaus/ui/SettingsScreen.kt"
+            line="195"
+            column="19"/>
+    </issue>
 
 </issues>
