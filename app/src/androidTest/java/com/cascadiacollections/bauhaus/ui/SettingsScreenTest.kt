@@ -16,13 +16,14 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import assertk.assertThat
+import assertk.assertions.isEqualTo
+import assertk.assertions.isFalse
+import assertk.assertions.isNotNull
+import assertk.assertions.isTrue
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -109,7 +110,7 @@ class SettingsScreenTest {
 
         composeTestRule.onNodeWithText(targetLabel(WallpaperTarget.LOCK)).performClick()
 
-        assertEquals(WallpaperTarget.LOCK, capturedTarget)
+        assertThat(capturedTarget).isEqualTo(WallpaperTarget.LOCK)
     }
 
     @Test
@@ -148,8 +149,11 @@ class SettingsScreenTest {
         composeTestRule.onNodeWithTag(SettingsScreenTestTags.DAILY_UPDATES_SWITCH).assertIsOn()
         composeTestRule.onNodeWithTag(SettingsScreenTestTags.DAILY_UPDATES_SWITCH).performClick()
 
-        assertNotNull("onSchedulingToggle callback should have been invoked", capturedEnabled)
-        assertFalse("Callback should be called with false when toggling off", capturedEnabled!!)
+        assertThat(capturedEnabled, name = "onSchedulingToggle callback should have been invoked").isNotNull()
+        assertThat(
+            capturedEnabled,
+            name = "Callback should be called with false when toggling off"
+        ).isNotNull().isFalse()
     }
 
     @Test
@@ -189,7 +193,7 @@ class SettingsScreenTest {
         composeTestRule.onNodeWithText(getString(R.string.set_now)).assertIsDisplayed()
         composeTestRule.onNodeWithTag(SettingsScreenTestTags.SET_NOW_BUTTON).performClick()
 
-        assertTrue("onSetWallpaperNow callback should be invoked on button click", callbackInvoked)
+        assertThat(callbackInvoked, name = "onSetWallpaperNow callback should be invoked on button click").isTrue()
     }
 
     @Test
@@ -210,7 +214,7 @@ class SettingsScreenTest {
 
         composeTestRule.onNodeWithTag(SettingsScreenTestTags.SAVE_IMAGE_BUTTON).performClick()
 
-        assertTrue("onSaveImage callback should be invoked on button click", callbackInvoked)
+        assertThat(callbackInvoked, name = "onSaveImage callback should be invoked on button click").isTrue()
     }
 
     @Test
@@ -332,7 +336,7 @@ class SettingsScreenTest {
             .onNodeWithTag(SettingsScreenTestTags.ARTWORK_PREVIEW)
             .performTouchInput { longClick() }
 
-        assertTrue("onSaveImage callback should be invoked on long press", callbackInvoked)
+        assertThat(callbackInvoked, name = "onSaveImage callback should be invoked on long press").isTrue()
     }
 
     @Test
@@ -354,7 +358,7 @@ class SettingsScreenTest {
 
         composeTestRule.onNodeWithTag(SettingsScreenTestTags.FAVORITE_BUTTON).performClick()
 
-        assertTrue("onFavoriteToggle callback should be invoked on tap", callbackInvoked)
+        assertThat(callbackInvoked, name = "onFavoriteToggle callback should be invoked on tap").isTrue()
     }
 
     @Test
@@ -402,7 +406,7 @@ class SettingsScreenTest {
 
         composeTestRule.onNodeWithTag(SettingsScreenTestTags.FAVORITES_FILTER_CHIP).performClick()
 
-        assertTrue("onFavoritesFilterToggle should be invoked on chip tap", callbackInvoked)
+        assertThat(callbackInvoked, name = "onFavoritesFilterToggle should be invoked on chip tap").isTrue()
     }
 
     @Test

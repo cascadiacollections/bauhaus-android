@@ -18,8 +18,13 @@ Two product flavors on a `mode` dimension: `foss` and `full`. AGP therefore does
 or the `just` recipes (`just build`, `just test`, `just lint`, `just check`).
 
 `foss` is the shipping flavor — it is what CI builds, releases, and uploads.
-`full` adds Firebase Crashlytics and Analytics and is **not built by CI at all**,
-so it can break without anyone noticing. The store listing in
+`full` adds Firebase Crashlytics and Analytics and is never released. CI's
+"Full flavor compile check" job assembles it only as a compile check, and it is
+not a dependency of release. The Google Services plugin refuses to configure
+`full` without `app/google-services.json`, which is gitignored; the job writes
+a placeholder first. To compile `full` locally, write the same placeholder (see
+the "Write placeholder google-services.json" step in
+`.github/workflows/build.yml`) and delete it afterwards. The store listing in
 `fastlane/metadata/` states the app has no analytics or crash reporting; that
 claim is true of `foss` and would be false if `full` were ever shipped.
 
@@ -32,16 +37,31 @@ The service keys every artwork by **UTC** date and publishes at 04:00 UTC.
 
 - Never call `LocalDate.now()`. Use `serviceToday()`
   (`data/ServiceCalendar.kt`), which is `LocalDate.now(ZoneOffset.UTC)`.
-- `serviceToday()` is only a seed. The authoritative answer is the `date` field
-  the service returns in `/api/today.json`, exposed as
-  `ArtworkMetadata.publishedDate`. `BauhausViewModel` anchors browsing to it
-  (`anchorDate` / `UiState.latestDate`) and re-anchors when the service disagrees.
+- `serviceToday()` is only a seed. The authoritative answer is the publish day
+  in `/api/today.json`, exposed as `ArtworkMetadata.publishedDate`.
+  `BauhausViewModel` anchors browsing to it (`anchorDate` /
+  `UiState.latestDate`, with `UiState.latestDateStatus` saying whether the
+  service has confirmed it) and re-anchors when the service disagrees.
+- The metadata's `date` field is **not** the publish day. For most artworks it is
+  the artwork's own date (`"ca. 1750"`). `publishedDate` resolves, in order:
+  `published_date` (written by the pipeline since bauhaus#152, missing from older
+  archive entries); then the UTC calendar day of `generated_at`; then `date`,
+  but only when it is an ISO `yyyy-MM-dd`; then `null`. The pipeline takes the
+  archive key and `generated_at` from the same UTC clock, so for every entry
+  they name the same day. `date` comes last because an artwork whose own date
+  is ISO-formatted (`"2019-05-03"`) would otherwise read as published that day.
 - Between 00:00 and ~04:00 UTC the current UTC day is genuinely not published
   yet. That is what `/api/health` is for — it reports `stale`/`unhealthy` with the
   newest date the service does have. It is consulted only after a metadata fetch
   has already failed; it is `no-store`, so it must never go on the startup path.
 - The worker's "already set today" guard and the ViewModel's `lastUpdated` stamp
   must use the same calendar, or the daily update silently stops happening.
+  Both stamp the day the applied artwork was **published for**, not the day
+  they ran. Before the day's publish, `/api/today` is still yesterday's art.
+  Stamping the clock's day then made every later run that day skip, including
+  the run after publishing. The worker skips without a request when
+  `lastUpdated == serviceToday()`. It skips without downloading the image when
+  `lastUpdated` already equals the service's newest day.
 
 ## HTTP caching invariants
 
@@ -54,6 +74,14 @@ the worker. Two things must hold:
   excluding non-image routes (`.json`, `.json.sig`).
 - `/api/<date>*` is `immutable` with a one-year TTL because publishing is
   write-once. Do not add cache-busting query parameters to date-keyed URLs.
+
+Coil keeps its own disk cache on top of OkHttp's. Coil 3's default
+`CacheStrategy` serves a disk-cache hit **forever**, ignoring `Cache-Control`,
+and it caches 404s too. So a Coil cache key must only ever name an immutable
+URL. The preview loads every confirmed day, the newest included, from
+`/api/<date>` under the key `/api/<date>#<revision>`. `/api/today` is loaded only
+while the newest date is unconfirmed, with Coil's disk cache disabled
+(`archiveImageRequest` in `SettingsScreen.kt`).
 
 ## Notifications
 
@@ -75,6 +103,11 @@ non-bug to Crashlytics on every offline fetch.
 Use `Throwable.isConnectivityFailure` (`data/BauhausDataException.kt`). In the
 ViewModel that is `emitError()` / `reportMetadataFailure()`; add new call sites to
 those rather than writing fresh catch ladders.
+
+The worker retries connectivity failures and other transient faults, up to 3
+attempts. It returns `Result.failure()` at once for a failure no retry can fix:
+a 4xx `BauhausHttpException`, or a `BauhausDecodeException`. Image decode
+failures are typed as `BauhausDecodeException` too, not `IllegalStateException`.
 
 Also rethrow `CancellationException` before any generic `catch (e: Exception)` in
 a coroutine — `java.util.concurrent.CancellationException` extends
@@ -106,22 +139,35 @@ code has deliberate guards worth preserving:
   is written by the two paths that already hold a fetched bitmap (the worker and
   `setWallpaperNow()`), which then call `BauhausAppWidget.refresh()`. The cost is
   a placeholder until the first successful update; keep it that way.
-- Archive existence is probed with a body-less `HEAD` on `/api/<date>.json`, and a
-  date that exists implies every later date exists (publishing is contiguous and
-  write-once), so extending the pager costs one request, not one per day.
+- Publishing is daily and write-once but **not** contiguous. A failed pipeline
+  run leaves a day with no artwork: 2026-10-02 is missing, and so is
+  2026-07-20 through 07-30. So "a later date exists" says nothing about an
+  earlier one. The pager learns which days exist from the archive index
+  (`GET /api/archive?limit=1000&before=<date>`, read by `data/ArchiveIndex.kt`).
+  One page covers any jump within the two-year limit. What has been read is
+  kept, so paging back costs a request only when it passes what has already
+  been read. Never fall back to probing day by day.
 
 ## Testing
 
 Unit tests are Robolectric + JUnit4 + MockK + Turbine, under `app/src/test/`.
 Instrumented Compose tests under `app/src/androidTest/` are **not run by CI**.
 
-`BauhausApiClient` fakes live in the test files themselves — adding a method to
-that interface means updating the fakes in `BauhausViewModelTest` and
-`WallpaperWorkerTest`. `WallpaperScheduler` is faked the same way in
-`BauhausViewModelTest`.
+Assertions use AssertK (`assertThat(actual).isEqualTo(expected)`,
+`assertFailure { }.isInstanceOf<T>()`). detekt's `ForbiddenImport` rejects
+JUnit and kotlin.test asserts.
 
-Avoid unit tests that reach `WallpaperManager.setBitmap`; the Robolectric shadow's
-support for combined `FLAG_SYSTEM or FLAG_LOCK` is not something to rely on.
+`BauhausApiClient` fakes live with the tests, not in shared fixtures. Adding a
+method to that interface means updating `FakeBauhausApi` in
+`ui/BauhausViewModelFakes.kt` (shared by the `BauhausViewModel*Test` classes)
+and `FakeApi` in `WallpaperWorkerTest`. `WallpaperScheduler` and the settings
+repository are faked in `BauhausViewModelFakes.kt` too.
+
+Avoid unit tests that reach `WallpaperManager.setBitmap`. The Robolectric
+shadow's support for combined `FLAG_SYSTEM or FLAG_LOCK` is not something to
+rely on. The worker and the ViewModel take a `WallpaperSetter`
+(`data/WallpaperSetter.kt`), so tests can pass a recording fake and still
+reach the `lastUpdated` stamp that follows.
 
 ## Environment
 

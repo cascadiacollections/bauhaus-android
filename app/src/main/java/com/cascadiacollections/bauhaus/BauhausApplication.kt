@@ -175,8 +175,14 @@ class BauhausApplication :
     }
 
     /**
-     * Opportunistically warms the `/api/today` cache once per day so the first
-     * foreground render can hit local cache on the happy path.
+     * Opportunistically warms the HTTP cache with the newest artwork once per day
+     * so the first foreground render can hit local cache on the happy path.
+     *
+     * Warms the URL the preview will actually load: the newest page requests
+     * `/api/<date>` once `/api/today.json` has named the day (see
+     * `archiveImageRequest` in `SettingsScreen`), so that is what is fetched here.
+     * The metadata request is the one the screen makes on startup anyway, and is
+     * served from cache when it does.
      *
      * Skips when the wallpaper was already set today (image already cached) or
      * when prefetch already ran today.
@@ -190,7 +196,8 @@ class BauhausApplication :
             if (lastUpdated == today) return@launch
             if (settings.getLastPrefetchedDate() == today) return@launch
             try {
-                api.fetchTodayImageRaw()
+                val published = api.fetchTodayMetadata().publishedDate
+                if (published != null) api.fetchImageRawForDate(published) else api.fetchTodayImageRaw()
                 settings.setLastPrefetchedDate(today)
                 AppLogger.info(
                     TAG,

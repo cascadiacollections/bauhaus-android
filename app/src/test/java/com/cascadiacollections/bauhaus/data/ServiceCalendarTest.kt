@@ -1,11 +1,12 @@
 package com.cascadiacollections.bauhaus.data
 
+import assertk.assertThat
+import assertk.assertions.isIn
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.TimeZone
 import org.junit.After
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -52,9 +53,9 @@ class ServiceCalendarTest {
         val actual = serviceToday()
         val after = LocalDate.now(ZoneOffset.UTC)
 
-        assertTrue(
-            "serviceToday() returned $actual, outside the UTC window [$before, $after]",
-            actual == before || actual == after
-        )
+        assertThat(
+            actual,
+            name = "serviceToday() returned $actual, outside the UTC window [$before, $after]"
+        ).isIn(before, after)
     }
 }

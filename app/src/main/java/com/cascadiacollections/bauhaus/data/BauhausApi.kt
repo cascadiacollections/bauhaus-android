@@ -17,8 +17,10 @@ private val json = Json { ignoreUnknownKeys = true }
 /** Image format negotiation header shared by [BauhausApi] and [HttpModule]. */
 internal const val IMAGE_ACCEPT_HEADER = "image/avif, image/webp, image/jpeg"
 
-private const val HTTP_NOT_FOUND = 404
 private const val HTTP_UNAVAILABLE = 503
+
+/** `?limit=` for `/api/archive`: the service's maximum, so one page spans years. */
+private const val ARCHIVE_PAGE_LIMIT = 1000
 
 /**
  * Client for the bauhaus Cloudflare Workers service.
@@ -31,7 +33,7 @@ private const val HTTP_UNAVAILABLE = 503
  * | `GET /api/today.json` | Today's [ArtworkMetadata] |
  * | `GET /api/YYYY-MM-DD` | Archive image (immutable cache) |
  * | `GET /api/YYYY-MM-DD.json` | Archive [ArtworkMetadata] |
- * | `HEAD /api/YYYY-MM-DD.json` | Existence probe — see [hasArtworkForDate] |
+ * | `GET /api/archive` | Dates that have artwork — see [fetchArchivePage] |
  * | `GET /api/health` | Publish freshness — see [fetchHealth] |
  *
  * ## Format Negotiation
@@ -79,7 +81,7 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
      * @param maxWidth  Target width in pixels (0 = no downsampling).
      * @param maxHeight Target height in pixels (0 = no downsampling).
      * @return Decoded bitmap, sized to fit within the requested bounds.
-     * @throws IllegalStateException if the response cannot be decoded.
+     * @throws BauhausDecodeException if the response is not a decodable image.
      */
     override suspend fun fetchTodayImage(maxWidth: Int, maxHeight: Int): Bitmap = fetchImageForPath(
         imagePath = "/api/today",
@@ -112,7 +114,7 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
                 throw BauhausNetworkException(imagePath, e)
             }
 
-            decodeSampled(bytes, maxWidth, maxHeight)
+            decodeSampled(imagePath, bytes, maxWidth, maxHeight)
         }
 
     /**
@@ -189,31 +191,32 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
     }
 
     /**
-     * Probes whether the service has published artwork for [date], without
-     * transferring a body.
+     * Reads one page of the archive index: the dates strictly before [before]
+     * that have published artwork, newest first.
      *
-     * Uses `HEAD`, which the service answers with the same headers as `GET` and
-     * resolves with a metadata-only storage lookup. That matters for the archive
-     * pager: establishing that a date exists used to cost a full metadata `GET`
-     * per candidate day, so a two-year jump issued one request per day in the span.
+     * This is what the archive pager walks instead of guessing. Publishing has
+     * gaps — days whose pipeline run failed have no artwork — so "yesterday
+     * exists" says nothing about the day before it, and probing day by day would
+     * both cost a request per day and stop at the first gap.
      *
-     * @return `true` for `200`, `false` for `404`.
-     * @throws BauhausHttpException for any other status.
-     * @throws BauhausNetworkException if the request cannot be completed.
+     * Pages are as large as the service allows ([ARCHIVE_PAGE_LIMIT]), so the
+     * pager's two-year jump limit is covered by a single request. Paging is keyed
+     * by date rather than an opaque cursor, so the URL for a given `before` is
+     * stable and the response caches like any other.
      */
-    override suspend fun hasArtworkForDate(date: LocalDate): Boolean = withContext(Dispatchers.IO) {
-        val path = metadataPath(date)
+    override suspend fun fetchArchivePage(before: LocalDate): ArchiveIndexPage = withContext(Dispatchers.IO) {
+        val path = "/api/archive?limit=$ARCHIVE_PAGE_LIMIT&before=${before.format(ISO_DATE_FORMAT)}"
         val request = Request.Builder()
             .url("$BASE_URL$path")
-            .head()
             .build()
 
         try {
             client.newCall(request).execute().use { response ->
-                when {
-                    response.isSuccessful -> true
-                    response.code == HTTP_NOT_FOUND -> false
-                    else -> throw BauhausHttpException(response.code, path)
+                if (!response.isSuccessful) throw BauhausHttpException(response.code, path)
+                try {
+                    json.decodeFromString<ArchiveIndexPage>(response.body.string())
+                } catch (e: Exception) {
+                    throw BauhausDecodeException(path, e)
                 }
             }
         } catch (e: BauhausDataException) {
@@ -282,8 +285,12 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
  * The allocator is forced to software because
  * [WallpaperManager.setBitmap][android.app.WallpaperManager.setBitmap] and
  * `Bitmap.compress` cannot read a hardware bitmap.
+ *
+ * A failure is a [BauhausDecodeException] for [endpoint]: the service answered,
+ * but with bytes that are not an image, which no retry will fix. Callers tell
+ * that apart from a request that never completed.
  */
-private fun decodeSampled(bytes: ByteArray, maxWidth: Int, maxHeight: Int): Bitmap {
+private fun decodeSampled(endpoint: String, bytes: ByteArray, maxWidth: Int, maxHeight: Int): Bitmap {
     val source = ImageDecoder.createSource(ByteBuffer.wrap(bytes))
     return try {
         ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
@@ -299,7 +306,7 @@ private fun decodeSampled(bytes: ByteArray, maxWidth: Int, maxHeight: Int): Bitm
             }
         }
     } catch (e: IOException) {
-        throw IllegalStateException("Failed to decode image from ${bytes.size} bytes", e)
+        throw BauhausDecodeException(endpoint, e)
     }
 }
 

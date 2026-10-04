@@ -4,8 +4,9 @@ import android.app.Application
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.testing.WorkManagerTestInitHelper
+import assertk.assertThat
+import assertk.assertions.hasSize
 import com.cascadiacollections.bauhaus.worker.WallpaperWorker
-import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,7 +34,7 @@ class WorkManagerWallpaperSchedulerTest {
     fun `immediate update enqueues one work item`() {
         scheduler.requestImmediateUpdate()
 
-        assertEquals(1, immediateWork().size)
+        assertThat(immediateWork()).hasSize(1)
     }
 
     @Test
@@ -42,7 +43,7 @@ class WorkManagerWallpaperSchedulerTest {
         // hammering the Quick Settings tile must not queue five fetches.
         repeat(5) { scheduler.requestImmediateUpdate() }
 
-        assertEquals(1, immediateWork().size)
+        assertThat(immediateWork()).hasSize(1)
     }
 
     @Test
@@ -55,7 +56,7 @@ class WorkManagerWallpaperSchedulerTest {
             .getWorkInfosForUniqueWork(WallpaperWorker.WORK_NAME)
             .get()
             .filterNot { it.state == WorkInfo.State.CANCELLED }
-        assertEquals(1, periodic.size)
+        assertThat(periodic).hasSize(1)
     }
 
     private fun immediateWork(): List<WorkInfo> = workManager

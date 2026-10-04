@@ -11,8 +11,11 @@ interface BauhausApiClient {
     suspend fun fetchImageRawForDate(date: LocalDate): Pair<ByteArray, String>
     suspend fun fetchMetadataForDate(date: LocalDate): ArtworkMetadata
 
-    /** `true` when the service has artwork published for [date]. Body-less probe. */
-    suspend fun hasArtworkForDate(date: LocalDate): Boolean
+    /**
+     * Published dates strictly before [before], newest first, one page at a time.
+     * See [BauhausApi.fetchArchivePage].
+     */
+    suspend fun fetchArchivePage(before: LocalDate): ArchiveIndexPage
 
     /** The service's own publish-freshness report. See [BauhausApi.fetchHealth]. */
     suspend fun fetchHealth(): ServiceHealth

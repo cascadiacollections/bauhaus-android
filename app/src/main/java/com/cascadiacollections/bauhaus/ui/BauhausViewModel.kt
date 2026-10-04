@@ -20,11 +20,14 @@ import com.cascadiacollections.bauhaus.AppContainerProvider
 import com.cascadiacollections.bauhaus.CrashReporter
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.WallpaperScheduler
+import com.cascadiacollections.bauhaus.data.ArchiveIndex
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.BauhausApi
 import com.cascadiacollections.bauhaus.data.BauhausApiClient
 import com.cascadiacollections.bauhaus.data.BauhausHttpException
 import com.cascadiacollections.bauhaus.data.SettingsStore
+import com.cascadiacollections.bauhaus.data.SystemWallpaperSetter
+import com.cascadiacollections.bauhaus.data.WallpaperSetter
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
 import com.cascadiacollections.bauhaus.data.isConnectivityFailure
 import com.cascadiacollections.bauhaus.data.serviceToday
@@ -35,7 +38,6 @@ import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.util.LinkedHashMap
 import kotlin.coroutines.cancellation.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -52,10 +54,27 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 
 /** Aspect ratio the preview card uses until the service tells us the artwork's real shape. */
 const val FALLBACK_ASPECT_RATIO = 4f / 3f
+
+/**
+ * How far [UiState.latestDate] can be trusted.
+ *
+ * It decides how the newest page's image is requested: a date the service has
+ * confirmed is requested by its own immutable `/api/<date>` URL, while the
+ * clock's guess can only go through `/api/today`, whose contents change daily.
+ */
+enum class LatestDateStatus {
+    /** The clock's guess; the service has not answered yet. */
+    RESOLVING,
+
+    /** The service named the day it is serving. */
+    CONFIRMED,
+
+    /** The service could not say; still the clock's guess. */
+    UNCONFIRMED
+}
 
 /** One-shot event for [SnackbarHost][androidx.compose.material3.SnackbarHost] display. */
 data class SnackbarEvent(val message: String, val uri: Uri? = null)
@@ -70,6 +89,8 @@ data class ShareArtworkEvent(val uri: Uri, val text: String)
  * @property latestDate The newest date the service has published. The UI needs
  *   this — not the device clock — to know when a page should be requested as
  *   `/api/today` rather than `/api/<date>`.
+ * @property latestDateStatus Whether [latestDate] is the service's answer or
+ *   still the clock's guess.
  * @property previewAspectRatio Shape of the preview card, taken from the first
  *   metadata that carries variant dimensions and then held for the session. Each
  *   day's artwork has its own dimensions, so recomputing this per page would
@@ -80,6 +101,7 @@ data class UiState(
     val schedulingEnabled: Boolean = true,
     val lastUpdated: String? = null,
     val latestDate: LocalDate = serviceToday(),
+    val latestDateStatus: LatestDateStatus = LatestDateStatus.RESOLVING,
     val previewAspectRatio: Float = FALLBACK_ASPECT_RATIO,
     val visibleDate: LocalDate = serviceToday(),
     val availableDates: List<LocalDate> = listOf(serviceToday()),
@@ -132,7 +154,8 @@ class BauhausViewModel(
     private val settings: SettingsStore,
     private val api: BauhausApiClient,
     private val scheduler: WallpaperScheduler,
-    private val savedState: SavedStateHandle
+    private val savedState: SavedStateHandle,
+    private val wallpaperSetter: WallpaperSetter = SystemWallpaperSetter
 ) : AndroidViewModel(application) {
     private val maxJumpExpansionDays: Long = 730
 
@@ -146,6 +169,10 @@ class BauhausViewModel(
     private var anchorDate: LocalDate = serviceToday()
 
     private val archiveMutex = Mutex()
+
+    /** Which older days exist. Guarded by [archiveMutex]. */
+    private val archiveIndex = ArchiveIndex(api::fetchArchivePage)
+
     private val metadataByDate = object : LinkedHashMap<LocalDate, ArtworkMetadata>(16, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<LocalDate, ArtworkMetadata>): Boolean =
             size > MAX_METADATA_CACHE_SIZE
@@ -159,9 +186,14 @@ class BauhausViewModel(
     private var allBrowsableDates: List<LocalDate> = listOf(anchorDate)
         set(value) {
             field = value
-            // Only the oldest date is stored: publishing is contiguous, so the
-            // whole pager rebuilds from [anchorDate] down to this one.
+            // Stored compactly: the oldest date, plus the days inside the span the
+            // service never published. The pager rebuilds from [anchorDate] down to
+            // the oldest, leaving those out. Gaps are rare, so the list is short.
             savedState[KEY_OLDEST_BROWSED_DATE] = value.lastOrNull()?.toString()
+            savedState[KEY_SKIPPED_DATES] = value.zipWithNext()
+                .flatMap { (newer, older) -> daysStrictlyBetween(older, newer) }
+                .map(LocalDate::toEpochDay)
+                .toLongArray()
         }
 
     /** Minimum milliseconds between user-initiated refreshes (DOS guard). */
@@ -257,15 +289,14 @@ class BauhausViewModel(
         }
         viewModelScope.launch {
             try {
-                val metadata = fetchMetadata(anchorDate)
-                metadata.publishedDate?.let { rebaseToLatest(it) }
-                // Read anchorDate only after the rebase: the clock's guess is the
-                // wrong cache key once the service has named the day it served.
-                metadataByDate[anchorDate] = metadata
+                // Keyed by the day the service says it served, not the clock's
+                // guess: the guess is the wrong cache key once the service answers.
+                val (date, metadata) = fetchLatestMetadata()
+                metadataByDate[date] = metadata
                 _uiState.update {
-                    if (it.visibleDate == anchorDate) {
+                    if (it.visibleDate == date) {
                         it.copy(isMetadataLoading = false, metadataLoadFailed = false)
-                            .showingMetadataFor(anchorDate, metadata)
+                            .showingMetadataFor(date, metadata)
                     } else {
                         it.withPreviewRatioFrom(metadata)
                     }
@@ -274,10 +305,11 @@ class BauhausViewModel(
                 throw e
             } catch (e: Exception) {
                 _uiState.update {
+                    val unconfirmed = it.copy(latestDateStatus = it.latestDateStatus.settled())
                     if (it.visibleDate == anchorDate) {
-                        it.copy(metadata = null, isMetadataLoading = false, metadataLoadFailed = true)
+                        unconfirmed.copy(metadata = null, isMetadataLoading = false, metadataLoadFailed = true)
                     } else {
-                        it
+                        unconfirmed
                     }
                 }
                 reportMetadataFailure(e)
@@ -332,22 +364,47 @@ class BauhausViewModel(
     }
 
     /**
-     * Fetches [date]'s metadata over whichever route the service caches best.
+     * Fetches [date]'s metadata, paired with the day it actually belongs to.
      *
-     * The newest published day goes through `/api/today.json`, which carries a
-     * 5-minute TTL and an `ETag`; older days go through `/api/<date>.json`, which
-     * is `immutable` with a one-year TTL because publishing is write-once.
+     * Every day the service has confirmed goes through `/api/<date>.json`, which
+     * is `immutable` with a one-year TTL because publishing is write-once. Only the
+     * newest page, while its date is still the clock's guess, has to go through
+     * `/api/today.json` — and that may answer for a different day than asked.
      */
-    private suspend fun fetchMetadata(date: LocalDate): ArtworkMetadata =
-        if (date == anchorDate) api.fetchTodayMetadata() else api.fetchMetadataForDate(date)
+    private suspend fun fetchMetadata(date: LocalDate): Pair<LocalDate, ArtworkMetadata> =
+        if (date == anchorDate && _uiState.value.latestDateStatus != LatestDateStatus.CONFIRMED) {
+            fetchLatestMetadata()
+        } else {
+            date to api.fetchMetadataForDate(date)
+        }
+
+    /**
+     * Fetches `/api/today.json` and adopts the day it names as the newest
+     * published date, returning that day with the metadata.
+     *
+     * The clock's guess yields to the service in either direction — before the
+     * day's publish, the service is on yesterday. A date the service has already
+     * confirmed only moves forward: `/api/today.json` is edge-cached, so a stale
+     * copy can name an older day than one already seen.
+     */
+    private suspend fun fetchLatestMetadata(): Pair<LocalDate, ArtworkMetadata> {
+        val metadata = api.fetchTodayMetadata()
+        val published = metadata.publishedDate
+        val confirmed = _uiState.value.latestDateStatus == LatestDateStatus.CONFIRMED
+        when {
+            published == null -> _uiState.update { it.copy(latestDateStatus = it.latestDateStatus.settled()) }
+            !confirmed || published.isAfter(anchorDate) -> rebaseToLatest(published)
+        }
+        return (published ?: anchorDate) to metadata
+    }
 
     /**
      * Rebuilds where the user was browsing before the process was killed.
      *
-     * Only three things are persisted — the oldest date paged to, the visible
-     * date, and the favorites filter — because publishing is contiguous, so the
-     * pager reconstructs from [anchorDate] down to the oldest without storing the
-     * list itself.
+     * Only four things are persisted — the oldest date paged to, the days in
+     * that span the service never published, the visible date, and the favorites
+     * filter — so the pager reconstructs from [anchorDate] down to the oldest
+     * without storing the list itself.
      *
      * [anchorDate] is deliberately *not* restored. It is a claim about what the
      * service has published, which may have moved on while the app was dead, so
@@ -359,10 +416,13 @@ class BauhausViewModel(
         val restoredOldest = savedState.get<String>(KEY_OLDEST_BROWSED_DATE)?.toLocalDateOrNull()
         val span = restoredOldest?.let { ChronoUnit.DAYS.between(it, anchorDate) }
         if (span != null && span in 0..maxJumpExpansionDays) {
+            val skipped = savedState.get<LongArray>(KEY_SKIPPED_DATES)
+                ?.mapTo(HashSet()) { LocalDate.ofEpochDay(it) }
+                .orEmpty()
             allBrowsableDates = buildList {
                 var cursor = anchorDate
                 while (!cursor.isBefore(restoredOldest)) {
-                    add(cursor)
+                    if (cursor == anchorDate || cursor !in skipped) add(cursor)
                     cursor = cursor.minusDays(1)
                 }
             }
@@ -401,7 +461,10 @@ class BauhausViewModel(
      * under them would be worse than a one-day-off label.
      */
     private fun rebaseToLatest(latest: LocalDate) {
-        if (latest == anchorDate) return
+        if (latest == anchorDate) {
+            _uiState.update { it.copy(latestDateStatus = LatestDateStatus.CONFIRMED) }
+            return
+        }
         val previous = anchorDate
         anchorDate = latest
 
@@ -413,12 +476,13 @@ class BauhausViewModel(
             if (untouched && state.availableDates == listOf(previous)) {
                 state.copy(
                     latestDate = latest,
+                    latestDateStatus = LatestDateStatus.CONFIRMED,
                     availableDates = listOf(latest),
                     visibleDate = latest,
                     isFavorite = latest in state.favoriteDates
                 )
             } else {
-                state.copy(latestDate = latest)
+                state.copy(latestDate = latest, latestDateStatus = LatestDateStatus.CONFIRMED)
             }
         }
     }
@@ -461,52 +525,54 @@ class BauhausViewModel(
     /**
      * Jumps the pager to [date], extending the archive backwards if needed.
      *
-     * Extending costs exactly one request — a body-less
-     * [hasArtworkForDate][BauhausApiClient.hasArtworkForDate] probe of the target
-     * day. Publishing is daily and write-once, so a day that exists implies every
-     * later day exists, and the intervening pages can be appended without being
-     * probed individually. Their metadata loads lazily as the user reaches them.
+     * Extending reads the archive index ([ArchiveIndex]) for the span between the
+     * target and the oldest loaded page — one request for any jump within
+     * [maxJumpExpansionDays] — and appends only the days that were published.
+     * Publishing has gaps, so appending every calendar day in the span would leave
+     * pages for days with no artwork that could never load. Metadata for the
+     * appended pages loads lazily as the user reaches them.
      *
-     * The previous implementation fetched full metadata for every day between the
-     * target and the oldest loaded page before it could decide, which meant a
-     * two-year jump issued over seven hundred requests to answer one question.
+     * Everything that reads the pager's extent does so inside [archiveMutex]: an
+     * append that lands while this is queued moves the oldest loaded day.
      */
     fun jumpToDate(date: LocalDate) {
         if (date.isAfter(anchorDate)) return
         if (date == _uiState.value.visibleDate) return
 
-        val oldestLoaded = allBrowsableDates.lastOrNull() ?: anchorDate
-        if (date in allBrowsableDates || !date.isBefore(oldestLoaded)) {
-            selectDate(date)
-            return
-        }
-
-        if (ChronoUnit.DAYS.between(date, oldestLoaded) > maxJumpExpansionDays) {
-            _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_archive_jump_too_far)))
-            return
-        }
-
         viewModelScope.launch {
             archiveMutex.withLock {
-                val exists = try {
-                    api.hasArtworkForDate(date)
+                if (date in allBrowsableDates) {
+                    selectDate(date)
+                    return@withLock
+                }
+
+                val oldestLoaded = allBrowsableDates.lastOrNull() ?: anchorDate
+                if (!date.isBefore(oldestLoaded)) {
+                    // Inside the loaded span but not a page: a day the service
+                    // never published.
+                    _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_no_artwork_for_date)))
+                    return@withLock
+                }
+
+                if (ChronoUnit.DAYS.between(date, oldestLoaded) > maxJumpExpansionDays) {
+                    _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_archive_jump_too_far)))
+                    return@withLock
+                }
+
+                val appended = try {
+                    archiveIndex.publishedBetween(from = date, until = oldestLoaded)
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     emitError(e, R.string.error_refresh)
                     return@withLock
                 }
 
-                if (!exists) {
+                if (date !in appended) {
                     _snackbarEvent.tryEmit(SnackbarEvent(getString(R.string.error_no_artwork_for_date)))
                     return@withLock
                 }
 
-                val appended = buildList {
-                    var cursor = oldestLoaded.minusDays(1)
-                    while (!cursor.isBefore(date)) {
-                        add(cursor)
-                        cursor = cursor.minusDays(1)
-                    }
-                }
                 allBrowsableDates = allBrowsableDates + appended
 
                 val cached = metadataByDate[date]
@@ -607,6 +673,12 @@ class BauhausViewModel(
      * treats that field as "today's artwork is already on screen" and skips its
      * daily fetch when it matches. Stamping it after applying an archive image
      * suppressed the day's real update.
+     *
+     * The stamp is the day the applied artwork was published for, which is not
+     * necessarily the clock's day: before the day's publish, the newest artwork is
+     * yesterday's. Stamping the clock's day then suppressed the worker's run after
+     * the publish, and the day's artwork was never applied. If the newest page's
+     * date is still the clock's guess, `/api/today.json` is asked which day it is.
      */
     fun setWallpaperNow() {
         viewModelScope.launch {
@@ -614,27 +686,34 @@ class BauhausViewModel(
             try {
                 val visibleDate = _uiState.value.visibleDate
                 val isLatest = visibleDate == anchorDate
+                // null only when the service's metadata names no day at all.
+                val artDate: LocalDate? = if (isLatest &&
+                    _uiState.value.latestDateStatus != LatestDateStatus.CONFIRMED
+                ) {
+                    fetchLatestMetadata().second.publishedDate
+                } else {
+                    visibleDate
+                }
                 val targetSize = wallpaperTargetSize(getApplication())
-                val bitmap = if (isLatest) {
-                    api.fetchTodayImage(
+                val bitmap = if (artDate != null) {
+                    api.fetchImageForDate(
+                        date = artDate,
                         maxWidth = targetSize.width,
                         maxHeight = targetSize.height
                     )
                 } else {
-                    api.fetchImageForDate(
-                        date = visibleDate,
+                    api.fetchTodayImage(
                         maxWidth = targetSize.width,
                         maxHeight = targetSize.height
                     )
                 }
                 try {
                     val target = _uiState.value.wallpaperTarget
-                    withContext(Dispatchers.IO) {
-                        val wallpaperManager = WallpaperManager.getInstance(getApplication())
-                        wallpaperManager.setBitmap(bitmap, null, true, target.flag)
-                    }
+                    wallpaperSetter.set(getApplication(), bitmap, target)
                     if (isLatest) {
-                        settings.setLastUpdated(visibleDate.toString())
+                        // With no publish date to go on, stamp nothing: a wrong
+                        // stamp suppresses a whole day of updates.
+                        artDate?.let { settings.setLastUpdated(it.toString()) }
                         // The widget shows the newest artwork, so only a set of
                         // the newest date can have changed what it displays.
                         // Written from the bitmap already in hand — the widget
@@ -689,7 +768,10 @@ class BauhausViewModel(
             var saveSucceeded = false
             try {
                 val visibleDate = _uiState.value.visibleDate
-                val (bytes, mimeType) = if (visibleDate == anchorDate) {
+                // The same route the preview used, so what is saved is what is shown.
+                val (bytes, mimeType) = if (visibleDate == anchorDate &&
+                    _uiState.value.latestDateStatus != LatestDateStatus.CONFIRMED
+                ) {
                     api.fetchTodayImageRaw()
                 } else {
                     api.fetchImageRawForDate(visibleDate)
@@ -780,15 +862,23 @@ class BauhausViewModel(
         }
         try {
             val visibleDate = _uiState.value.visibleDate
-            val metadata = fetchMetadata(visibleDate)
+            // Refreshing the newest page always asks /api/today.json, confirmed or
+            // not: finding out that a newer day was published is the point. Its
+            // answer is cached under the day it names, which is not necessarily
+            // the page that asked.
+            val (date, metadata) = if (visibleDate == anchorDate) {
+                fetchLatestMetadata()
+            } else {
+                fetchMetadata(visibleDate)
+            }
             lastRefreshAt = SystemClock.elapsedRealtime()
-            metadataByDate[visibleDate] = metadata
+            metadataByDate[date] = metadata
             _uiState.update {
                 it.copy(
                     isRefreshing = false,
                     isMetadataLoading = false,
                     metadataLoadFailed = false
-                ).showingMetadataFor(visibleDate, metadata, bumpImageRevision = true)
+                ).showingMetadataFor(date, metadata, bumpImageRevision = true)
             }
         } catch (e: Exception) {
             _uiState.update {
@@ -821,14 +911,18 @@ class BauhausViewModel(
                 }
             }
             try {
-                val metadata = fetchMetadata(date)
-                metadataByDate[date] = metadata
+                val (resolved, metadata) = fetchMetadata(date)
+                metadataByDate[resolved] = metadata
                 _uiState.update { state ->
-                    val shown = state.showingMetadataFor(date, metadata)
-                    if (state.visibleDate == date) {
-                        shown.copy(isMetadataLoading = false, metadataLoadFailed = false)
-                    } else {
-                        shown
+                    val shown = state.showingMetadataFor(resolved, metadata)
+                    when (state.visibleDate) {
+                        resolved -> shown.copy(isMetadataLoading = false, metadataLoadFailed = false)
+
+                        // /api/today.json answered for another day, and the page
+                        // that asked is still on screen: it has nothing to show.
+                        date -> shown.copy(metadata = null, isMetadataLoading = false, metadataLoadFailed = true)
+
+                        else -> shown
                     }
                 }
             } catch (e: CancellationException) {
@@ -848,7 +942,14 @@ class BauhausViewModel(
     }
 
     /**
-     * Extends the pager by one older day.
+     * Extends the pager by the next older published day.
+     *
+     * "Next older" comes from the archive index, not from subtracting a day:
+     * publishing has gaps (2026-10-02 has no artwork, nor do eleven days of July
+     * 2026), and treating the first missing day as the start of the archive
+     * stranded the pager there for good. The index is read a page at a time and
+     * kept, so this costs a request only when it reaches past what has been read.
+     * [UiState.reachedArchiveStart] is set only when the index has nothing older.
      *
      * Serves one request from [archiveAppendRequests]; because that collection is
      * sequential, appends cannot overlap each other and no "already appending"
@@ -860,26 +961,25 @@ class BauhausViewModel(
     private suspend fun appendNextOlderDate() {
         archiveMutex.withLock {
             val oldest = allBrowsableDates.lastOrNull() ?: anchorDate
-            val nextOlderDate = oldest.minusDays(1)
-            try {
-                val metadata = api.fetchMetadataForDate(nextOlderDate)
-                metadataByDate[nextOlderDate] = metadata
-                allBrowsableDates = allBrowsableDates + nextOlderDate
-                _uiState.update { state ->
-                    if (!state.showFavoritesOnly) {
-                        state.copy(availableDates = allBrowsableDates)
-                    } else {
-                        state
-                    }
-                }
-            } catch (e: BauhausHttpException) {
-                if (e.code == HTTP_NOT_FOUND) {
-                    _uiState.update { it.copy(reachedArchiveStart = true) }
-                } else {
-                    emitError(e, R.string.error_refresh)
-                }
+            val nextOlderDate = try {
+                archiveIndex.newestBefore(oldest)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 emitError(e, R.string.error_refresh)
+                return@withLock
+            }
+            if (nextOlderDate == null) {
+                _uiState.update { it.copy(reachedArchiveStart = true) }
+                return@withLock
+            }
+            allBrowsableDates = allBrowsableDates + nextOlderDate
+            _uiState.update { state ->
+                if (!state.showFavoritesOnly) {
+                    state.copy(availableDates = allBrowsableDates)
+                } else {
+                    state
+                }
             }
         }
     }
@@ -959,6 +1059,7 @@ class BauhausViewModel(
 
         private const val KEY_VISIBLE_DATE = "visible_date"
         private const val KEY_OLDEST_BROWSED_DATE = "oldest_browsed_date"
+        private const val KEY_SKIPPED_DATES = "skipped_dates"
         private const val KEY_SHOW_FAVORITES_ONLY = "show_favorites_only"
 
         val Factory: ViewModelProvider.Factory = viewModelFactory {
@@ -1005,6 +1106,19 @@ class BauhausViewModel(
  * a gesture could be dropped spuriously.
  */
 private fun requestChannel(): Channel<Unit> = Channel(Channel.RENDEZVOUS)
+
+/** A failed attempt to resolve the newest date leaves it unconfirmed; any other status stands. */
+private fun LatestDateStatus.settled(): LatestDateStatus =
+    if (this == LatestDateStatus.RESOLVING) LatestDateStatus.UNCONFIRMED else this
+
+/** The calendar days after [older] and before [newer], newest first. */
+private fun daysStrictlyBetween(older: LocalDate, newer: LocalDate): List<LocalDate> = buildList {
+    var cursor = newer.minusDays(1)
+    while (cursor.isAfter(older)) {
+        add(cursor)
+        cursor = cursor.minusDays(1)
+    }
+}
 
 /** Parses an ISO date, or null if the stored value is not one. */
 private fun String.toLocalDateOrNull(): LocalDate? = runCatching { LocalDate.parse(this) }.getOrNull()

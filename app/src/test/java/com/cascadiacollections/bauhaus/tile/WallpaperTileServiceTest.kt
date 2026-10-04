@@ -1,12 +1,13 @@
 package com.cascadiacollections.bauhaus.tile
 
 import android.app.Application
+import assertk.assertThat
+import assertk.assertions.isEqualTo
+import assertk.assertions.isFalse
+import assertk.assertions.isTrue
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.serviceToday
 import java.time.LocalDate
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -22,24 +23,24 @@ class WallpaperTileServiceTest {
     fun `tile is active when the wallpaper was already set for the service day`() {
         val state = tileStateFor(lastUpdated = "2026-08-04", today = today)
 
-        assertTrue(state.active)
-        assertEquals(R.string.tile_subtitle_up_to_date, state.subtitleRes)
+        assertThat(state.active).isTrue()
+        assertThat(state.subtitleRes).isEqualTo(R.string.tile_subtitle_up_to_date)
     }
 
     @Test
     fun `tile is inactive when the wallpaper has never been set`() {
         val state = tileStateFor(lastUpdated = null, today = today)
 
-        assertFalse(state.active)
-        assertEquals(R.string.tile_subtitle_tap_to_update, state.subtitleRes)
+        assertThat(state.active).isFalse()
+        assertThat(state.subtitleRes).isEqualTo(R.string.tile_subtitle_tap_to_update)
     }
 
     @Test
     fun `tile is inactive when the stamp is from an earlier day`() {
         val state = tileStateFor(lastUpdated = "2026-08-03", today = today)
 
-        assertFalse(state.active)
-        assertEquals(R.string.tile_subtitle_tap_to_update, state.subtitleRes)
+        assertThat(state.active).isFalse()
+        assertThat(state.subtitleRes).isEqualTo(R.string.tile_subtitle_tap_to_update)
     }
 
     @Test
@@ -49,8 +50,8 @@ class WallpaperTileServiceTest {
         // discourage the tap that would fix it.
         val state = tileStateFor(lastUpdated = "2026-08-05", today = today)
 
-        assertFalse(state.active)
-        assertEquals(R.string.tile_subtitle_tap_to_update, state.subtitleRes)
+        assertThat(state.active).isFalse()
+        assertThat(state.subtitleRes).isEqualTo(R.string.tile_subtitle_tap_to_update)
     }
 
     @Test
@@ -59,6 +60,6 @@ class WallpaperTileServiceTest {
         // LocalDate.now(), which would disagree with the worker's own guard.
         val state = tileStateFor(lastUpdated = serviceToday().toString(), today = serviceToday())
 
-        assertTrue(state.active)
+        assertThat(state.active).isTrue()
     }
 }

@@ -1,5 +1,6 @@
 package com.cascadiacollections.bauhaus.ui
 
+import android.content.Context
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -69,6 +70,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import com.cascadiacollections.bauhaus.R
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
@@ -105,29 +107,62 @@ object SettingsScreenTestTags {
     const val VIEW_LICENSE_BUTTON = "view_license_button"
 }
 
-internal data class ArchiveImageRequest(val imagePath: String, val cacheKey: String)
+/**
+ * How one page's image is requested.
+ *
+ * @property imagePath Service-relative URL path.
+ * @property cacheKey Coil memory- and disk-cache key.
+ * @property diskCacheable Whether Coil may keep the image in its own disk cache.
+ *   Coil 3's default cache strategy serves a disk-cache hit forever without
+ *   consulting `Cache-Control`, so only immutable URLs may go there.
+ */
+internal data class ArchiveImageRequest(val imagePath: String, val cacheKey: String, val diskCacheable: Boolean = true)
 
 /**
- * Route for [date]'s image.
+ * How to request [date]'s image, or `null` while it should not be requested yet.
  *
  * [latestDate] is the newest date the *service* has published, not the device's
- * idea of today — see [UiState.latestDate]. The newest page goes through
- * `/api/today`, which resolves server-side and shares a cache entry with the
- * startup prefetch and the daily worker.
+ * idea of today — see [UiState.latestDate].
+ *
+ * Every day the service has confirmed loads from its own `/api/<date>` URL, which
+ * is immutable, so the cache key `/api/<date>#<revision>` always names the same bytes.
+ * The newest page used to load `/api/today` under that key, and `/api/today`
+ * is whatever day the service is on *now* — before the day's publish, yesterday's
+ * artwork. Coil kept it under today's key for good, so the day's real artwork
+ * never appeared on that page.
+ *
+ * While the newest date is still the clock's guess ([LatestDateStatus.RESOLVING])
+ * the page waits rather than load a URL it would load again moments later. If
+ * the service cannot confirm it, the page falls back to `/api/today` — kept out
+ * of Coil's disk cache, and left to the HTTP cache, which honours its 5-minute TTL.
  */
-internal fun imagePathForDate(date: LocalDate, latestDate: LocalDate): String = if (date == latestDate) {
-    "/api/today"
-} else {
-    BauhausApi.imagePath(date)
-}
+internal fun archiveImageRequest(
+    date: LocalDate,
+    latestDate: LocalDate,
+    latestDateStatus: LatestDateStatus,
+    imageRevision: Int
+): ArchiveImageRequest? = when {
+    date != latestDate || latestDateStatus == LatestDateStatus.CONFIRMED -> BauhausApi.imagePath(date).let { path ->
+        // Keyed by the URL itself. The old `<date>-<revision>` keys are never read
+        // again: entries written under them by earlier builds may hold the wrong
+        // day's image, and Coil would serve those forever.
+        ArchiveImageRequest(imagePath = path, cacheKey = "$path#$imageRevision")
+    }
 
-internal fun imageCacheKeyForDate(date: LocalDate, imageRevision: Int): String =
-    "${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}-$imageRevision"
+    latestDateStatus == LatestDateStatus.RESOLVING -> null
+
+    else -> ArchiveImageRequest(
+        imagePath = "/api/today",
+        cacheKey = "today-$imageRevision",
+        diskCacheable = false
+    )
+}
 
 internal fun neighborPrefetchRequests(
     dates: List<LocalDate>,
     settledPage: Int,
     latestDate: LocalDate,
+    latestDateStatus: LatestDateStatus,
     imageRevision: Int
 ): List<ArchiveImageRequest> {
     if (dates.isEmpty()) return emptyList()
@@ -135,13 +170,25 @@ internal fun neighborPrefetchRequests(
         .filter { it in dates.indices }
         .map { dates[it] }
         .distinct()
-    return neighbors.map { date ->
-        ArchiveImageRequest(
-            imagePath = imagePathForDate(date, latestDate),
-            cacheKey = imageCacheKeyForDate(date, imageRevision)
-        )
+    return neighbors.mapNotNull { date ->
+        archiveImageRequest(date, latestDate, latestDateStatus, imageRevision)
     }
 }
+
+/** A Coil request for [request], sized for the preview card. */
+private fun coilRequest(context: Context, request: ArchiveImageRequest, size: IntSize): ImageRequest =
+    ImageRequest.Builder(context)
+        .data("${BauhausApi.BASE_URL}${request.imagePath}")
+        .size(size.width, size.height)
+        .memoryCacheKey(request.cacheKey)
+        .apply {
+            if (request.diskCacheable) {
+                diskCacheKey(request.cacheKey)
+            } else {
+                diskCachePolicy(CachePolicy.DISABLED)
+            }
+        }
+        .build()
 
 internal fun previewImageSizePx(size: IntSize): IntSize {
     val maxWidth = 1600
@@ -343,17 +390,11 @@ fun SettingsScreen(
                                 dates = currentState.availableDates,
                                 settledPage = pageIndex,
                                 latestDate = currentState.latestDate,
+                                latestDateStatus = currentState.latestDateStatus,
                                 imageRevision = currentState.imageRevision
                             ).forEach { request ->
                                 if (prefetchedNeighborKeys.put(request.cacheKey, Unit) == null) {
-                                    imageLoader.enqueue(
-                                        ImageRequest.Builder(context)
-                                            .data("${BauhausApi.BASE_URL}${request.imagePath}")
-                                            .size(artworkPreviewSize.width, artworkPreviewSize.height)
-                                            .memoryCacheKey(request.cacheKey)
-                                            .diskCacheKey(request.cacheKey)
-                                            .build()
-                                    )
+                                    imageLoader.enqueue(coilRequest(context, request, artworkPreviewSize))
                                 }
                             }
                         }
@@ -372,20 +413,20 @@ fun SettingsScreen(
                         .semantics { testTag = SettingsScreenTestTags.ARTWORK_PAGER }
                 ) { page ->
                     val date = uiState.availableDates[page]
-                    val cacheKey = imageCacheKeyForDate(date, uiState.imageRevision)
-                    val imagePath = imagePathForDate(date, latestDate)
+                    val request = archiveImageRequest(
+                        date = date,
+                        latestDate = latestDate,
+                        latestDateStatus = uiState.latestDateStatus,
+                        imageRevision = uiState.imageRevision
+                    )
                     val contentDescription = if (date == latestDate) {
                         stringResource(R.string.todays_artwork)
                     } else {
                         stringResource(R.string.artwork_for_date, rememberDisplayDate(date))
                     }
-                    val imageRequest = remember(context, artworkPreviewSize, cacheKey, imagePath) {
-                        ImageRequest.Builder(context)
-                            .data("${BauhausApi.BASE_URL}$imagePath")
-                            .size(artworkPreviewSize.width, artworkPreviewSize.height)
-                            .memoryCacheKey(cacheKey)
-                            .diskCacheKey(cacheKey)
-                            .build()
+                    // A null model renders nothing until the newest date resolves.
+                    val imageRequest = remember(context, artworkPreviewSize, request) {
+                        request?.let { coilRequest(context, it, artworkPreviewSize) }
                     }
                     // Fit, not Crop: the frame is already the artwork's own ratio,
                     // and days whose dimensions differ should letterbox rather than

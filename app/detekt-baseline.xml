@@ -21,16 +21,16 @@
     <ID>ReturnCount:WallpaperSizing.kt:fun wallpaperTargetSize: Size</ID>
     <ID>ReturnCount:WallpaperWorker.kt:WallpaperWorker$override suspend fun doWork: Result</ID>
     <ID>ThrowsCount:BauhausApi.kt:BauhausApi$private fun fetchImageRawForPath: Pair&lt;ByteArray, String&gt;</ID>
-    <ID>ThrowsCount:BauhausViewModelTest.kt:BauhausViewModelTest.FakeBauhausApi$override suspend fun fetchImageForDate: Bitmap</ID>
-    <ID>ThrowsCount:BauhausViewModelTest.kt:BauhausViewModelTest.FakeBauhausApi$override suspend fun fetchImageRawForDate: Pair&lt;ByteArray, String&gt;</ID>
-    <ID>ThrowsCount:BauhausViewModelTest.kt:BauhausViewModelTest.FakeBauhausApi$override suspend fun fetchMetadataForDate: ArtworkMetadata</ID>
-    <ID>ThrowsCount:BauhausViewModelTest.kt:BauhausViewModelTest.FakeBauhausApi$override suspend fun fetchTodayMetadata: ArtworkMetadata</ID>
+    <ID>ThrowsCount:BauhausViewModelFakes.kt:FakeBauhausApi$override suspend fun fetchImageForDate: Bitmap</ID>
+    <ID>ThrowsCount:BauhausViewModelFakes.kt:FakeBauhausApi$override suspend fun fetchImageRawForDate: Pair&lt;ByteArray, String&gt;</ID>
+    <ID>ThrowsCount:BauhausViewModelFakes.kt:FakeBauhausApi$override suspend fun fetchMetadataForDate: ArtworkMetadata</ID>
+    <ID>ThrowsCount:BauhausViewModelFakes.kt:FakeBauhausApi$override suspend fun fetchTodayMetadata: ArtworkMetadata</ID>
     <ID>TooGenericExceptionCaught:BauhausApi.kt:BauhausApi$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BauhausApplication.kt:BauhausApplication$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BauhausViewModel.kt:BauhausViewModel$e: Exception</ID>
     <ID>TooGenericExceptionCaught:WallpaperWorker.kt:WallpaperWorker$e: Exception</ID>
     <ID>TooGenericExceptionCaught:WidgetImageStore.kt:WidgetImageStore$e: Exception</ID>
-    <ID>TooGenericExceptionThrown:BauhausViewModelTest.kt:BauhausViewModelTest.FakeBauhausApi$throw RuntimeException("Unexpected error")</ID>
+    <ID>TooGenericExceptionThrown:BauhausViewModelFakes.kt:FakeBauhausApi$throw RuntimeException("Unexpected error")</ID>
     <ID>TooGenericExceptionThrown:WallpaperWorkerTest.kt:WallpaperWorkerTest.FakeApi$throw RuntimeException("boom")</ID>
     <ID>UnusedParameter:CrashReporter.kt:CrashReporter$id: String</ID>
     <ID>UnusedParameter:CrashReporter.kt:CrashReporter$message: String</ID>

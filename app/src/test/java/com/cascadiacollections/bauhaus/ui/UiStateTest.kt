@@ -1,11 +1,13 @@
 package com.cascadiacollections.bauhaus.ui
 
+import assertk.assertThat
+import assertk.assertions.isEmpty
+import assertk.assertions.isEqualTo
+import assertk.assertions.isFalse
+import assertk.assertions.isNull
+import assertk.assertions.isTrue
 import com.cascadiacollections.bauhaus.data.ArtworkMetadata
 import com.cascadiacollections.bauhaus.data.WallpaperTarget
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UiStateTest {
@@ -14,17 +16,17 @@ class UiStateTest {
     fun `default state has expected values`() {
         val state = UiState()
 
-        assertEquals(WallpaperTarget.BOTH, state.wallpaperTarget)
-        assertTrue(state.schedulingEnabled)
-        assertNull(state.lastUpdated)
-        assertNull(state.metadata)
-        assertFalse(state.isSettingWallpaper)
-        assertFalse(state.isRefreshing)
-        assertFalse(state.isSavingImage)
-        assertEquals(0, state.imageRevision)
-        assertFalse(state.isFavorite)
-        assertFalse(state.showFavoritesOnly)
-        assertTrue(state.favoriteDates.isEmpty())
+        assertThat(state.wallpaperTarget).isEqualTo(WallpaperTarget.BOTH)
+        assertThat(state.schedulingEnabled).isTrue()
+        assertThat(state.lastUpdated).isNull()
+        assertThat(state.metadata).isNull()
+        assertThat(state.isSettingWallpaper).isFalse()
+        assertThat(state.isRefreshing).isFalse()
+        assertThat(state.isSavingImage).isFalse()
+        assertThat(state.imageRevision).isEqualTo(0)
+        assertThat(state.isFavorite).isFalse()
+        assertThat(state.showFavoritesOnly).isFalse()
+        assertThat(state.favoriteDates).isEmpty()
     }
 
     @Test
@@ -32,7 +34,7 @@ class UiStateTest {
         val state = UiState()
         val updated = state.copy(imageRevision = state.imageRevision + 1)
 
-        assertEquals(1, updated.imageRevision)
+        assertThat(updated.imageRevision).isEqualTo(1)
     }
 
     @Test
@@ -50,14 +52,14 @@ class UiStateTest {
         )
         val updated = state.copy(imageRevision = state.imageRevision + 1)
 
-        assertEquals(WallpaperTarget.HOME, updated.wallpaperTarget)
-        assertFalse(updated.schedulingEnabled)
-        assertEquals("2026-03-29", updated.lastUpdated)
-        assertEquals(metadata, updated.metadata)
-        assertTrue(updated.isSettingWallpaper)
-        assertTrue(updated.isRefreshing)
-        assertTrue(updated.isSavingImage)
-        assertEquals(6, updated.imageRevision)
+        assertThat(updated.wallpaperTarget).isEqualTo(WallpaperTarget.HOME)
+        assertThat(updated.schedulingEnabled).isFalse()
+        assertThat(updated.lastUpdated).isEqualTo("2026-03-29")
+        assertThat(updated.metadata).isEqualTo(metadata)
+        assertThat(updated.isSettingWallpaper).isTrue()
+        assertThat(updated.isRefreshing).isTrue()
+        assertThat(updated.isSavingImage).isTrue()
+        assertThat(updated.imageRevision).isEqualTo(6)
     }
 
     @Test
@@ -70,9 +72,9 @@ class UiStateTest {
             imageRevision = state.imageRevision + 1
         )
 
-        assertEquals(4, afterRefresh.imageRevision)
-        assertFalse(afterRefresh.isRefreshing)
-        assertEquals(metadata, afterRefresh.metadata)
+        assertThat(afterRefresh.imageRevision).isEqualTo(4)
+        assertThat(afterRefresh.isRefreshing).isFalse()
+        assertThat(afterRefresh.metadata).isEqualTo(metadata)
     }
 
     @Test
@@ -80,8 +82,8 @@ class UiStateTest {
         val state = UiState(isRefreshing = true, imageRevision = 3)
         val afterFailure = state.copy(isRefreshing = false)
 
-        assertEquals(3, afterFailure.imageRevision)
-        assertFalse(afterFailure.isRefreshing)
+        assertThat(afterFailure.imageRevision).isEqualTo(3)
+        assertThat(afterFailure.isRefreshing).isFalse()
     }
 
     @Test
@@ -89,7 +91,7 @@ class UiStateTest {
         val state = UiState()
         val saving = state.copy(isSavingImage = true)
 
-        assertTrue(saving.isSavingImage)
+        assertThat(saving.isSavingImage).isTrue()
     }
 
     @Test
@@ -97,6 +99,6 @@ class UiStateTest {
         val state = UiState(isSavingImage = true)
         val afterSave = state.copy(isSavingImage = false)
 
-        assertFalse(afterSave.isSavingImage)
+        assertThat(afterSave.isSavingImage).isFalse()
     }
 }
