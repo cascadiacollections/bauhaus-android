@@ -1,0 +1,5 @@
+Initial F-Droid release.
+
+• A new stylized public-domain artwork each day
+• Set artwork as the home screen or lock screen wallpaper
+• Browse the archive, save images, and view source/licence details
