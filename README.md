@@ -152,3 +152,9 @@ get wrong:
 Artwork is not covered by that licence: images from the daily scheduled runs are
 CC0-1.0, and each image's own licence and upstream source are published in its
 metadata and shown in the app.
+
+## Nightly APK
+
+[Download the signed FOSS APK](https://github.com/cascadiacollections/bauhaus-android/releases/download/nightly-build/bauhaus-android-nightly.apk) or view the [nightly release](https://github.com/cascadiacollections/bauhaus-android/releases/tag/nightly-build). Builds publish on pushes to main and daily at 10:23 UTC; Actions also supports manual runs. Enable installation from unknown sources on your device, then open the APK. Nightlies keep the same signing key so subsequent builds install as updates. Switching from a store or locally signed build may require uninstalling it first.
+
+Maintainers: `NIGHTLY_KEYSTORE_BASE64` holds a persistent JKS with alias `androiddebugkey` and store/key password `android`. Preserve this secret to keep installed nightlies updateable. The workflow verifies APK signatures and publishes `SHA256SUMS`.
