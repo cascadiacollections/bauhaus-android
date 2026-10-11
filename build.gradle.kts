@@ -4,7 +4,7 @@ buildscript {
     dependencies {
         constraints {
             classpath("com.google.guava:guava:33.6.0-jre")
-            classpath("com.squareup.wire:wire-runtime:6.4.5")
+            classpath("com.squareup.wire:wire-runtime:7.1.0")
             classpath("org.apache.commons:commons-lang3:3.18.0")
             classpath("org.apache.httpcomponents:httpclient:4.5.14")
             classpath("org.bitbucket.b_c:jose4j:0.9.6")
