@@ -3,7 +3,7 @@
 buildscript {
     dependencies {
         constraints {
-            classpath("com.google.guava:guava:33.6.0-jre")
+            classpath("com.google.guava:guava:33.7.2-android")
             classpath("com.squareup.wire:wire-runtime:6.4.5")
             classpath("org.apache.commons:commons-lang3:3.18.0")
             classpath("org.apache.httpcomponents:httpclient:4.5.14")
