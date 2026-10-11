@@ -92,6 +92,15 @@ just                # list all recipes
 
 Recipes default to the `foss` flavor; override with `just flavor=full build`.
 
+### CodeQL
+
+[The CodeQL workflow](.github/workflows/codeql.yml) uses advanced setup to build
+`assembleFossDebug` explicitly. Disable CodeQL default setup in **Settings > Code
+security > CodeQL analysis** before enabling this workflow: default autobuild
+runs `assemble`, which also builds `full` and fails without `google-services.json`.
+The analysis build disables Gradle build/configuration caches and reruns tasks
+so CodeQL observes compilation rather than restored outputs.
+
 ## Development environment
 
 Install [mise](https://mise.jdx.dev) to get the pinned JDK, then point Gradle at
