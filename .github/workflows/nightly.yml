@@ -74,10 +74,11 @@ jobs:
         run: |
           set -euo pipefail
           gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/nightly-build" -f sha="$GITHUB_SHA" -F force=true ||             gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref=refs/tags/nightly-build -f sha="$GITHUB_SHA"
-          notes="Latest main ($GITHUB_SHA). Signed FOSS APK for sideloading. Uses a persistent nightly key; updating an existing store or locally signed installation may require uninstalling it first."
+          updated_at=$(date -u '+%Y-%m-%d %H:%M UTC')
+          notes="Updated $updated_at. Latest main ($GITHUB_SHA). Signed FOSS APK for sideloading. Uses a persistent nightly key; updating an existing store or locally signed installation may require uninstalling it first."
           if gh release view nightly-build --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release edit nightly-build --repo "$GITHUB_REPOSITORY" --title 'Nightly Build' --notes "$notes" --prerelease --latest=false
+            gh release edit nightly-build --repo "$GITHUB_REPOSITORY" --title "Nightly Build · $(date -u '+%Y-%m-%d')" --notes "$notes" --prerelease --latest=false
           else
-            gh release create nightly-build --repo "$GITHUB_REPOSITORY" --title 'Nightly Build' --notes "$notes" --prerelease --latest=false --verify-tag
+            gh release create nightly-build --repo "$GITHUB_REPOSITORY" --title "Nightly Build · $(date -u '+%Y-%m-%d')" --notes "$notes" --prerelease --latest=false --verify-tag
           fi
           gh release upload nightly-build dist/* --repo "$GITHUB_REPOSITORY" --clobber

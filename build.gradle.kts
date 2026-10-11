@@ -1,3 +1,20 @@
+// These are transitive Gradle plugin dependencies. Explicit constraints keep
+// security updates editable by Dependabot without adding libraries to the APK.
+buildscript {
+    dependencies {
+        constraints {
+            classpath("com.google.guava:guava:33.6.0-jre")
+            classpath("com.squareup.wire:wire-runtime:6.4.5")
+            classpath("org.apache.commons:commons-lang3:3.18.0")
+            classpath("org.apache.httpcomponents:httpclient:4.5.14")
+            classpath("org.bitbucket.b_c:jose4j:0.9.6")
+            classpath("org.bouncycastle:bcpkix-jdk18on:1.85")
+            classpath("org.bouncycastle:bcprov-jdk18on:1.85")
+            classpath("org.jdom:jdom2:2.0.6.1")
+        }
+    }
+}
+
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.test) apply false
