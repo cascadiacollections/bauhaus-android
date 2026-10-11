@@ -1,4 +1,6 @@
 [versions]
+guavaSecurity = "33.6.0-android"
+wireSecurity = "6.4.5"
 agp = "9.5.0-alpha08"
 macrobenchmark = "1.5.0"
 profileinstaller = "1.4.1"
@@ -36,6 +38,9 @@ detekt = "2.0.0-alpha.6"
 composeRules = "0.6.7"
 composeLintChecks = "1.6.1"
 [libraries]
+guava-security = { module = "com.google.guava:guava", version.ref = "guavaSecurity" }
+wire-runtime-security = { module = "com.squareup.wire:wire-runtime", version.ref = "wireSecurity" }
+wire-runtime-jvm-security = { module = "com.squareup.wire:wire-runtime-jvm", version.ref = "wireSecurity" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

@@ -188,6 +188,12 @@ composeCompiler {
 }
 
 dependencies {
+    // Patched minimums for transitive app dependencies; Gradle can still select newer versions.
+    constraints {
+        implementation(libs.guava.security)
+        implementation(libs.wire.runtime.security)
+        implementation(libs.wire.runtime.jvm.security)
+    }
     lintChecks(libs.compose.lint.checks)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
