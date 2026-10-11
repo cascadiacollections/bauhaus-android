@@ -1,48 +1,202 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Bauhaus — Daily artwork for Android</title>
-    <meta name="description" content="Try Bauhaus for Android: daily artwork for your wallpaper. Download a signed nightly APK and share feedback." />
-    <style>
-      body {
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        max-width: 42rem;
-        margin: 4rem auto;
-        padding: 0 1.25rem;
-        line-height: 1.5;
-      }
-      a { color: #0b57d0; }
-      .muted { color: #555; }
-      .download { display: inline-block; background: #0b57d0; color: #fff; padding: 0.85rem 1.2rem; border-radius: 0.5rem; font-weight: 600; text-decoration: none; }
-      .download:hover { background: #0842a0; }
-      a:focus-visible { outline: 3px solid #bc4900; outline-offset: 4px; }
-      section { margin-top: 2.5rem; }
-      li { margin-bottom: 0.65rem; }
-      h1 { font-size: 2.75rem; margin-bottom: 0.5rem; }
-    </style>
-  </head>
-  <body>
-    <main>
-      <h1>Bauhaus</h1>
-      <p>A daily artwork wallpaper app for Android.</p>
-      <p><a class="download" href="https://github.com/cascadiacollections/bauhaus-android/releases/download/nightly-build/bauhaus-android-nightly.apk">Download nightly APK</a></p>
-      <p class="muted">A signed FOSS build for early adopters. Updated daily and after changes to the app. You may encounter bugs.</p>
-      <section aria-labelledby="install">
-        <h2 id="install">Try it on your phone</h2>
-        <ol>
-          <li>Download the nightly APK and open it on your Android device.</li>
-          <li>When Android asks, allow your browser or file manager to <strong>install unknown apps</strong>.</li>
-          <li>Install and open Bauhaus. Use the same download button for future updates.</li>
-        </ol>
-        <p>Nightlies use the same signing key so you can update without uninstalling. Switching from a store or locally signed build may require uninstalling first, which removes local app data.</p>
-      </section>
-      <section aria-labelledby="feedback">
-        <h2 id="feedback">Help shape Bauhaus</h2>
-        <p><a href="https://github.com/cascadiacollections/bauhaus-android/issues">Report a bug or share feedback</a>. Include your device model, Android version, and what happened.</p>
-        <p><a href="https://github.com/cascadiacollections/bauhaus-android/releases/tag/nightly-build">Build notes and checksums</a> · <a href="https://github.com/cascadiacollections/bauhaus-android">Source on GitHub</a></p>
-      </section>
-    </main>
-  </body>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bauhaus for Android — A fresh perspective, every day</title>
+<meta name="description" content="A fresh perspective, every day. A free and open-source Android app by Cascadia Collections.">
+<meta name="theme-color" content="#f3f0e6">
+<link rel="canonical" href="https://cascadiacollections.github.io/bauhaus-android/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Bauhaus for Android">
+<meta property="og:description" content="A fresh perspective, every day">
+<meta property="og:url" content="https://cascadiacollections.github.io/bauhaus-android/">
+<meta property="og:image" content="https://cascadiacollections.github.io/bauhaus-android/assets/social.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+<nav aria-label="Main">
+<a class="brand" href="./">
+<span class="brandmark" aria-hidden="true">
+</span>Bauhaus</a>
+<div class="navlinks">
+<a href="#experience">The app</a>
+<a href="https://github.com/cascadiacollections/bauhaus-android">Source ↗</a>
+<a href="#download">Get Bauhaus ↓</a>
+</div>
+</nav>
+<main id="main">
+<div class="hero">
+<div>
+<div class="eyebrow">A daily artwork wallpaper app</div>
+<h1>A fresh<br>perspective.<br>
+<em>Every day.</em>
+</h1>
+<p class="intro muted">Make your everyday screen a place for art. Bauhaus brings a new, art-inspired landscape to your Android wallpaper each day.</p>
+<div class="buttons">
+<a class="button primary" href="https://github.com/cascadiacollections/bauhaus-android/releases/download/nightly-build/bauhaus-android-nightly.apk">Download for Android ↗</a>
+<a class="button" href="#experience">Step inside ↓</a>
+</div>
+<p class="small muted">Free &amp; open source · Android 15+ · MIT licensed</p>
+</div>
+<div class="heroart">
+<div class="phone">
+<img src="assets/today.webp" alt="Bauhaus Today screen showing the daily artwork and wallpaper controls" width="1080" height="2400" fetchpriority="high">
+</div>
+<span class="artlabel">A SMALL DAILY RITUAL</span>
+</div>
+</div>
+<div class="strip">
+<span>Public-domain beginnings</span>
+<span>A new artwork each day</span>
+<span>Made for your screen</span>
+</div>
+<section id="experience">
+<div class="sectionhead">
+<div>
+<div class="eyebrow">01 / Your pocket gallery</div>
+<h2>Art to live with.<br>And return to.</h2>
+</div>
+<p class="muted">Enjoy today's work, browse the archive, and keep your favorites close. Choose what belongs on your home screen, lock screen, or both.</p>
+</div>
+<div class="gallery">
+<figure>
+<div class="phone">
+<img src="assets/today.webp" alt="Bauhaus daily artwork screen with source attribution" width="1080" height="2400" loading="lazy">
+</div>
+<figcaption>
+<strong>Meet today’s artwork.</strong>A new landscape, with its source and license just a tap away.</figcaption>
+</figure>
+<figure>
+<div class="phone">
+<img src="assets/archive.webp" alt="Bauhaus archive with previous daily artworks" width="1080" height="2400" loading="lazy">
+</div>
+<figcaption>
+<strong>Find a day worth keeping.</strong>Browse earlier works and revisit a different palette or mood.</figcaption>
+</figure>
+<figure>
+<div class="phone">
+<img src="assets/settings.webp" alt="Bauhaus settings for automatic wallpaper updates" width="1080" height="2400" loading="lazy">
+</div>
+<figcaption>
+<strong>Make it a daily ritual.</strong>Choose your wallpaper destination and background update preferences.</figcaption>
+</figure>
+</div>
+<p class="shotnote">Actual app screens captured on an Android emulator. Content and appearance can vary.</p>
+</section>
+<section class="process">
+<div>
+<img class="artwork" src="assets/artwork.jpg" alt="A landscape from the Bauhaus daily artwork service" width="1000" height="1000" loading="lazy">
+<p class="credit muted">Daily artwork from the Bauhaus service. <a href="assets/artwork-metadata.json">View this artwork’s source and license ↗</a>
+</p>
+</div>
+<div>
+<div class="eyebrow">02 / From collection to canvas</div>
+<h2>An old landscape.<br>A new way to see it.</h2>
+<p class="muted">The Bauhaus service starts with a CC0 landscape from the Metropolitan Museum of Art or the Art Institute of Chicago, then uses neural style transfer with a curated artistic reference.</p>
+<ol>
+<li>
+<strong>A public-domain starting point.</strong>
+<span class="muted">Museum collections provide the original landscape.</span>
+</li>
+<li>
+<strong>A different artistic lens.</strong>
+<span class="muted">References include Monet, Hokusai, Cézanne, and Turner.</span>
+</li>
+<li>
+<strong>A place in your day.</strong>
+<span class="muted">The Android app fetches the result and lets you make it your wallpaper.</span>
+</li>
+</ol>
+<a class="button" href="https://github.com/cascadiacollections/bauhaus">Explore the artwork service ↗</a>
+</div>
+</section>
+<section>
+<div class="sectionhead">
+<div>
+<div class="eyebrow">03 / Beyond the gallery</div>
+<h2>Part of your<br>everyday Android.</h2>
+</div>
+</div>
+<div class="featuregrid">
+<article>
+<span class="number">01 / KEEP</span>
+<h3>Save what stays with you.</h3>
+<p class="muted">Favorite an artwork, reapply it later, save it to your gallery, or share it with someone.</p>
+</article>
+<article>
+<span class="number">02 / DISCOVER</span>
+<h3>Know where it began.</h3>
+<p class="muted">Follow each artwork's original source and license. The art has a story beyond your screen.</p>
+</article>
+<article>
+<span class="number">03 / RETURN</span>
+<h3>A shortcut to something new.</h3>
+<p class="muted">Use the home-screen widget, Quick Settings tile, or launcher shortcuts to reach your daily artwork.</p>
+</article>
+</div>
+</section>
+<section id="download" class="install">
+<div>
+<div class="eyebrow">04 / Make room for art</div>
+<h2>Your next wallpaper<br>is waiting.</h2>
+<p class="muted">Bauhaus runs on Android 15 and newer. The FOSS edition has no Google or proprietary dependencies. Nightly builds are for early adopters and may contain bugs.</p>
+<a class="button primary" href="https://github.com/cascadiacollections/bauhaus-android/releases">View releases ↗</a>
+</div>
+<ol class="steps">
+<li>
+<strong>Download an installable APK.</strong>
+<span class="muted">Choose bauhaus-android-nightly.apk from GitHub Releases. Nightlies are development builds; read the release notes before installing.</span>
+</li>
+<li>
+<strong>Open Bauhaus.</strong>
+<span class="muted">Install the APK, then fetch today's artwork using an internet connection.</span>
+</li>
+<li>
+<strong>Choose its home.</strong>
+<span class="muted">Set your home screen, lock screen, or both. Enable background updates for a daily refresh.</span>
+</li>
+</ol>
+</section>
+<section>
+<div class="faq">
+<div class="eyebrow">A few details</div>
+<h2>Good to know.</h2>
+<details>
+<summary>Is the artwork free to use?</summary>
+<p class="muted">The daily scheduled artwork is published as CC0. Each image includes its own license and upstream source in the service metadata and app. Check the individual artwork's attribution.</p>
+</details>
+<details>
+<summary>Will my wallpaper change automatically?</summary>
+<p class="muted">Enable background updates in the app. Android schedules that work, so the refresh time can vary with battery and background restrictions.</p>
+</details>
+<details>
+<summary>Can I keep an older wallpaper?</summary>
+<p class="muted">Yes. Browse the archive, favorite a work, or reapply a day you love. You can also save artwork to your gallery.</p>
+</details>
+<details>
+<summary>Is Bauhaus open source?</summary>
+<p class="muted">Yes. The Android app is MIT licensed. The artwork service is also available on GitHub. App licensing and artwork licensing are listed separately.</p>
+</details>
+</div>
+</section>
+<div class="closing">
+<h2>A little art.<br>A different kind of day.</h2>
+<a class="button" href="https://github.com/cascadiacollections/bauhaus-android/releases/download/nightly-build/bauhaus-android-nightly.apk">Get Bauhaus ↗</a>
+</div>
+</main>
+<footer style="margin-top:70px">
+<span>Bauhaus / Cascadia Collections</span>
+<div>
+<a href="https://github.com/cascadiacollections/bauhaus-android/blob/main/LICENSE">License</a>
+<a href="https://github.com/cascadiacollections/bauhaus-android/issues">Feedback</a>
+<a href="https://github.com/cascadiacollections/bauhaus-android">GitHub ↗</a>
+</div>
+</footer>
+</div>
+</body>
 </html>

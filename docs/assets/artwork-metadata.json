@@ -1,0 +1,58 @@
+{
+  "aesthetic": {
+    "colorfulness": 62.22,
+    "contrast": 52.92,
+    "method": "heuristic-v1+nima-mobilenet-v1",
+    "nima_mean": 5.117,
+    "nima_std": 1.433,
+    "score": 8.49,
+    "sharpness": 3594.08
+  },
+  "alpha": 0.8,
+  "alpha_mode": "uniform",
+  "artist": "Utagawa Hiroshige",
+  "content_type": "image/jpeg",
+  "date": "early 20th century",
+  "generated_at": "2026-10-11T04:10:45.480881+00:00",
+  "license": "CC0-1.0",
+  "license_details": {
+    "source": "met",
+    "source_url": "https://www.metmuseum.org/art/collection/search/55665",
+    "type": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "photographer": "",
+  "photographer_url": "",
+  "postprocessing": {
+    "color_harmonize": true,
+    "sharpen": true,
+    "upscale": false
+  },
+  "published_date": "2026-10-11",
+  "source": "met",
+  "source_url": "https://www.metmuseum.org/art/collection/search/55665",
+  "style_artist": "Utagawa Hiroshige",
+  "style_mode": "curated",
+  "style_source_url": "https://www.metmuseum.org/art/collection/search/36975",
+  "style_title": "Sudden Shower over Shin-\u014chashi Bridge and Atake",
+  "title": "\u6771\u6d77\u9053\u4e94\u5341\u4e09\u6b21\u3000\u8208\u6d25",
+  "variants": [
+    {
+      "format": "image/jpeg",
+      "height": 3034,
+      "size_bytes": 3812310,
+      "type": "stylized",
+      "url": "/api/2026-10-11",
+      "width": 3912
+    },
+    {
+      "format": "image/jpeg",
+      "height": 3034,
+      "size_bytes": 4606839,
+      "type": "original",
+      "url": "/api/2026-10-11/original",
+      "width": 3912
+    }
+  ]
+}
