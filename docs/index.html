@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Bauhaus</title>
+    <title>Bauhaus — Daily artwork for Android</title>
+    <meta name="description" content="Try Bauhaus for Android: daily artwork for your wallpaper. Download a signed nightly APK and share feedback." />
     <style>
       body {
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -13,13 +14,35 @@
         line-height: 1.5;
       }
       a { color: #0b57d0; }
-      .muted { color: #666; }
+      .muted { color: #555; }
+      .download { display: inline-block; background: #0b57d0; color: #fff; padding: 0.85rem 1.2rem; border-radius: 0.5rem; font-weight: 600; text-decoration: none; }
+      .download:hover { background: #0842a0; }
+      a:focus-visible { outline: 3px solid #bc4900; outline-offset: 4px; }
+      section { margin-top: 2.5rem; }
+      li { margin-bottom: 0.65rem; }
+      h1 { font-size: 2.75rem; margin-bottom: 0.5rem; }
     </style>
   </head>
   <body>
-    <h1>Bauhaus</h1>
-    <p>A daily artwork wallpaper app for Android.</p>
-    <p class="muted">Source: <a href="https://github.com/cascadiacollections/bauhaus-android">GitHub</a></p>
-    <p><a href="https://github.com/cascadiacollections/bauhaus-android/releases">Downloads</a> and build info are in the repository.</p>
+    <main>
+      <h1>Bauhaus</h1>
+      <p>A daily artwork wallpaper app for Android.</p>
+      <p><a class="download" href="https://github.com/cascadiacollections/bauhaus-android/releases/download/nightly-build/bauhaus-android-nightly.apk">Download nightly APK</a></p>
+      <p class="muted">A signed FOSS build for early adopters. Updated daily and after changes to the app. You may encounter bugs.</p>
+      <section aria-labelledby="install">
+        <h2 id="install">Try it on your phone</h2>
+        <ol>
+          <li>Download the nightly APK and open it on your Android device.</li>
+          <li>When Android asks, allow your browser or file manager to <strong>install unknown apps</strong>.</li>
+          <li>Install and open Bauhaus. Use the same download button for future updates.</li>
+        </ol>
+        <p>Nightlies use the same signing key so you can update without uninstalling. Switching from a store or locally signed build may require uninstalling first, which removes local app data.</p>
+      </section>
+      <section aria-labelledby="feedback">
+        <h2 id="feedback">Help shape Bauhaus</h2>
+        <p><a href="https://github.com/cascadiacollections/bauhaus-android/issues">Report a bug or share feedback</a>. Include your device model, Android version, and what happened.</p>
+        <p><a href="https://github.com/cascadiacollections/bauhaus-android/releases/tag/nightly-build">Build notes and checksums</a> · <a href="https://github.com/cascadiacollections/bauhaus-android">Source on GitHub</a></p>
+      </section>
+    </main>
   </body>
 </html>
