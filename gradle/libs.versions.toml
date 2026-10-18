@@ -35,7 +35,7 @@ assertk = "0.28.1"
 versionCatalogUpdate = "1.1.1"
 
 detekt = "2.0.0-alpha.6"
-composeRules = "0.6.7"
+composeRules = "0.6.8"
 composeLintChecks = "1.6.1"
 [libraries]
 guava-security = { module = "com.google.guava:guava", version.ref = "guavaSecurity" }
