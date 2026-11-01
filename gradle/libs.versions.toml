@@ -32,7 +32,7 @@ firebaseCrashlyticsPlugin = "3.0.8"
 mockk = "1.14.11"
 turbine = "1.2.1"
 assertk = "0.28.1"
-versionCatalogUpdate = "1.1.1"
+versionCatalogUpdate = "1.1.2"
 
 detekt = "2.0.0-alpha.6"
 composeRules = "0.6.8"
