@@ -16,7 +16,7 @@
         android:shortcutLongLabel="@string/shortcut_set_wallpaper_long">
         <intent
             android:action="com.cascadiacollections.bauhaus.action.SET_TODAY"
-            android:targetPackage="com.cascadiacollections.bauhaus"
+            android:targetPackage="@string/shortcut_target_package"
             android:targetClass="com.cascadiacollections.bauhaus.MainActivity" />
     </shortcut>
 
@@ -28,7 +28,7 @@
         android:shortcutLongLabel="@string/shortcut_browse_archive_long">
         <intent
             android:action="com.cascadiacollections.bauhaus.action.BROWSE_ARCHIVE"
-            android:targetPackage="com.cascadiacollections.bauhaus"
+            android:targetPackage="@string/shortcut_target_package"
             android:targetClass="com.cascadiacollections.bauhaus.MainActivity" />
     </shortcut>
 

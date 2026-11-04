@@ -42,6 +42,7 @@ android {
 
     defaultConfig {
         applicationId = "com.cascadiacollections.bauhaus"
+        resValue("string", "shortcut_target_package", "com.cascadiacollections.bauhaus")
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }
@@ -52,6 +53,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            val suffix = providers.gradleProperty("debugApplicationIdSuffix").orNull
+            if (suffix != null) {
+                applicationIdSuffix = suffix
+                resValue("string", "shortcut_target_package", "com.cascadiacollections.bauhaus$suffix")
+            }
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -74,6 +82,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        resValues = true
     }
 
     flavorDimensions += "mode"

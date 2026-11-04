@@ -111,6 +111,48 @@ and asserted on in CI whenever `.devcontainer/` changes.
 `just install` reads an optional `android.device.serial=` line from
 `local.properties` to target a specific device when several are attached.
 
+### Native builds in Termux
+
+Keep the checkout and Gradle cache in Termux's private home directory. Use its
+Android-native OpenJDK 21 with `-PtermuxBuild=true`; this removes only the Temurin
+vendor requirement, not the Java 21 requirement. Desktop and CI builds keep the
+Temurin pin by default.
+
+An API 37 SDK platform, licensed SDK metadata and Java tools are still required.
+Provide AGP's selected build-tools version as well (currently `36.0.0`).
+Desktop Linux SDK executables do not run on Android: provide Android-native
+`aapt2` and `zipalign` instead (`pkg install aapt aapt2` in Termux). Select the
+resource compiler explicitly:
+
+```bash
+bash ./gradlew assembleFossDebug -PtermuxBuild=true \
+  -Pandroid.aapt2FromMavenOverride="$PREFIX/bin/aapt2" \
+  -Dorg.gradle.native=false -Dorg.gradle.vfs.watch=false --max-workers=2
+```
+
+Add `-PdebugApplicationIdSuffix=.tabletdev` to install debug builds alongside an
+existing app signed by another development machine. This keeps its data and
+wallpaper widget intact; launcher shortcuts target the selected debug package.
+Without this property the application ID is unchanged.
+
+Use the project's Gradle wrapper and keep Git history available for the generated
+version code. Android-native SDK tools must be validated against this project's
+AGP and platform versions; merely installing Java and Gradle is not sufficient.
+
+On a workstation with the `tablet-dev` USB helpers configured, the complete loop
+from the repository root is:
+
+```bash
+tablet-dev loop . assembleFossDebug \
+  app/build/outputs/apk/foss/debug/app-foss-debug.apk \
+  com.cascadiacollections.bauhaus.tabletdev \
+  -PdebugApplicationIdSuffix=.tabletdev
+```
+
+This synchronizes source files, compiles on the tablet, retrieves the signed APK,
+and installs and launches the separate development app. Source synchronization
+does not delete device-only files or update Git history.
+
 ## Release signing
 
 Release builds are signed only when signing material is present. Without it the
