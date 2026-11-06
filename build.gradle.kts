@@ -3,7 +3,7 @@
 buildscript {
     dependencies {
         constraints {
-            classpath("com.google.guava:guava:33.6.0-jre")
+            classpath("com.google.guava:guava:33.8.0-jre")
             classpath("com.squareup.wire:wire-runtime:7.1.2")
             classpath("org.apache.commons:commons-lang3:3.21.0")
             classpath("org.apache.httpcomponents:httpclient:4.5.14")
@@ -25,6 +25,21 @@ plugins {
     alias(libs.plugins.firebase.crashlytics) apply false
     alias(libs.plugins.version.catalog.update)
     alias(libs.plugins.detekt) apply false
+}
+
+// Android Lint runs from its own resolved classpath (androidLintTool), which AGP fills with
+// older Guava, commons-lang3 and httpclient. Patched minimums for that tool classpath only;
+// nothing here reaches the APK.
+val lintToolSecurityConstraints = listOf(
+    "com.google.guava:guava:33.8.0-jre",
+    "org.apache.commons:commons-lang3:3.21.0",
+    "org.apache.httpcomponents:httpclient:4.5.14",
+)
+subprojects {
+    val constraintHandler = dependencies.constraints
+    configurations.matching { it.name == "androidLintTool" }.configureEach {
+        lintToolSecurityConstraints.forEach { dependencyConstraints.add(constraintHandler.create(it)) }
+    }
 }
 
 subprojects {

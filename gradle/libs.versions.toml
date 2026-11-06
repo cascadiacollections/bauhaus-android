@@ -1,6 +1,8 @@
 [versions]
-guavaSecurity = "33.6.0-android"
+guavaSecurity = "33.8.0-android"
 wireSecurity = "7.1.2"
+# benchmark-common 1.5.0 is built against Wire 6; keep its patched minimum on 6.x.
+wireBenchmark = "6.4.7"
 agp = "9.6.0-alpha02"
 macrobenchmark = "1.5.0"
 profileinstaller = "1.4.1"
@@ -41,6 +43,8 @@ composeLintChecks = "1.6.1"
 guava-security = { module = "com.google.guava:guava", version.ref = "guavaSecurity" }
 wire-runtime-security = { module = "com.squareup.wire:wire-runtime", version.ref = "wireSecurity" }
 wire-runtime-jvm-security = { module = "com.squareup.wire:wire-runtime-jvm", version.ref = "wireSecurity" }
+wire-runtime-benchmark = { module = "com.squareup.wire:wire-runtime", version.ref = "wireBenchmark" }
+wire-runtime-jvm-benchmark = { module = "com.squareup.wire:wire-runtime-jvm", version.ref = "wireBenchmark" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
