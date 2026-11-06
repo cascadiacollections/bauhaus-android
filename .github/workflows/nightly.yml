@@ -15,8 +15,39 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Pushes to main already build every merged commit, so a scheduled run
+  # only rebuilds when main has moved since the last successful nightly.
+  # Commits by github-actions[bot] (generated files) do not count. Any API
+  # error falls through to a build.
+  changes:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          last=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nightly.yml/runs?branch=main&status=success&per_page=1" --jq '.workflow_runs[0].head_sha // ""' || true)
+          build=true
+          if [ -n "$last" ]; then
+            new=$(gh api "repos/$GITHUB_REPOSITORY/compare/$last...$GITHUB_SHA" --jq 'if .status == "identical" or .status == "ahead" then [.commits[] | select(.author.login != "github-actions[bot]")] | length else -1 end' || echo -1)
+            if [ "$new" = "0" ]; then build=false; fi
+            echo "last successful nightly: $last; new commits: $new"
+          fi
+          echo "build=$build" | tee -a "$GITHUB_OUTPUT"
+
   build:
-    if: github.ref == 'refs/heads/main'
+    needs: changes
+    if: >-
+      !cancelled() && needs.changes.outputs.build != 'false' &&
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -59,6 +90,9 @@ jobs:
 
   publish:
     needs: build
+    # Explicit result check: `changes` is skipped on push, which would
+    # otherwise skip this job too.
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
