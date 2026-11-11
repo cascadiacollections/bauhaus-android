@@ -39,9 +39,32 @@ updates:
           - "app.cash.turbine*"
           - "androidx.test*"
           - "androidx.benchmark*"
+      # Everything the groups above don't claim (okhttp, coil, detekt, the
+      # buildscript security constraints, ...). Dependabot puts a dependency in
+      # the first group that matches, so this catch-all must stay last.
       # AGP is deliberately not grouped: it is currently tracking an alpha line,
       # and a bump can change build behaviour on its own. It stays reviewable in
       # isolation rather than riding along with library updates.
+      gradle:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "com.android.application"
+          - "com.android.test"
+          - "com.android.tools.build*"
+    ignore:
+      # Wire is declared twice on purpose (gradle/libs.versions.toml): 7.x as
+      # the app's and buildscript's security floor, and 6.x for the benchmark
+      # module because benchmark-common 1.5.0 is built against Wire 6.
+      # Dependabot merges both into one dependency at the lowest version and
+      # tries 6.4.7 -> 7.1.2, which its Gradle updater cannot apply ("No files
+      # changed!"). That failed every weekly run with
+      # record_update_job_unknown_error. Major bumps are made by hand;
+      # minor and patch updates of the 7.x pins still arrive.
+      - dependency-name: "com.squareup.wire:*"
+        update-types: ["version-update:semver-major"]
+    cooldown:
+      default-days: 7
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -52,6 +75,8 @@ updates:
       actions:
         patterns:
           - "*"
+    cooldown:
+      default-days: 7
 
   # The devcontainer's Debian base and its Android SDK layer are part of the
   # enlistment: a stale base is a stale toolchain for everyone who opens the repo
@@ -61,9 +86,19 @@ updates:
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 2
+    groups:
+      docker:
+        patterns: ["*"]
+    cooldown:
+      default-days: 7
 
   - package-ecosystem: "devcontainers"
     directory: "/"
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 2
+    groups:
+      devcontainers:
+        patterns: ["*"]
+    cooldown:
+      default-days: 7

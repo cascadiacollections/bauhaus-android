@@ -11,8 +11,10 @@ import com.cascadiacollections.bauhaus.data.serviceToday
 import java.time.Duration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Before
@@ -59,6 +61,19 @@ class BauhausViewModelPublishedDayTest {
         Dispatchers.resetMain()
     }
 
+    /**
+     * Waits for [BauhausViewModel.setWallpaperNow] to finish.
+     *
+     * Its tail — storing the widget artwork on `Dispatchers.IO` and refreshing
+     * the widget — runs on a real thread after everything these tests assert.
+     * Returning before it settles lets that work outlive the test: it resumes
+     * during teardown or a later test, and anything it throws is charged to the
+     * next `runTest` in the sandbox as `UncaughtExceptionsBeforeTest`.
+     */
+    private suspend fun awaitSetNow(vm: BauhausViewModel) {
+        vm.uiState.first { !it.isSettingWallpaper }
+    }
+
     private fun viewModelWith(savedState: SavedStateHandle, api: FakeBauhausApi = FakeBauhausApi()) = BauhausViewModel(
         RuntimeEnvironment.getApplication(),
         FakeSettingsRepository(RuntimeEnvironment.getApplication()),
@@ -96,7 +111,7 @@ class BauhausViewModelPublishedDayTest {
     }
 
     @Test
-    fun `Set Now stamps the day the service published, not the clock's day`() {
+    fun `Set Now stamps the day the service published, not the clock's day`() = runTest {
         // Before the day's publish the newest artwork is yesterday's. Stamping the
         // clock's day would make the worker skip the run after publishing.
         val published = serviceToday().minusDays(1)
@@ -115,6 +130,7 @@ class BauhausViewModelPublishedDayTest {
         )
 
         vm.setWallpaperNow()
+        awaitSetNow(vm)
 
         assertThat(setter.calls).isEqualTo(1)
         assertThat(api.imageDates).containsExactly(published)
@@ -122,7 +138,7 @@ class BauhausViewModelPublishedDayTest {
     }
 
     @Test
-    fun `Set Now on an unconfirmed newest page asks the service which day it is`() {
+    fun `Set Now on an unconfirmed newest page asks the service which day it is`() = runTest {
         val published = serviceToday().minusDays(1)
         val api = FakeBauhausApi().apply { throwIOException = true }
         val setter = RecordingWallpaperSetter()
@@ -138,13 +154,14 @@ class BauhausViewModelPublishedDayTest {
         api.metadataToReturn = ArtworkMetadata(publishedDateRaw = published.toString())
 
         vm.setWallpaperNow()
+        awaitSetNow(vm)
 
         assertThat(api.imageDates).containsExactly(published)
         assertThat(vm.uiState.value.lastUpdated).isEqualTo(published.toString())
     }
 
     @Test
-    fun `Set Now stamps nothing when the service names no day`() {
+    fun `Set Now stamps nothing when the service names no day`() = runTest {
         val setter = RecordingWallpaperSetter()
         val vm = BauhausViewModel(
             RuntimeEnvironment.getApplication(),
@@ -156,6 +173,7 @@ class BauhausViewModelPublishedDayTest {
         )
 
         vm.setWallpaperNow()
+        awaitSetNow(vm)
 
         assertThat(setter.calls).isEqualTo(1)
         assertThat(fakeApi.todayImageCalls).isEqualTo(1)
