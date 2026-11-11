@@ -11,6 +11,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import kotlin.math.roundToInt
 
 private val json = Json { ignoreUnknownKeys = true }
 
@@ -267,7 +268,7 @@ open class BauhausApi(private val client: OkHttpClient) : BauhausApiClient {
  * Decodes [bytes] into a [Bitmap], scaled to fit [maxWidth] x [maxHeight] when
  * both are > 0.
  *
- * Uses [ImageDecoder] rather than [BitmapFactory] for three reasons that all
+ * Uses [ImageDecoder] rather than [android.graphics.BitmapFactory] for three reasons that all
  * matter for artwork destined to become a wallpaper:
  *
  * - **Exact scaling.** `BitmapFactory.inSampleSize` only halves, so the result
@@ -322,6 +323,6 @@ internal fun scaleToFit(sourceWidth: Int, sourceHeight: Int, maxWidth: Int, maxH
         maxHeight.toDouble() / sourceHeight
     )
     if (scale >= 1.0) return sourceWidth to sourceHeight
-    return maxOf(1, Math.round(sourceWidth * scale).toInt()) to
-        maxOf(1, Math.round(sourceHeight * scale).toInt())
+    return maxOf(1, (sourceWidth * scale).roundToInt()) to
+        maxOf(1, (sourceHeight * scale).roundToInt())
 }
