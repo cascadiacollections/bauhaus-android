@@ -29,6 +29,7 @@ jobs:
         with:
           languages: actions
           build-mode: none
+          queries: security-extended
       - uses: github/codeql-action/analyze@v4
         with:
           category: /language:actions
@@ -64,6 +65,7 @@ jobs:
         with:
           languages: java-kotlin
           build-mode: manual
+          queries: security-extended
 
       # Analyze the shipping flavor without Firebase configuration or cached compilation.
       - name: Build FOSS debug for CodeQL
