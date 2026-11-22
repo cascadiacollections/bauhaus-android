@@ -5,11 +5,11 @@ buildscript {
         constraints {
             classpath("com.google.guava:guava:33.8.0-jre")
             classpath("com.squareup.wire:wire-runtime:7.1.2")
-            classpath("org.apache.commons:commons-lang3:3.21.0")
+            classpath("org.apache.commons:commons-lang3:3.22.0")
             classpath("org.apache.httpcomponents:httpclient:4.5.14")
             classpath("org.bitbucket.b_c:jose4j:0.9.7")
-            classpath("org.bouncycastle:bcpkix-jdk18on:1.86")
-            classpath("org.bouncycastle:bcprov-jdk18on:1.86")
+            classpath("org.bouncycastle:bcpkix-jdk18on:1.87")
+            classpath("org.bouncycastle:bcprov-jdk18on:1.87")
             classpath("org.jdom:jdom2:2.0.6.1")
         }
     }
@@ -32,7 +32,7 @@ plugins {
 // nothing here reaches the APK.
 val lintToolSecurityConstraints = listOf(
     "com.google.guava:guava:33.8.0-jre",
-    "org.apache.commons:commons-lang3:3.21.0",
+    "org.apache.commons:commons-lang3:3.22.0",
     "org.apache.httpcomponents:httpclient:4.5.14",
 )
 subprojects {
