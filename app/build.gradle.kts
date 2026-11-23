@@ -119,12 +119,17 @@ android {
         // red build on every branch, with no change to this repository. While AGP
         // tracks an alpha that fires every few days. Dependabot already opens the
         // bump; CI does not also need to fail until it is merged.
+        //
+        // GradleVersion is the same trap for the wrapper. A patch release (9.9.2
+        // while the repo is on 9.9.1) fails lintFossDebug on every branch until
+        // the wrapper bump lands. Dependabot owns that bump.
         disable += setOf(
             "OldTargetApi",
             "NewerVersionAvailable",
             "ObsoleteSdkInt",
             "GradleDependency",
-            "AndroidGradlePluginVersion"
+            "AndroidGradlePluginVersion",
+            "GradleVersion"
         )
         // Off-by-default checks worth having.
         enable += setOf("StopShip", "WrongThreadInterprocedural", "UnusedIds", "ComposeM2Api")
