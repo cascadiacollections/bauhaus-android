@@ -108,3 +108,33 @@ body{background:#f3f0e6;color:#25271d}
 .strip{grid-template-columns:1fr;gap:10px}
 .process{grid-template-columns:1fr;gap:35px}
 }
+
+/* Seasonal promo (docs/promo.js). The gate is duplicated in index.html so a cached stylesheet cannot reveal it. */
+body .promo-banner,body .promo-section{display:none}
+html.show-banner .promo-banner{display:block}
+html.promo-on .promo-section{display:block}
+.promo-banner{background:#e6bc49;color:#25271d}
+.promo-banner-inner{display:flex;align-items:center;gap:18px;padding:14px 0}
+.promo-banner-inner p{flex:1;min-width:0;margin:0}
+.promo-banner .eyebrow{display:block;margin-bottom:4px}
+.promo-banner .button{flex:none;border-color:#25271d;background:transparent;color:#25271d}
+.promo-banner .button:hover{background:#25271d;color:#f3f0e6}
+.promo-dismiss{flex:none;width:44px;height:44px;margin:0;padding:0;border:1px solid #25271d;border-radius:50%;background:transparent;color:#25271d;font:inherit;font-size:1.35rem;line-height:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.promo-dismiss:hover{background:#25271d;color:#f3f0e6}
+.promo-banner a:focus-visible,.promo-banner button:focus-visible{outline:3px solid #25271d;outline-offset:4px}
+.promo-note{max-width:40rem;border-left:4px solid #e6bc49;padding-left:22px}
+.promo-note h2{margin-bottom:12px}
+.promo-section .button{background:#e6bc49;border-color:#e6bc49;color:#25271d}
+.promo-section .button:hover{background:#25271d;border-color:#25271d;color:#f3f0e6}
+@media(max-width:600px){
+.promo-banner-inner{flex-wrap:wrap;align-items:flex-start;gap:12px}
+.promo-banner-inner p{flex-basis:100%}
+.promo-dismiss{margin-left:auto}
+}
+@media print{
+body .promo-banner{display:none !important}
+}
+@media(forced-colors:active){
+.promo-banner{border-bottom:1px solid CanvasText}
+.promo-dismiss,.promo-banner .button,.promo-section .button{border:1px solid ButtonText}
+}
