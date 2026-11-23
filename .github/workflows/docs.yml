@@ -1,0 +1,21 @@
+name: Site
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  promo:
+    name: Promo window
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Test the marketing-site promo window
+        run: node --test test/site/promo.test.js

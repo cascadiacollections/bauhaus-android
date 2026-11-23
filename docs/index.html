@@ -107,9 +107,24 @@
 </script>
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
+<style>
+/* Gate for the seasonal promo. promo.js adds the html classes during the window, or with ?promo=bf2026. No JS: nothing is shown. */
+body .promo-banner,body .promo-section{display:none}
+html.show-banner .promo-banner{display:block}
+html.promo-on .promo-section{display:block}
+</style>
+<script src="promo.js"></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
+<!-- Seasonal promo. Window and preview live in promo.js (PROMO). Preview: ?promo=bf2026 -->
+<div class="promo-banner" data-promo="bf2026" role="region" aria-label="Black Friday and Cyber Monday">
+<div class="wrap promo-banner-inner">
+<p><span class="eyebrow">November 27 – December 1, 2026</span><strong>Skip the checkout line.</strong> Bauhaus is free every week. No ads, no account, and no tracking in the app we publish.</p>
+<a class="button" href="https://github.com/cascadiacollections/bauhaus-android/releases/download/nightly-build/bauhaus-android-nightly.apk">Download for Android ↗</a>
+<button type="button" class="promo-dismiss" data-promo-dismiss aria-label="Dismiss promotion"><span aria-hidden="true">×</span></button>
+</div>
+</div>
 <div class="wrap">
 <nav aria-label="Main">
 <a class="brand" href="./">
@@ -230,6 +245,14 @@
 <h3>A shortcut to something new.</h3>
 <p class="muted">Use the home-screen widget, Quick Settings tile, or launcher shortcuts to reach your daily artwork.</p>
 </article>
+</div>
+</section>
+<section class="promo-section" aria-labelledby="promo-heading">
+<div class="promo-note">
+<div class="eyebrow">November 27 – December 1, 2026</div>
+<h2 id="promo-heading">Skip the checkout line.</h2>
+<p class="muted">A small alternative for Black Friday and Cyber Monday. Bauhaus is free to download, this week and every week. No ads, no account, and the app we publish includes no analytics, tracking, or crash reporting.</p>
+<a class="button" href="https://github.com/cascadiacollections/bauhaus-android/releases/download/nightly-build/bauhaus-android-nightly.apk">Download for Android ↗</a>
 </div>
 </section>
 <section id="download" class="install">
