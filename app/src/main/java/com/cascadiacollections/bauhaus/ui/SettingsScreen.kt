@@ -45,6 +45,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -59,6 +60,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -66,6 +68,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import coil3.SingletonImageLoader
@@ -224,6 +227,27 @@ internal fun resolvePreviewAspectRatio(metadata: ArtworkMetadata?): Float {
  */
 internal val CONTENT_MAX_WIDTH = 640.dp
 
+/**
+ * Widest the preview card may be for the whole artwork to fit in a window
+ * [viewportHeight] tall.
+ *
+ * The card is as wide as the column, and its height follows the artwork's
+ * ratio, so a wide artwork on a phone held sideways (or a tall one upright)
+ * came out taller than the window: the preview someone decides from could
+ * only be seen a strip at a time. Narrowing the card instead keeps all of it
+ * on screen, with the caption under it.
+ *
+ * Never narrower than [MIN_PREVIEW_WIDTH]: below that the artwork is too
+ * small to judge, and scrolling is the lesser problem.
+ */
+internal fun previewMaxWidth(viewportHeight: Dp, aspectRatio: Float): Dp =
+    ((viewportHeight - PREVIEW_CHROME_HEIGHT) * aspectRatio).coerceAtLeast(MIN_PREVIEW_WIDTH)
+
+/** The column's padding above and below the card (16 dp each) plus the card's caption row. */
+internal val PREVIEW_CHROME_HEIGHT = 72.dp
+
+internal val MIN_PREVIEW_WIDTH = 200.dp
+
 /** Upper bound on remembered prefetch keys; see the LRU in [SettingsScreen]. */
 private const val MAX_TRACKED_PREFETCH_KEYS = 64
 
@@ -304,10 +328,24 @@ fun SettingsScreen(
         }
     }
 
+    var viewportHeightPx by remember { mutableIntStateOf(0) }
+    val previewMaxWidth = with(LocalDensity.current) {
+        // Not measured yet on the first frame: leave the card uncapped.
+        if (viewportHeightPx == 0) {
+            Dp.Infinity
+        } else {
+            previewMaxWidth(viewportHeightPx.toDp(), uiState.previewAspectRatio)
+        }
+    }
+
     PullToRefreshBox(
         isRefreshing = uiState.isRefreshing,
         onRefresh = onRefresh,
-        modifier = modifier.fillMaxSize()
+        // Measured here, outside the scrolling column, where the height is
+        // still the window's: the preview card is sized from it below.
+        modifier = modifier
+            .fillMaxSize()
+            .onSizeChanged { viewportHeightPx = it.height }
     ) {
         Column(
             modifier = Modifier
@@ -332,6 +370,8 @@ fun SettingsScreen(
             val saveImageLabel = stringResource(R.string.save_image)
             Card(
                 modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .widthIn(max = previewMaxWidth)
                     .fillMaxWidth()
                     .onSizeChanged { artworkCardSize = it }
                     // Long-press to save, and nothing on tap. The previous
