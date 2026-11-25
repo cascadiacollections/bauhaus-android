@@ -1,0 +1,37 @@
+Categories:
+  - Wallpaper
+  - Graphics
+License: MIT
+AuthorName: Kevin T. Coughlin
+AuthorWebSite: https://github.com/KevinTCoughlin
+WebSite: https://cascadiacollections.github.io/bauhaus-android/
+SourceCode: https://github.com/cascadiacollections/bauhaus-android
+IssueTracker: https://github.com/cascadiacollections/bauhaus-android/issues
+
+RepoType: git
+Repo: https://github.com/cascadiacollections/bauhaus-android.git
+
+Builds:
+  - versionName: 1.0.1
+    versionCode: 225
+    # Placeholder. Replace with the full SHA of the v1.0.1 tag before submitting.
+    commit: 0000000000000000000000000000000000000000
+    subdir: app
+    gradle:
+      - foss
+    gradleprops:
+      - bauhaus.applicationIdSuffix=.foss
+    rm:
+      - app/src/full
+    prebuild:
+      - sdkmanager "platforms;android-37.0" "build-tools;37.0.0"
+      - sed -i -e '/foojay/d' ../settings.gradle.kts
+      - sed -i -e '/vendor.set(JvmVendorSpec.ADOPTIUM)/d' ../build.gradle.kts
+      - sed -i -e '/libs\.plugins\.google\.services/d' -e '/libs\.plugins\.firebase\.crashlytics/d'
+        ../build.gradle.kts build.gradle.kts
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^v\d+\.\d+\.\d+$
+UpdateCheckData: app/build.gradle.kts|versionCode\s=\s(\d+)|app/build.gradle.kts|versionName\s=\s"([\d.]+)"
+CurrentVersion: 1.0.1
+CurrentVersionCode: 225

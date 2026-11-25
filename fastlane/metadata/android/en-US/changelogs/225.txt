@@ -1,0 +1,4 @@
+Maintenance release.
+
+- Screenshots and icon added to the store listing
+- Corrected the permission list in the description

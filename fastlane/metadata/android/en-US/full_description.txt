@@ -13,7 +13,10 @@ Features:
 Privacy:
 • No account, no sign-in, no ads
 • No analytics, tracking, or crash reporting in this build
-• Two permissions only: INTERNET, to fetch the artwork, and SET_WALLPAPER
+• INTERNET to fetch the artwork and SET_WALLPAPER to apply it. The daily update
+  also uses the network-state, wake-lock, boot and foreground-service permissions
+  that Android's WorkManager adds, and POST_NOTIFICATIONS to report an update you
+  start by hand.
 • Nothing is collected or shared. The app sends no identifiers — it makes plain
   GET requests to the artwork service and nothing else.
 

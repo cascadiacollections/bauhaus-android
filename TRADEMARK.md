@@ -21,6 +21,7 @@ fork or derived product without written permission.
 - Build and install the app from source for yourself, unchanged, including its name and icon
 - Distribute unmodified builds through F-Droid and similar repositories that build from this
   source
+- The official F-Droid build may use the Bauhaus name and icon as `com.cascadiacollections.bauhaus.foss`
 - Use the name "Bauhaus" nominatively: to refer to this project in articles, reviews,
   compatibility notes ("based on Bauhaus"), and attribution
 

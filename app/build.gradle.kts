@@ -17,6 +17,11 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
+// F-Droid builds pass -Pbauhaus.applicationIdSuffix=.foss so the F-Droid install
+// is a separate app from the Play and nightly builds (different signing key).
+// Unset, the applicationId is unchanged.
+val applicationIdSuffixOverride = providers.gradleProperty("bauhaus.applicationIdSuffix").orElse("").get()
+
 android {
     namespace = "com.cascadiacollections.bauhaus"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -42,11 +47,15 @@ android {
 
     defaultConfig {
         applicationId = "com.cascadiacollections.bauhaus"
+        applicationIdSuffix = applicationIdSuffixOverride
+        // Launcher shortcuts need the real package name; see res/xml/shortcuts.xml.
+        resValue("string", "bauhaus_application_id", "com.cascadiacollections.bauhaus$applicationIdSuffixOverride")
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }
-            .standardOutput.asText.get().trim().toIntOrNull() ?: 1
-        versionName = "1.0.0"
+        // Literal values so F-Droid's checkupdates can read them from each tag.
+        // Bump both for every release.
+        versionCode = 225
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -74,6 +83,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        resValues = true
     }
 
     flavorDimensions += "mode"
