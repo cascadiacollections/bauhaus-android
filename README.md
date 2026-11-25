@@ -1,5 +1,7 @@
 # Bauhaus
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/cascadiacollections/bauhaus-android/badge)](https://scorecard.dev/viewer/?uri=github.com/cascadiacollections/bauhaus-android)
+
 A daily artwork wallpaper app for Android.
 
 Each morning the [bauhaus service](https://github.com/cascadiacollections/bauhaus)
