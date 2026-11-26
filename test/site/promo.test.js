@@ -32,12 +32,14 @@ function fakeDocument() {
   const listeners = {};
   const button = { listeners: {}, addEventListener(type, fn) { this.listeners[type] = fn; } };
   const banner = {
+    hidden: true,
     listeners: {},
     addEventListener(type, fn) { this.listeners[type] = fn; },
     querySelector(selector) {
       return selector === "[data-promo-dismiss]" ? button : null;
     },
   };
+  const section = { hidden: true };
   const names = new Set();
   const brand = {
     focused: false,
@@ -48,6 +50,7 @@ function fakeDocument() {
     listeners,
     button,
     banner,
+    section,
     brand,
     documentElement: {
       classList: {
@@ -59,6 +62,7 @@ function fakeDocument() {
     addEventListener(type, fn) { listeners[type] = fn; },
     querySelector(selector) {
       if (selector === ".promo-banner") return banner;
+      if (selector === ".promo-section") return section;
       if (selector === ".brand") return brand;
       return null;
     },
@@ -202,11 +206,13 @@ test("dismissal is a localStorage flag and storage failures stay quiet", () => {
   assert.doesNotThrow(() => promo.writeDismissed(null));
 });
 
-test("mount outside the window adds no classes", () => {
+test("mount outside the window hides the banner and the section", () => {
   const doc = fakeDocument();
+  doc.banner.hidden = false;
+  doc.section.hidden = false;
   promo.mount(doc, { localStorage: memoryStorage(), location: { search: "" } }, atLosAngeles("2026-11-01T12:00:00"));
-  assert.equal(doc.documentElement.classList.contains("promo-on"), false);
-  assert.equal(doc.documentElement.classList.contains("show-banner"), false);
+  assert.equal(doc.banner.hidden, true);
+  assert.equal(doc.section.hidden, true);
 });
 
 test("mount inside the window shows both, and dismiss keeps the section", () => {
@@ -217,13 +223,13 @@ test("mount inside the window shows both, and dismiss keeps the section", () => 
     { localStorage: storage, location: { search: "" } },
     atLosAngeles("2026-11-30T09:00:00")
   );
-  assert.equal(doc.documentElement.classList.contains("promo-on"), true);
-  assert.equal(doc.documentElement.classList.contains("show-banner"), true);
+  assert.equal(doc.banner.hidden, false);
+  assert.equal(doc.section.hidden, false);
 
   doc.button.listeners.click();
   assert.equal(storage.getItem(PROMO.storageKey), "1");
-  assert.equal(doc.documentElement.classList.contains("show-banner"), false);
-  assert.equal(doc.documentElement.classList.contains("promo-on"), true);
+  assert.equal(doc.banner.hidden, true);
+  assert.equal(doc.section.hidden, false);
   assert.equal(doc.brand.focused, true);
 });
 
@@ -237,19 +243,21 @@ test("escape dismisses the banner from the keyboard", () => {
   let prevented = false;
   doc.banner.listeners.keydown({ key: "Tab", preventDefault() { prevented = true; } });
   assert.equal(prevented, false);
-  assert.equal(doc.documentElement.classList.contains("show-banner"), true);
+  assert.equal(doc.banner.hidden, false);
+  assert.equal(doc.section.hidden, false);
 
   doc.banner.listeners.keydown({ key: "Escape", preventDefault() { prevented = true; } });
   assert.equal(prevented, true);
-  assert.equal(doc.documentElement.classList.contains("show-banner"), false);
+  assert.equal(doc.banner.hidden, true);
+  assert.equal(doc.section.hidden, false);
 });
 
 test("a stored dismissal hides the banner on a later visit in the window", () => {
   const doc = fakeDocument();
   const storage = memoryStorage({ [PROMO.storageKey]: "1" });
   promo.mount(doc, { localStorage: storage, location: { search: "" } }, atLosAngeles("2026-11-28T12:00:00"));
-  assert.equal(doc.documentElement.classList.contains("promo-on"), true);
-  assert.equal(doc.documentElement.classList.contains("show-banner"), false);
+  assert.equal(doc.section.hidden, false);
+  assert.equal(doc.banner.hidden, true);
 });
 
 test("preview shows the banner again after dismissal", () => {
@@ -260,8 +268,8 @@ test("preview shows the banner again after dismissal", () => {
     { localStorage: storage, location: { search: "?promo=bf2026" } },
     atLosAngeles("2026-06-01T12:00:00")
   );
-  assert.equal(doc.documentElement.classList.contains("show-banner"), true);
-  assert.equal(doc.documentElement.classList.contains("promo-on"), true);
+  assert.equal(doc.banner.hidden, false);
+  assert.equal(doc.section.hidden, false);
 });
 
 test("dismiss is bound after DOMContentLoaded while the document is loading", () => {
@@ -273,8 +281,12 @@ test("dismiss is bound after DOMContentLoaded while the document is loading", ()
     atLosAngeles("2026-06-01T12:00:00")
   );
   assert.equal(doc.button.listeners.click, undefined);
+  assert.equal(doc.banner.hidden, true);
+  assert.equal(doc.section.hidden, true);
   doc.listeners.DOMContentLoaded();
   assert.equal(typeof doc.button.listeners.click, "function");
+  assert.equal(doc.banner.hidden, false);
+  assert.equal(doc.section.hidden, false);
 });
 
 test("mount survives localStorage being blocked", () => {
@@ -284,8 +296,10 @@ test("mount survives localStorage being blocked", () => {
     location: { search: "?promo=bf2026" },
   };
   assert.doesNotThrow(() => promo.mount(doc, view, atLosAngeles("2026-06-01T12:00:00")));
+  assert.equal(doc.banner.hidden, false);
   assert.doesNotThrow(() => doc.button.listeners.click());
-  assert.equal(doc.documentElement.classList.contains("show-banner"), false);
+  assert.equal(doc.banner.hidden, true);
+  assert.equal(doc.section.hidden, false);
 });
 
 test("rejects a local time that is not second precision", () => {
@@ -293,11 +307,17 @@ test("rejects a local time that is not second precision", () => {
 });
 
 test("the page hides the promo unless script opts in, with no third-party code", () => {
-  assert.match(html, /body \.promo-banner,body \.promo-section\{display:none\}/);
-  assert.match(html, /html\.show-banner \.promo-banner\{display:block\}/);
-  assert.match(html, /html\.promo-on \.promo-section\{display:block\}/);
+  const gate = ".promo-banner[hidden],.promo-section[hidden],.promo-banner[hidden] *,.promo-section[hidden] *{display:none !important}";
+  assert.match(html, /class="promo-banner"[^>]*\shidden[\s>]/);
+  assert.match(html, /class="promo-section"[^>]*\shidden[\s>]/);
+  assert.ok(html.includes(gate));
+  const section = sliceBetween(html, 'class="promo-section"', "</section>");
+  assert.ok(section.indexOf("hidden") < section.indexOf('id="promo-heading"'));
   assert.equal(source.includes('classList.add("promo-banner")'), false);
-  assert.match(source, /classList\.add\("show-banner"\)/);
+  assert.equal(source.includes('classList.add("promo-on")'), false);
+  assert.equal(source.includes('classList.add("show-banner")'), false);
+  assert.match(source, /section\.hidden = !decision\.showSection/);
+  assert.match(source, /banner\.hidden = !decision\.showBanner/);
   const styleAt = html.indexOf("<style>");
   const scriptAt = html.indexOf('<script src="promo.js">');
   const bodyAt = html.indexOf("<body>");
@@ -342,9 +362,7 @@ test("promo styles keep a visible focus treatment and do not animate", () => {
   const promoCss = css.slice(css.indexOf("Seasonal promo"));
   assert.ok(promoCss.length > 40);
   assert.match(css, /@media\(prefers-reduced-motion:reduce\)/);
-  assert.match(promoCss, /body \.promo-banner,body \.promo-section\{display:none\}/);
-  assert.match(promoCss, /html\.show-banner \.promo-banner\{display:block\}/);
-  assert.match(promoCss, /html\.promo-on \.promo-section\{display:block\}/);
+  assert.match(promoCss, /\.promo-banner\[hidden\],\.promo-section\[hidden\],\.promo-banner\[hidden\] \*,\.promo-section\[hidden\] \*\{display:none !important\}/);
   assert.match(promoCss, /\.promo-banner a:focus-visible,\.promo-banner button:focus-visible\{outline:3px solid #25271d/);
   assert.match(promoCss, /@media print\{[\s\S]*body \.promo-banner\{display:none !important\}/);
   assert.doesNotMatch(promoCss, /animation\s*:/);

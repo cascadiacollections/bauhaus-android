@@ -4,9 +4,11 @@
  * Black Friday / Cyber Monday window for the marketing site.
  *
  * Edit PROMO to move the campaign. docs/ is served as-is by GitHub Pages
- * (no site build), so this client-side check is the gate. index.html repeats
- * PROMO.label, PROMO.id, and the preview query; test/site/promo.test.js
- * fails if those drift.
+ * (no site build), so this client-side check is the gate. The banner and the
+ * section ship with the hidden attribute, and mount() removes it only while
+ * the block should show. That hides the heading with the rest of the block.
+ * index.html repeats PROMO.label, PROMO.id, and the preview query;
+ * test/site/promo.test.js fails if those drift.
  *
  * start is inclusive. endExclusive is the first instant the promo is off.
  * Both are wall-clock times in timeZone, so 2026-12-02T00:00:00 means
@@ -130,26 +132,31 @@ function writeDismissed(storage) {
   }
 }
 
+function applyVisibility(doc, decision) {
+  var banner = doc.querySelector(".promo-banner");
+  var section = doc.querySelector(".promo-section");
+  // The hidden attribute covers the whole element, heading included.
+  // Removing it is the only way the block is shown.
+  if (section) section.hidden = !decision.showSection;
+  if (banner) banner.hidden = !decision.showBanner;
+  return banner;
+}
+
 function mount(doc, view, now) {
   var decision = decide({
     now: now || new Date(),
     search: (view.location && view.location.search) || "",
     dismissed: readDismissed(storageOf(view)),
   });
-  var root = doc.documentElement;
-  // show-banner is intentionally not the element class. A "promo-banner" class
-  // on <html> would match the hide rule and blank the page.
-  if (decision.showSection) root.classList.add("promo-on");
-  if (decision.showBanner) root.classList.add("show-banner");
 
   var bind = function () {
-    var banner = doc.querySelector(".promo-banner");
+    var banner = applyVisibility(doc, decision);
     if (!banner) return;
     var button = banner.querySelector("[data-promo-dismiss]");
     if (!button) return;
     var dismiss = function () {
       writeDismissed(storageOf(view));
-      root.classList.remove("show-banner");
+      banner.hidden = true;
       var brand = doc.querySelector(".brand");
       if (brand && typeof brand.focus === "function") {
         brand.focus({ preventScroll: true });

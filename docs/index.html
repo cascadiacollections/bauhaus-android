@@ -108,17 +108,18 @@
 <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 <style>
-/* Gate for the seasonal promo. promo.js adds the html classes during the window, or with ?promo=bf2026. No JS: nothing is shown. */
-body .promo-banner,body .promo-section{display:none}
-html.show-banner .promo-banner{display:block}
-html.promo-on .promo-section{display:block}
+/* Gate for the seasonal promo. The banner and section ship with hidden.
+   promo.js removes it during the window, or with ?promo=bf2026.
+   display:none !important stops an author display rule, including on the
+   heading, from overriding hidden. No JS: nothing is shown. */
+.promo-banner[hidden],.promo-section[hidden],.promo-banner[hidden] *,.promo-section[hidden] *{display:none !important}
 </style>
 <script src="promo.js"></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 <!-- Seasonal promo. Window and preview live in promo.js (PROMO). Preview: ?promo=bf2026 -->
-<div class="promo-banner" data-promo="bf2026" role="region" aria-label="Black Friday and Cyber Monday">
+<div class="promo-banner" data-promo="bf2026" hidden role="region" aria-label="Black Friday and Cyber Monday">
 <div class="wrap promo-banner-inner">
 <p><span class="eyebrow">November 27 – December 1, 2026</span><strong>Skip the checkout line.</strong> Bauhaus is free every week. No ads, no account, and no tracking in the app we publish.</p>
 <a class="button" href="https://github.com/cascadiacollections/bauhaus-android/releases/download/nightly-build/bauhaus-android-nightly.apk">Download for Android ↗</a>
@@ -247,7 +248,7 @@ html.promo-on .promo-section{display:block}
 </article>
 </div>
 </section>
-<section class="promo-section" aria-labelledby="promo-heading">
+<section class="promo-section" hidden aria-labelledby="promo-heading">
 <div class="promo-note">
 <div class="eyebrow">November 27 – December 1, 2026</div>
 <h2 id="promo-heading">Skip the checkout line.</h2>
