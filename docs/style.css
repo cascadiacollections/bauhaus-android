@@ -109,10 +109,10 @@ body{background:#f3f0e6;color:#25271d}
 .process{grid-template-columns:1fr;gap:35px}
 }
 
-/* Seasonal promo (docs/promo.js). The gate is duplicated in index.html so a cached stylesheet cannot reveal it. */
-body .promo-banner,body .promo-section{display:none}
-html.show-banner .promo-banner{display:block}
-html.promo-on .promo-section{display:block}
+/* Seasonal promo (docs/promo.js). Hidden until the script removes the attribute.
+   The same rule is in index.html so a cached stylesheet cannot reveal the
+   block, heading included, by overriding [hidden] with a display value. */
+.promo-banner[hidden],.promo-section[hidden],.promo-banner[hidden] *,.promo-section[hidden] *{display:none !important}
 .promo-banner{background:#e6bc49;color:#25271d}
 .promo-banner-inner{display:flex;align-items:center;gap:18px;padding:14px 0}
 .promo-banner-inner p{flex:1;min-width:0;margin:0}
